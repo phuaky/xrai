@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "xrai",
+  "version": "1.0.0",
+  "description": "Local AI tweet filter. Signal stays, noise disappears.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://x.com/*",
+    "https://twitter.com/*",
+    "http://localhost:11434/*"
+  ],
+  "background": {
+    "service_worker": "background/worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "js": [
+        "lib/memory.js",
+        "lib/ollama.js",
+        "lib/config.js",
+        "content/prefilter.js",
+        "content/detector.js",
+        "content/viewport.js",
+        "content/classifier.js",
+        "content/hider.js",
+        "content/reply.js",
+        "content/indicator.js",
+        "content/main.js"
+      ],
+      "css": ["content/styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {}
+}
