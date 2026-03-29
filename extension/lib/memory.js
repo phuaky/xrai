@@ -139,6 +139,8 @@ const XraiMemory = (function () {
   // Stores every classification decision with full context
   var CLASSIFICATIONS_KEY = 'xrai_classifications';
   var MAX_CLASSIFICATIONS = 1000;
+  var COLLECTOR_URL = 'http://localhost:11435';
+  var FLUSH_EVERY = 100; // auto-send to collector every N entries
 
   function logClassification(tweetText, mediaType, prediction, confidence, source) {
     return new Promise(function (resolve) {
@@ -149,15 +151,31 @@ const XraiMemory = (function () {
           mediaType: mediaType || 'text',
           prediction: prediction,
           confidence: confidence || 0,
-          source: source || 'unknown', // 'prefilter', 'model', 'memory', 'default'
+          source: source || 'unknown',
           timestamp: Date.now()
         });
+        // Auto-flush to local collector every FLUSH_EVERY entries
+        if (log.length >= FLUSH_EVERY) {
+          flushToCollector(log);
+          log = []; // clear after sending
+        }
         if (log.length > MAX_CLASSIFICATIONS) log = log.slice(-MAX_CLASSIFICATIONS);
         var obj = {};
         obj[CLASSIFICATIONS_KEY] = log;
         chrome.storage.local.set(obj, function () { resolve(); });
       });
     });
+  }
+
+  function flushToCollector(entries) {
+    // Fire and forget — don't block if collector isn't running
+    try {
+      fetch(COLLECTOR_URL + '/classifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entries)
+      }).catch(function () { /* collector not running, that's fine */ });
+    } catch (e) { /* ignore */ }
   }
 
   function getClassifications() {
