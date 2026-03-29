@@ -15,7 +15,10 @@ When you find a signal tweet worth replying to, xrai generates reply suggestions
 ```
 Tweet appears → Already seen? → HIDE
                      ↓ new
+              Has tech/AI keywords? → pass to AI (safelist)
+                     ↓ no
               Obvious spam/bait? → HIDE (regex, instant)
+              Entertainment/video? → HIDE (prefilter)
                      ↓ passes
               On screen 500ms? → classify with local AI
                      ↓
@@ -24,30 +27,31 @@ Tweet appears → Already seen? → HIDE
 ```
 
 **5-dimension scoring** (each 0 or 1):
+- **Relevant** — Is this about tech, AI, coding, startups?
 - **Novelty** — New info or recycled take?
 - **Specificity** — Concrete details or vague claims?
 - **Density** — High insight-to-word ratio?
-- **Authenticity** — Genuine sharing or engagement farming?
 - **Actionable** — Can you learn/use/apply this?
 
 ## Setup
 
 ### 1. Install Ollama
 
-Download from [ollama.ai](https://ollama.ai). On Mac, it auto-starts on login.
+Download from [ollama.ai](https://ollama.ai). On Mac, it sits in the menubar and auto-starts on login.
 
 ### 2. Pull a model
 
 ```bash
 ollama pull gemma2:2b    # recommended: 93% accuracy, 210ms, 1.6GB
+ollama pull phi4-mini    # backup: 91% accuracy, 285ms, 2.5GB (optional)
 ```
 
-**Benchmarked models** (on 45 real tweets, Apple Silicon):
+**Benchmarked models** (45 real tweets, Apple Silicon M5 Pro):
 
 | Model | Accuracy | Speed | Size |
 |-------|----------|-------|------|
 | `gemma2:2b` | **93%** | **210ms** | 1.6 GB |
-| `phi4-mini` | 91% | 285ms | 2.5 GB |
+| `phi4-mini` | 93% | 285ms | 2.5 GB |
 
 ### 3. Load the extension
 
@@ -56,39 +60,73 @@ ollama pull gemma2:2b    # recommended: 93% accuracy, 210ms, 1.6GB
 3. Click **Load unpacked** → select the `extension/` folder
 4. Go to [x.com](https://x.com) and scroll
 
-### 4. Look for the indicator
+### 4. Start the data collector (optional)
 
-A small pill appears in the bottom-right corner:
+The extension logs every classification. To save this data to your local machine for improving filters:
 
+```bash
+node scripts/collector.js              # saves to data/classifications.jsonl
+node scripts/collector.js --improve    # also auto-runs improve script every 200 entries
 ```
-xrai: 12 shown | 31 hidden | local ●
-```
 
-Click the gear icon to adjust settings (model, aggressiveness, hide method).
+The collector runs on `localhost:11435`. The extension auto-sends every 100 classifications. If the collector isn't running, no problem — the extension works fine without it.
 
 ## Features
 
-- **Local-first** — All AI runs on your machine via Ollama
-- **Content memory** — Never see the same tweet twice across sessions
-- **Pre-filter** — Regex catches obvious noise instantly (NSFW, spam, clickbait) before the model
+- **Local-first** — All AI runs on your machine via Ollama. No cloud, no API keys
+- **Tech-focused** — Tuned for AI engineers and entrepreneurs. Tech/AI tweets safelisted
+- **Content memory** — Never see the same tweet twice across sessions (IndexedDB fingerprints)
+- **Pre-filter** — 7 regex categories catch obvious noise instantly: NSFW, spam, engagement bait, clickbait, entertainment, short-video-non-tech, ultra-short text
 - **Viewport-aware** — Only classifies tweets you actually look at (saves compute)
 - **Reply generation** — Copy-paste only, never auto-posts
 - **Rate limited** — 20 model calls/min max, debounced DOM observer
-- **Self-improving** — Correction tracking + meta-learning script
+- **Self-improving** — Classification data collected automatically, feeds into improvement pipeline
 
-## Self-improving filters
+## Data Collection & Self-Improving Filters
 
-xrai tracks when you disagree with its classification. After ~200 corrections, run the improve script:
+xrai automatically logs every classification decision (tweet text, media type, prediction, confidence, source).
+
+### Automatic pipeline
 
 ```bash
-# Export corrections from extension (in Chrome DevTools console):
-# chrome.storage.local.get('xrai_corrections', r => copy(JSON.stringify(r.xrai_corrections)))
+# 1. Start the collector (runs alongside the extension)
+node scripts/collector.js --improve
 
-# Analyze and generate improvements:
-node scripts/improve.js corrections.json
+# 2. Browse x.com normally
+#    Extension auto-sends data every 100 tweets
+
+# 3. At 200 new entries, collector auto-runs improve analysis
+#    Output: patterns in misclassifications + suggested regex/prompt fixes
 ```
 
-This generates a prompt you can pipe to `claude -p` to get updated regex patterns and prompt adjustments.
+### Manual pipeline
+
+```bash
+# Export from Chrome DevTools console on x.com:
+chrome.storage.local.get('xrai_classifications', r => copy(JSON.stringify(r.xrai_classifications)))
+
+# Save to file and analyze:
+node scripts/improve.js classifications.json
+
+# Pipe to Claude for AI-generated improvements:
+node scripts/improve.js classifications.json | claude -p
+```
+
+### Data format
+
+Classifications stored as JSONL in `data/classifications.jsonl`:
+
+```json
+{"text":"Just shipped a feature...","mediaType":"text","prediction":"signal","confidence":0.92,"source":"model","timestamp":1743282000}
+{"text":"this is so good 😂","mediaType":"video","prediction":"noise","confidence":0.80,"source":"prefilter:short-video-non-tech","timestamp":1743282001}
+```
+
+### Running benchmarks
+
+```bash
+# Test model accuracy on 45 labeled tweets
+node benchmarks/benchmark.js
+```
 
 ## X Terms of Service
 
@@ -107,26 +145,29 @@ xrai/
 ├── extension/
 │   ├── manifest.json        # Chrome Manifest V3
 │   ├── content/
-│   │   ├── detector.js      # Tweet detection (MutationObserver)
-│   │   ├── prefilter.js     # Regex instant noise filter
-│   │   ├── viewport.js      # Only classify visible tweets
-│   │   ├── classifier.js    # Ollama batch queue
-│   │   ├── hider.js         # Hide/blur noise tweets
-│   │   ├── reply.js         # Reply generation (copy-paste)
+│   │   ├── detector.js      # Tweet detection (MutationObserver, debounced)
+│   │   ├── prefilter.js     # Regex noise filter (7 categories + tech safelist)
+│   │   ├── viewport.js      # Only classify visible tweets (IntersectionObserver)
+│   │   ├── classifier.js    # Ollama batch queue (rate limited)
+│   │   ├── hider.js         # Hide/blur/collapse noise tweets
+│   │   ├── reply.js         # Reply generation (copy-paste only)
 │   │   ├── indicator.js     # Status pill UI
 │   │   ├── main.js          # Orchestrator
 │   │   └── styles.css
 │   ├── lib/
-│   │   ├── memory.js        # Content fingerprint store (IndexedDB)
-│   │   ├── ollama.js        # Ollama API client
-│   │   └── config.js        # User preferences
+│   │   ├── memory.js        # Fingerprints (IndexedDB) + classification log + corrections
+│   │   ├── ollama.js        # Ollama API client + classification prompt
+│   │   └── config.js        # User preferences (chrome.storage.local)
 │   └── background/
-│       └── worker.js        # Service worker (Ollama proxy)
+│       └── worker.js        # Service worker (Ollama HTTP proxy)
 ├── scripts/
-│   └── improve.js           # Meta-learning script
+│   ├── collector.js         # Local data collector (port 11435)
+│   └── improve.js           # Meta-learning analysis script
 ├── benchmarks/
-│   └── benchmark.js         # Model speed/accuracy tests
-└── SPEC.md                  # Full architecture spec
+│   └── benchmark.js         # Model speed/accuracy tests (45 tweets)
+├── data/                    # Local classification data (gitignored)
+├── SPEC.md                  # Full architecture spec
+└── CLAUDE.md                # Dev instructions for AI assistants
 ```
 
 ## License
