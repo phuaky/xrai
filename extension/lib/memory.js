@@ -135,6 +135,46 @@ const XraiMemory = (function () {
     });
   }
 
+  // === Classification log (for training/improving prompts) ===
+  // Stores every classification decision with full context
+  var CLASSIFICATIONS_KEY = 'xrai_classifications';
+  var MAX_CLASSIFICATIONS = 1000;
+
+  function logClassification(tweetText, mediaType, prediction, confidence, source) {
+    return new Promise(function (resolve) {
+      chrome.storage.local.get(CLASSIFICATIONS_KEY, function (result) {
+        var log = result[CLASSIFICATIONS_KEY] || [];
+        log.push({
+          text: (tweetText || '').substring(0, 300),
+          mediaType: mediaType || 'text',
+          prediction: prediction,
+          confidence: confidence || 0,
+          source: source || 'unknown', // 'prefilter', 'model', 'memory', 'default'
+          timestamp: Date.now()
+        });
+        if (log.length > MAX_CLASSIFICATIONS) log = log.slice(-MAX_CLASSIFICATIONS);
+        var obj = {};
+        obj[CLASSIFICATIONS_KEY] = log;
+        chrome.storage.local.set(obj, function () { resolve(); });
+      });
+    });
+  }
+
+  function getClassifications() {
+    return new Promise(function (resolve) {
+      chrome.storage.local.get(CLASSIFICATIONS_KEY, function (result) {
+        resolve(result[CLASSIFICATIONS_KEY] || []);
+      });
+    });
+  }
+
+  function exportAll() {
+    // Export both classifications and corrections as JSON for improve script
+    return Promise.all([getClassifications(), getCorrections()]).then(function (results) {
+      return JSON.stringify({ classifications: results[0], corrections: results[1] }, null, 2);
+    });
+  }
+
   // === Correction tracking (for meta-learning) ===
   // Stored in chrome.storage.local so the improve script can read via export
 
@@ -199,6 +239,9 @@ const XraiMemory = (function () {
     pruneOld: pruneOld,
     getStats: getStats,
     clearAll: clearAll,
+    logClassification: logClassification,
+    getClassifications: getClassifications,
+    exportAll: exportAll,
     saveCorrection: saveCorrection,
     getCorrections: getCorrections,
     getCorrectionCount: getCorrectionCount,

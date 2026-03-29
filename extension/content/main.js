@@ -94,6 +94,7 @@ var XraiMain = (function () {
       if (pfResult) {
         XraiHider.hide(el, config ? config.hideMethod : 'remove');
         XraiMemory.markSeen(fp, 'noise');
+        XraiMemory.logClassification(data.text, data.mediaType, 'noise', pfResult.confidence, 'prefilter:' + pfResult.reason);
         XraiIndicator.incrementHidden();
         return;
       }
@@ -101,6 +102,7 @@ var XraiMain = (function () {
       // Step 4: If Ollama unavailable, show by default (pre-filter already caught obvious noise)
       if (!ollamaAvailable) {
         XraiMemory.markSeen(fp, 'signal');
+        XraiMemory.logClassification(data.text, data.mediaType, 'signal', 0.5, 'default');
         XraiIndicator.incrementShown();
         XraiReply.attachReplyButton(el, data);
         return;
@@ -114,9 +116,11 @@ var XraiMain = (function () {
           if (result.prediction === 'noise' && result.confidence >= threshold) {
             XraiHider.hide(el, config ? config.hideMethod : 'remove');
             XraiMemory.markSeen(fp, 'noise');
+            XraiMemory.logClassification(viewportData.text, viewportData.mediaType, 'noise', result.confidence, 'model');
             XraiIndicator.incrementHidden();
           } else {
             XraiMemory.markSeen(fp, 'signal');
+            XraiMemory.logClassification(viewportData.text, viewportData.mediaType, 'signal', result.confidence, 'model');
             XraiIndicator.incrementShown();
             XraiReply.attachReplyButton(el, viewportData);
           }
