@@ -3,10 +3,10 @@
 
 const OLLAMA_URL = 'http://localhost:11434';
 
-const MODELS = ['gemma2:2b', 'gemma3:1b', 'gemma3:4b', 'qwen3:1.7b', 'qwen3:4b', 'phi4-mini'];
+const MODELS = ['gemma2:2b', 'phi4-mini'];
 
-// 50 test tweets with expected labels (25 signal, 25 noise)
-// Includes synthetic + real tweets scraped from timeline 2026-03-30
+// 78 test tweets with expected labels (38 signal, 40 noise)
+// Sources: synthetic + timeline 2026-03-30 + bookmarks extraction
 const TEST_TWEETS = [
   // ═══════════════════════════════════════════════
   // SIGNAL tweets — tech, insightful, specific
@@ -35,6 +35,26 @@ const TEST_TWEETS = [
   { text: "Claire Vo's first day with OpenClaw it deleted her family calendar. Now she runs 9 agents across 3 Mac Minis, and said \"I haven't felt like this since I was a teenager learning to code.\" Her sales agent Sam does a daily CRM sweep, identifies decision-makers from new signups.", expected: 'signal', author: '@lennysan' },
   { text: "The only 4 jobs that will remain at tech companies.", expected: 'signal', media: 'image', author: '@chintanzalani' },
   { text: "No electricity, no battery, Swiss movement tropical fan from 1910. The full wind lasts about 30 minutes. It still works.", expected: 'signal', media: 'video', author: '@BrianRoemmele' },
+
+  // Real signal — from bookmarks
+  { text: "prediction re the end of spreadsheets. AI code gen means that anything that is currently modeled as a spreadsheet is better modeled in code. You get all the advantages of software - libraries, open source, AI, all the complexity and expressiveness.", expected: 'signal', author: '@andrewchen' },
+  { text: "people are buying rigs worth thousands of dollars while your five year old GPUs can run 9B parameter open source LLMs", expected: 'signal', media: 'image', author: '@aviral10x' },
+  { text: "I'm not the only one doing this. - karpathy best thought leader, best person to learn from imo. Nanochat is the best way to get into training LLMs its the simplest and most digestible source for building your first AI model", expected: 'signal', media: 'image', author: '@0xSero' },
+  { text: "When someone signs up to your SaaS, grab their email domain, get a summary from Firecrawl, have an LLM generate you the best starting keywords/configuration/demo project", expected: 'signal', author: '@arvidkahl' },
+  { text: "I mass launched 70+ startups since 2013. Here's my stack: a $5/month VPS, PHP, jQuery, SQLite. No frameworks. No dependencies. No team. $2.7M ARR.", expected: 'signal', author: '@levelsio' },
+  { text: "Every page on all of my sites has a screenshot for og:image social media cards. Remote OK has 1.7 million user profiles, millions of job filter combo pages.", expected: 'signal', author: '@levelsio' },
+  { text: "Structured outputs are the most underrated feature in LLM APIs. Stop parsing markdown. Just define a schema.", expected: 'signal', author: '@jxnlco' },
+  { text: "LangGraph just hit 1M downloads. The shift from chains to graphs is real. Agents need cycles, not pipelines.", expected: 'signal', author: '@hwchase17' },
+  { text: "Tailwind CSS v4 alpha is out. New engine, 10x faster builds, and native CSS cascade layers.", expected: 'signal', author: '@adamwathan' },
+  { text: "Gumroad hit $200M in creator payouts. Our team is 3 people. SaaS doesn't need to be complicated.", expected: 'signal', author: '@shl' },
+  { text: "DeepSeek-R1 is here! Performance on par with OpenAI-o1. Fully open-source model.", expected: 'signal', author: '@deepseek_ai' },
+  { text: "Firecrawl v2 can now extract structured data from any website. No more parsing HTML. Just define your schema and go.", expected: 'signal', author: '@nickscamara_' },
+  { text: "80% of auditing is codebase understanding. How can you make someone faster at understanding code?", expected: 'signal', author: '@0xjimmyk' },
+  { text: "Used deep research to extract common keywords, product mentions, and painpoints from subreddits", expected: 'signal', author: '@mayowaoshin' },
+  { text: "Crazy story how we built Cursor Directory in 3 hours and gathered over 1.1M views.", expected: 'signal', media: 'image', author: '@pontusab' },
+  { text: "the only things you need to know: your account has a base score and it runs before your tweet is evaluated: verified accounts: +100 automatic unverified accounts: max +55 then multiplied by your follower ratio", expected: 'signal', author: '@retardmode' },
+  { text: "If only someone told me this before my 1st startup: 1. Validate. I wasted at least 5 years building things nobody wanted.", expected: 'signal', author: '@johnrushx' },
+  { text: "I spent 6 months building an AI writing tool nobody wanted. Then I pivoted to a simple grammar checker and got 50k users in 2 weeks.", expected: 'signal', author: '@JamesBorrell' },
 
   // ═══════════════════════════════════════════════
   // NOISE tweets — bait, vague, engagement farming
@@ -68,20 +88,52 @@ const TEST_TWEETS = [
   { text: "One great thing about SF is that you can see criminals just roaming the street!", expected: 'noise', author: '@mil0theminer' },
   { text: "A moving man will meet his luck", expected: 'noise', author: '@Adikastakes' },
   { text: "Ever wondered how Olympics can become more sustainable, efficient and intelligent?", expected: 'noise', author: '@AlibabaGroup' },
+
+  // Real noise — from bookmarks (video bait, vague, entertainment)
+  { text: "Test if you can read at 900 words per minute with this technique", expected: 'noise', media: 'video', author: '@InternetH0F' },
+  { text: "iPhone 13 battery cell replacement", expected: 'noise', media: 'video', author: '@_Brainboxx' },
+  { text: "Gym etiquette final boss", expected: 'noise', media: 'video', author: '@unhingedfeed' },
+  { text: "your favorite founders' favorite founder", expected: 'noise', media: 'video', author: '@jacobandreou' },
+  { text: "This new anime season is looking cool. Would you watch this?", expected: 'noise', media: 'video', author: '@Leaflit' },
+  { text: "Ever heard of the Michelangelo effect?", expected: 'noise', media: 'video', author: '@manly_mentor' },
+  { text: "goodnight", expected: 'noise', author: '@Abhinavstwt' },
+  { text: "The danger that's killing your long term health: Muscle loss. Here's what happens: Memory loss, Trouble walking, Chronic disease. But luckily there is a simple answer. Here is your ultimate guide.", expected: 'noise', media: 'image', author: '@theoliveranwar' },
+  { text: "Start building your moat now it's not too late", expected: 'noise', media: 'image', author: '@boringmarketer' },
+  { text: "The fastest way to change your life isn't: Starting a business, Investing in crypto. It's fixing your sleep.", expected: 'noise', author: '@edendotso' },
+  { text: "How to do marketing (If you are Solopreneurs who sucks at marketing)", expected: 'noise', media: 'image', author: '@DanKulkov' },
+  { text: "Back pain? This is the one book you need. I know someone who only read the description and got better.", expected: 'noise', media: 'image', author: '@julianweisser' },
+  { text: "Your pitch deck is losing you money.", expected: 'noise', media: 'image', author: '@KevinHenrikson' },
+  { text: "The 7 best free AI tools that will save you 100+ hours a week", expected: 'noise', media: 'image', author: '@alexfinnx' },
+  { text: "Everything you need to know about building a $1M agency", expected: 'noise', media: 'image', author: '@charlierward' },
+
+  // Real noise — from chrome.storage classifications (misclassified by model)
+  { text: "THIS GUY BUILT AN APP MASCOT THAT CAN EAT, SLEEP, AND CHANGE COLOR USING A STATE MACHINE.", expected: 'noise', media: 'video' },
+  { text: "2098x 209,700% gain in one call. Someone in our private tg channel caught $PIXEL at $2.4K before flying to $10m", expected: 'noise', media: 'image' },
+  { text: "THE TICKER IS $___", expected: 'noise' },
+  { text: "WEB 3 SOCIAL MEDIA JUST GOT A LOT EASIER TO BUILD", expected: 'noise', media: 'video' },
+  { text: "NOTHING BEATS A MONDAY MORNING PUMP", expected: 'noise', media: 'image' },
+  { text: "If you want to build a startup that makes real money, here's what actually works", expected: 'noise' },
+  { text: "Every SaaS founder should know this pricing trick", expected: 'noise' },
+  { text: "GM CT SAY IT BACK", expected: 'noise', media: 'image' },
+
+  // Real signal — from chrome.storage classifications (correctly classified)
+  { text: "DefiLlama launched an MCP that brings onchain data directly to AI agent. 23 tools covering data across protocols.", expected: 'signal', media: 'video' },
+  { text: "This is nuts: Clawdbot figured out how to transcribe and respond to a voice message on its own, detecting the Opus format, converting to wav, transcribing", expected: 'signal' },
+  { text: "PimEyes has been doing this since 2017. The scary part isn't the technology. It's that most people are only finding out now.", expected: 'signal' },
 ];
 
-const SYSTEM_PROMPT = `You classify tweets as signal or noise. Output ONLY valid JSON, nothing else.
+const SYSTEM_PROMPT = `You classify tweets as signal or noise. Output ONLY valid JSON.
+Score 4 dimensions (0 or 1 each):
+- NOVELTY: New info (1) or recycled take (0)?
+- SPECIFICITY: Concrete details (1) or vague claims (0)?
+- DENSITY: High insight per word (1) or filler (0)?
+- AUTHENTICITY: Genuine sharing (1) or engagement farming (0)?
 
-Score on 4 dimensions (0 or 1):
-1. NOVELTY - New info or recycled take?
-2. SPECIFICITY - Concrete details or vague?
-3. DENSITY - High insight-to-word ratio?
-4. AUTHENTICITY - Genuine or engagement bait?
+NOISE indicators: ALL CAPS text, vague hype ("insane", "wild", "crazy"), video+short text, no concrete details, crypto pumps.
+SIGNAL indicators: specific numbers/tools/results, personal experience with details, technical content.
 
-Score 3-4 = signal. Score 0-2 = noise.
-If tweet has video/image with vague text, lean noise.
-
-Output format: {"prediction":"signal" or "noise","confidence":0.0-1.0}`;
+Score 3-4 = signal (confidence 0.75-0.95). Score 0-2 = noise (confidence 0.75-0.95). Score 2 with some specifics = noise confidence 0.6.
+Output: {"prediction":"signal"|"noise","confidence":0.6-0.95}`;
 
 async function classifyTweet(model, tweet) {
   const userMsg = tweet.media

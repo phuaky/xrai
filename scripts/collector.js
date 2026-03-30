@@ -18,6 +18,7 @@ const path = require('path');
 const PORT = 11435;
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const CLASSIFICATIONS_FILE = path.join(DATA_DIR, 'classifications.jsonl');
+const MODEL_LOG_FILE = path.join(DATA_DIR, 'model-io.jsonl');
 const STATS_FILE = path.join(DATA_DIR, 'stats.json');
 const AUTO_IMPROVE = process.argv.includes('--improve');
 const IMPROVE_THRESHOLD = 200;
@@ -102,6 +103,39 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ error: e.message }));
       }
     });
+    return;
+  }
+
+  // Receive model I/O log — every single model call with input + raw output
+  if (req.method === 'POST' && req.url === '/model-log') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const entry = JSON.parse(body);
+        fs.appendFileSync(MODEL_LOG_FILE, JSON.stringify(entry) + '\n');
+        console.log(`[collector] model-io: ${entry.prediction} (${entry.confidence}) ${entry.elapsed}ms | "${(entry.input || '').substring(0, 60)}..."`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // Get model I/O log
+  if (req.method === 'GET' && req.url === '/model-log') {
+    if (!fs.existsSync(MODEL_LOG_FILE)) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end('[]');
+      return;
+    }
+    const lines = fs.readFileSync(MODEL_LOG_FILE, 'utf8').trim().split('\n');
+    const entries = lines.filter(l => l).map(l => { try { return JSON.parse(l); } catch(e) { return null; } }).filter(Boolean);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(entries));
     return;
   }
 

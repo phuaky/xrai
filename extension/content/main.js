@@ -54,18 +54,27 @@ var XraiMain = (function () {
     });
 
     // Periodic health check (every 30s)
-    setInterval(function () {
-      chrome.runtime.sendMessage({ action: 'checkHealth' }, function (response) {
-        if (chrome.runtime.lastError) return;
-        var wasAvailable = ollamaAvailable;
-        ollamaAvailable = response && response.available;
-        if (wasAvailable !== ollamaAvailable) {
-          XraiIndicator.update(null, {
-            connected: ollamaAvailable,
-            label: ollamaAvailable ? 'local' : 'pre-filter only'
-          });
-        }
-      });
+    // Guard against "Extension context invalidated" after extension reload
+    var healthInterval = setInterval(function () {
+      if (!chrome.runtime || !chrome.runtime.id) {
+        clearInterval(healthInterval);
+        return;
+      }
+      try {
+        chrome.runtime.sendMessage({ action: 'checkHealth' }, function (response) {
+          if (chrome.runtime.lastError) return;
+          var wasAvailable = ollamaAvailable;
+          ollamaAvailable = response && response.available;
+          if (wasAvailable !== ollamaAvailable) {
+            XraiIndicator.update(null, {
+              connected: ollamaAvailable,
+              label: ollamaAvailable ? 'local' : 'pre-filter only'
+            });
+          }
+        });
+      } catch (e) {
+        clearInterval(healthInterval);
+      }
     }, 30000);
   }
 
@@ -128,6 +137,24 @@ var XraiMain = (function () {
       });
     });
   }
+
+  // DOM event bridge — allows page JS to request classification data
+  // Model I/O logs go directly to collector (data/model-io.jsonl), not chrome.storage
+  window.addEventListener('xrai-export-request', function () {
+    Promise.all([XraiMemory.getClassifications(), XraiMemory.getCorrections()])
+      .then(function (results) {
+        var data = { classifications: results[0], corrections: results[1] };
+        var el = document.getElementById('xrai-export-data');
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'xrai-export-data';
+          el.style.display = 'none';
+          document.body.appendChild(el);
+        }
+        el.textContent = JSON.stringify(data);
+        window.dispatchEvent(new CustomEvent('xrai-export-response'));
+      });
+  });
 
   // Auto-start when DOM ready
   if (document.readyState === 'loading') {

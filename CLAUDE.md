@@ -15,9 +15,10 @@ xrai is a Chrome extension that filters Twitter/X feeds using local AI (Ollama).
 - All state in chrome.storage.local + IndexedDB
 
 **Ollama** (local, port 11434):
-- Default model: `gemma2:2b` (93% accuracy, 210ms, 1.6GB)
-- Backup model: `phi4-mini` (93%, 285ms, 2.5GB)
-- Classification prompt uses 5 dimensions: RELEVANT, NOVELTY, SPECIFICITY, DENSITY, ACTIONABLE
+- Default model: `phi4-mini` (92% accuracy, 518ms avg, 2.5GB) — best accuracy
+- Backup model: `gemma2:2b` (88%, 231ms avg, 1.6GB) — fastest
+- Classification prompt uses 4 dimensions: NOVELTY, SPECIFICITY, DENSITY, AUTHENTICITY
+- Benchmark: 89 tweets (41 signal, 48 noise) from synthetic + real timeline + bookmarks + chrome.storage
 - Replies use a separate prompt with style options (curious/insight/connect)
 
 **Data Collector** (optional, port 11435):
@@ -41,7 +42,8 @@ xrai is a Chrome extension that filters Twitter/X feeds using local AI (Ollama).
 | `extension/background/worker.js` | Service worker — proxies Ollama HTTP calls |
 | `scripts/collector.js` | Local HTTP server for auto-exporting classification data |
 | `scripts/improve.js` | Meta-learning script — analyzes corrections for prompt improvement |
-| `benchmarks/benchmark.js` | Tests model accuracy/speed on 45 labeled tweets |
+| `benchmarks/benchmark.js` | Tests model accuracy/speed on 78 labeled tweets |
+| `benchmarks/bookmarks-raw.json` | Raw tweet dump from X bookmarks (114 entries) |
 | `SPEC.md` | Full architecture specification |
 
 ## Common Commands
@@ -106,11 +108,38 @@ Extension (x.com)
   → improve.js analyzes patterns, generates prompt for claude -p
 ```
 
-### Exporting data manually (if collector not running)
-In Chrome DevTools console on x.com:
+### Extracting training data from chrome.storage (PRIMARY source for benchmark improvement)
+
+The extension stores every classification decision in `chrome.storage.local` under `xrai_classifications` (up to 1,000 entries) and user corrections under `xrai_corrections` (up to 500 entries). **This is the primary data source for improving the benchmark and prompts.**
+
+**Method 1: Via service worker message** (works from content script or DevTools extension context):
 ```javascript
-chrome.storage.local.get('xrai_classifications', r => copy(JSON.stringify(r.xrai_classifications)))
+chrome.runtime.sendMessage({ action: 'exportData' }, function(data) {
+  console.log('Classifications:', data.classifications.length);
+  console.log('Corrections:', data.corrections.length);
+  copy(JSON.stringify(data)); // copies to clipboard
+});
 ```
+
+**Method 2: Direct chrome.storage access** (DevTools console on x.com, select extension context):
+```javascript
+chrome.storage.local.get(['xrai_classifications', 'xrai_corrections'], r => {
+  copy(JSON.stringify({ classifications: r.xrai_classifications, corrections: r.xrai_corrections }))
+});
+```
+
+**Method 3: Via data collector** (auto-exports when running):
+```bash
+node scripts/collector.js  # receives data at localhost:11435, saves to data/classifications.jsonl
+```
+
+**Workflow for improving benchmarks:**
+1. Browse X with the extension active — it accumulates classification data
+2. Export classifications using any method above
+3. Review and label the data (especially corrections — these are misclassifications)
+4. Add labeled tweets to `benchmarks/benchmark.js` TEST_TWEETS array
+5. Run `node benchmarks/benchmark.js` to measure model accuracy
+6. Use misclassification patterns to improve prompts in `extension/background/worker.js`
 
 ## Configuration Defaults
 

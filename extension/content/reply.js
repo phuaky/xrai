@@ -53,6 +53,7 @@ var XraiReply = (function () {
     }, 100);
 
     // Request replies via service worker
+    if (!chrome.runtime || !chrome.runtime.id) return;
     chrome.runtime.sendMessage(
       {
         action: 'reply',

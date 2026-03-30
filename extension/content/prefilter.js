@@ -4,7 +4,7 @@ var XraiPrefilter = (function () {
 
   // === SIGNAL SAFELIST — never filter these ===
   // Tech/AI keywords that indicate the tweet is likely worth reading
-  var TECH_SIGNAL = /\b(ai|llm|gpt|claude|openai|anthropic|gemini|ollama|model|transformer|token|inference|fine\s*tun|embed|vector|rag|agent|mcp|sdk|api|deploy|ship|launch|release|v\d|open\s*source|github|repo|commit|merge|pr\b|pull\s*request|code|coding|vibe\s*cod|dev|engineer|architect|startup|saas|arr|mrr|revenue|valuation|funding|seed|series\s*[a-d]|yc|product|ux|ui|figma|react|next\.?js|vue|svelte|node|python|rust|typescript|swift|docker|kubernetes|k8s|aws|gcp|azure|cloudflare|vercel|supabase|postgres|redis|mongo|sql|database|benchmark|latency|throughput|gpu|cuda|metal|chip|silicon|diffusion|sora|runway|midjourney|flux|dall-e|stable\s*diffusion|video\s*gen|image\s*gen|text\s*to|speech|tts|stt|whisper|deepseek|qwen|gemma|llama|phi|mistral|grounding|retrieval|prompt|chain\s*of\s*thought|context\s*window|robot|autonom|self\s*driv|neural|machine\s*learn|deep\s*learn|reinforcement|crypto|bitcoin|ethereum|blockchain|web3|defi|nft)\b/i;
+  var TECH_SIGNAL = /\b(ai|llm|gpt|claude|openai|anthropic|gemini|ollama|model|transformer|token|inference|fine\s*tun|embed|vector|rag|agent|mcp|sdk|api|deploy|ship|launch|release|v\d|open\s*source|github|repo|commit|merge|pr\b|pull\s*request|code|coding|vibe\s*cod|dev|engineer|architect|startup|saas|arr|mrr|revenue|valuation|funding|seed|series\s*[a-d]|yc|product|ux|ui|figma|react|next\.?js|vue|svelte|node|python|rust|typescript|swift|docker|kubernetes|k8s|aws|gcp|azure|cloudflare|vercel|supabase|postgres|redis|mongo|sql|database|benchmark|latency|throughput|gpu|cuda|metal|chip|silicon|diffusion|sora|runway|midjourney|flux|dall-e|stable\s*diffusion|video\s*gen|image\s*gen|text\s*to|speech|tts|stt|whisper|deepseek|qwen|gemma|llama|phi|mistral|grounding|retrieval|prompt|chain\s*of\s*thought|context\s*window|robot|autonom|self\s*driv|neural|machine\s*learn|deep\s*learn|reinforcement|crypto|bitcoin|ethereum|blockchain|web3|defi|nft|cursor|copilot|windsurf|karpathy|seedance|suno|kling|pika|luma|hailuo|minimax|comfyui|langchain|langgraph|crewai|autogen|n8n|make\.com|zapier|firecrawl|openclaw|clawdbot|state\s*machine)\b/i;
 
   // Entrepreneurship/business signal
   var BIZ_SIGNAL = /\b(founder|ceo|cto|coo|co-?found|bootstrap|profit|customer|churn|retention|conversion|growth|scale|pivot|acquisition|ipo|exit|cap\s*table|equity|vest|burn\s*rate|runway|market\s*fit|pmf|b2b|b2c|outbound|inbound|cold\s*email|sales|pipeline|onboard|pricing|freemium|enterprise)\b/i;
@@ -17,6 +17,9 @@ var XraiPrefilter = (function () {
   var ENGAGEMENT_SUFFIX = /\b(who\s*agrees\??|thoughts\??|am\s*i\s*wrong\??|change\s*my\s*mind|let\s*that\s*sink\s*in|read\s*that\s*again|iykyk|no\s*cap)\s*[.!?]*$/i;
 
   var SPAM = /\b(free\s*money|giveaway|passive\s*income|make\s*\$?\d+[k]?\s*(a\s*day|daily|per\s*month|in\s*my\s*first)|get\s*rich|dm\s*me\s*for|crypto\s*gem|100x\s*potential|guaranteed\s*returns|airdrop|drop\s*wallet|whitelist\s*spot|one\s*simple\s*trick|one\s*weird\s*trick|this\s*one\s*trick|side\s*hustle|financial\s*freedom)\b/i;
+
+  // Crypto pump/scam patterns — separate from general spam
+  var CRYPTO_PUMP = /(\d{2,}x\b|\d{1,3},?\d{3}%\s*gain|private\s*(tg|telegram)\s*(channel|group)|the\s*ticker\s*is|next\s*100x|buy\s*before|pump\s*(it|this)|rug\s*pull|moon\s*soon|degen\s*play|\$[A-Z]{2,8}\s*(at|before|from)\s*\$)/i;
 
   var CLICKBAIT_PHRASES = /\b(you\s*won'?t\s*believe|wait\s*(for|till)\s*(it|the\s*end)|this\s*is\s*so\s*(good|crazy|funny|wild|insane)|my\s*(grandma|mom|dad|kid)\s*(taught|showed|told)|i\s*can'?t\s*(believe|stop)|no\s*way|bro\s*what|absolute\s*madness|i'?m\s*dead|crying|screaming|watch\s*till\s*(the\s*)?end)\b/i;
 
@@ -61,6 +64,11 @@ var XraiPrefilter = (function () {
     // Spam
     if (SPAM.test(text)) {
       return { prediction: 'noise', confidence: 0.9, reason: 'spam', source: 'prefilter' };
+    }
+
+    // Crypto pump/scam
+    if (CRYPTO_PUMP.test(text)) {
+      return { prediction: 'noise', confidence: 0.9, reason: 'crypto-pump', source: 'prefilter' };
     }
 
     // Clickbait phrases

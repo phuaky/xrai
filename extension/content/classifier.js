@@ -50,6 +50,7 @@ var XraiClassifier = (function () {
       return { id: t.id, text: t.text, mediaType: t.mediaType };
     });
 
+    if (!chrome.runtime || !chrome.runtime.id) return;
     chrome.runtime.sendMessage(
       { action: 'classifyBatch', tweets: tweets },
       function (response) {
