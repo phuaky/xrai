@@ -21,7 +21,7 @@ var XraiPrefilter = (function () {
   // Crypto pump/scam patterns — separate from general spam
   var CRYPTO_PUMP = /(\d{2,}x\b|\d{1,3},?\d{3}%\s*gain|private\s*(tg|telegram)\s*(channel|group)|the\s*ticker\s*is|next\s*100x|buy\s*before|pump\s*(it|this)|rug\s*pull|moon\s*soon|degen\s*play|\$[A-Z]{2,8}\s*(at|before|from)\s*\$)/i;
 
-  var CLICKBAIT_PHRASES = /\b(you\s*won'?t\s*believe|wait\s*(for|till)\s*(it|the\s*end)|this\s*is\s*so\s*(good|crazy|funny|wild|insane)|my\s*(grandma|mom|dad|kid)\s*(taught|showed|told)|i\s*can'?t\s*(believe|stop)|no\s*way|bro\s*what|absolute\s*madness|i'?m\s*dead|crying|screaming|watch\s*till\s*(the\s*)?end)\b/i;
+  var CLICKBAIT_PHRASES = /\b(you\s*won'?t\s*believe|wait\s*(for|till)\s*(it|the\s*end)|this\s*is\s*so\s*(good|crazy|funny|wild|insane)|my\s*(grandma|mom|dad|kid)\s*(taught|showed|told)|i\s*can'?t\s*(believe|stop)|no\s*way|bro\s*what|absolute\s*madness|i'?m\s*dead|crying|screaming|watch\s*till\s*(the\s*)?end|what\s*happens\s*next\s*will\s*(shock|surprise|blow)|mind\s*blow|most\s*chaotic|100\s*\/\s*10|10\s*\/\s*10|\d+\/10\s*🍿|will\s*shock\s*you|stay\s*till\s*(the\s*)?end|this\s*will\s*(change|blow|shock|break)|you\s*need\s*to\s*see\s*this|i\s*wasn'?t\s*ready|nobody\s*expected|didn'?t\s*see\s*(this|that)\s*coming)\b/i;
 
   // Entertainment/lifestyle noise — not tech related
   var ENTERTAINMENT_NOISE = /\b(anime|manga|naruto|madara|one\s*piece|goku|jujutsu|demon\s*slayer|cosplay|marvel|dc\s*comics|avenger|harry\s*potter|hogwarts|snape|game\s*of\s*thrones|nba|nfl|fifa|premier\s*league|messi|ronaldo|lebron|recipe|cooking|baking|workout|gym|fitness|weight\s*loss|diet|skincare|makeup|fashion|outfit|ootd|haul|unbox|prank|challenge|mukbang|asmr|zodiac|horoscope|astrology|celebrity|gossip|drama|tea\b(?!\s*party)|stan|fandom|ship\b(?!\s*ped)|couple\s*goals)\b/i;
@@ -71,8 +71,8 @@ var XraiPrefilter = (function () {
       return { prediction: 'noise', confidence: 0.9, reason: 'crypto-pump', source: 'prefilter' };
     }
 
-    // Clickbait phrases
-    if (CLICKBAIT_PHRASES.test(text) && text.length < 80) {
+    // Clickbait phrases — no length restriction, clickbait is clickbait
+    if (CLICKBAIT_PHRASES.test(text)) {
       return { prediction: 'noise', confidence: 0.85, reason: 'clickbait-phrase', source: 'prefilter' };
     }
 
@@ -81,9 +81,9 @@ var XraiPrefilter = (function () {
       return { prediction: 'noise', confidence: 0.80, reason: 'entertainment', source: 'prefilter' };
     }
 
-    // VIDEO + SHORT VAGUE TEXT (< 60 chars) without tech keywords = entertainment bait
+    // VIDEO + SHORT VAGUE TEXT (< 80 chars) without tech keywords = entertainment bait
     // Tech keywords already caught by safelist above, so anything here is non-tech
-    if (data.hasVideo && text.length < 60) {
+    if (data.hasVideo && text.length < 80) {
       return { prediction: 'noise', confidence: 0.80, reason: 'short-video-non-tech', source: 'prefilter' };
     }
 
