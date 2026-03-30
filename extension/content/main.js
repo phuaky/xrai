@@ -8,17 +8,10 @@ var XraiMain = (function () {
   function start() {
     console.log('[xrai] Starting...');
 
-    // 1. Init memory
-    XraiMemory.init()
-      .then(function () {
-        return XraiMemory.pruneOld(30);
-      })
-      .then(function (pruned) {
-        if (pruned > 0) console.log('[xrai] Pruned ' + pruned + ' old entries');
-      })
-      .catch(function (e) {
-        console.warn('[xrai] Memory init error:', e);
-      });
+    // 1. Init memory (for classification logging, not dedup)
+    XraiMemory.init().catch(function (e) {
+      console.warn('[xrai] Memory init error:', e);
+    });
 
     // 2. Load config
     XraiConfig.getConfig().then(function (cfg) {
@@ -89,51 +82,40 @@ var XraiMain = (function () {
       return;
     }
 
-    // Step 2: Check memory
+    // Step 2: Compute fingerprint (for logging only, no dedup hiding)
     var fp = XraiMemory.computeFingerprint(data.text, data.mediaType);
-    XraiMemory.hasSeen(fp).then(function (seen) {
-      if (seen) {
-        XraiHider.hide(el, config ? config.hideMethod : 'remove');
-        XraiIndicator.incrementHidden();
-        return;
-      }
 
-      // Step 3: Pre-filter
-      var pfResult = XraiPrefilter.prefilter(data);
-      if (pfResult) {
-        XraiHider.hide(el, config ? config.hideMethod : 'remove');
-        XraiMemory.markSeen(fp, 'noise');
-        XraiMemory.logClassification(data.text, data.mediaType, 'noise', pfResult.confidence, 'prefilter:' + pfResult.reason);
-        XraiIndicator.incrementHidden();
-        return;
-      }
+    // Step 3: Pre-filter
+    var pfResult = XraiPrefilter.prefilter(data);
+    if (pfResult) {
+      XraiHider.hide(el, config ? config.hideMethod : 'remove');
+      XraiMemory.logClassification(data.text, data.mediaType, 'noise', pfResult.confidence, 'prefilter:' + pfResult.reason);
+      XraiIndicator.incrementHidden();
+      return;
+    }
 
-      // Step 4: If Ollama unavailable, show by default (pre-filter already caught obvious noise)
-      if (!ollamaAvailable) {
-        XraiMemory.markSeen(fp, 'signal');
-        XraiMemory.logClassification(data.text, data.mediaType, 'signal', 0.5, 'default');
-        XraiIndicator.incrementShown();
-        XraiReply.attachReplyButton(el, data);
-        return;
-      }
+    // Step 4: If Ollama unavailable, show by default (pre-filter already caught obvious noise)
+    if (!ollamaAvailable) {
+      XraiMemory.logClassification(data.text, data.mediaType, 'signal', 0.5, 'default');
+      XraiIndicator.incrementShown();
+      XraiReply.attachReplyButton(el, data);
+      return;
+    }
 
-      // Step 5: Viewport gate -> Classifier
-      XraiViewport.observe(el, data, function (viewportData) {
-        var threshold = (config && config.confidenceThreshold) || 0.7;
+    // Step 5: Viewport gate -> Classifier
+    XraiViewport.observe(el, data, function (viewportData) {
+      var threshold = (config && config.confidenceThreshold) || 0.7;
 
-        XraiClassifier.enqueue(viewportData.id, viewportData.text, viewportData.mediaType, function (result) {
-          if (result.prediction === 'noise' && result.confidence >= threshold) {
-            XraiHider.hide(el, config ? config.hideMethod : 'remove');
-            XraiMemory.markSeen(fp, 'noise');
-            XraiMemory.logClassification(viewportData.text, viewportData.mediaType, 'noise', result.confidence, 'model');
-            XraiIndicator.incrementHidden();
-          } else {
-            XraiMemory.markSeen(fp, 'signal');
-            XraiMemory.logClassification(viewportData.text, viewportData.mediaType, 'signal', result.confidence, 'model');
-            XraiIndicator.incrementShown();
-            XraiReply.attachReplyButton(el, viewportData);
-          }
-        });
+      XraiClassifier.enqueue(viewportData.id, viewportData.text, viewportData.mediaType, function (result) {
+        if (result.prediction === 'noise' && result.confidence >= threshold) {
+          XraiHider.hide(el, config ? config.hideMethod : 'remove');
+          XraiMemory.logClassification(viewportData.text, viewportData.mediaType, 'noise', result.confidence, 'model');
+          XraiIndicator.incrementHidden();
+        } else {
+          XraiMemory.logClassification(viewportData.text, viewportData.mediaType, 'signal', result.confidence, 'model');
+          XraiIndicator.incrementShown();
+          XraiReply.attachReplyButton(el, viewportData);
+        }
       });
     });
   }
