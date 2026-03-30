@@ -20,19 +20,40 @@ function getConfig() {
   });
 }
 
-// Health check
-function checkHealth(ollamaUrl) {
+// Health check — tests actual POST (catches CORS issues), not just GET
+function checkHealth(ollamaUrl, model) {
+  var result = { available: false, models: [], classify: false, reply: false };
+
   return fetch(ollamaUrl + '/api/tags', {
     method: 'GET',
     signal: AbortSignal.timeout(3000)
   })
     .then(function (r) { return r.json(); })
     .then(function (data) {
-      var models = (data.models || []).map(function (m) { return m.name; });
-      return { available: true, models: models };
+      result.models = (data.models || []).map(function (m) { return m.name; });
+      result.available = true;
+      // Now test actual POST (this is what was returning 403)
+      return fetch(ollamaUrl + '/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(5000),
+        body: JSON.stringify({
+          model: model || DEFAULT_MODEL,
+          messages: [{ role: 'user', content: 'ping' }],
+          stream: false,
+          options: { num_predict: 1 }
+        })
+      });
+    })
+    .then(function (r) {
+      if (r.ok) {
+        result.classify = true;
+        result.reply = true; // same endpoint, if classify works reply works
+      }
+      return result;
     })
     .catch(function () {
-      return { available: false, models: [] };
+      return result;
     });
 }
 
@@ -229,7 +250,7 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
 
     switch (msg.action) {
       case 'checkHealth':
-        checkHealth(url).then(sendResponse);
+        checkHealth(url, model || DEFAULT_MODEL).then(sendResponse);
         break;
 
       case 'classify':

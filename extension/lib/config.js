@@ -3,7 +3,7 @@ var XraiConfig = (function () {
   'use strict';
 
   var DEFAULTS = {
-    model: 'qwen2.5:1.5b',
+    model: 'phi4-mini',
     ollamaUrl: 'http://localhost:11434',
     confidenceThreshold: 0.7,
     contentFilter: 'posts-only',
