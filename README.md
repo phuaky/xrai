@@ -6,32 +6,33 @@ X-ray your Twitter/X feed with local AI. Noise disappears. Signal stays.
 
 ## What it does
 
-A Chrome extension that classifies every tweet in your feed as **signal** (worth reading) or **noise** (skip) using a local AI model via [Ollama](https://ollama.ai). Noise tweets are hidden instantly. You never see the same content twice.
+A Chrome extension that classifies every tweet in your feed as **signal** (worth reading) or **noise** (skip) using a local AI model via [Ollama](https://ollama.ai). Noise tweets are hidden instantly.
 
 When you find a signal tweet worth replying to, xrai generates reply suggestions that you **copy-paste manually** — zero automation, zero bot behavior.
 
 ## How it works
 
 ```
-Tweet appears → Already seen? → HIDE
-                     ↓ new
+Tweet appears → Reply? (posts-only mode) → HIDE
+                     ↓ not a reply
               Has tech/AI keywords? → pass to AI (safelist)
                      ↓ no
               Obvious spam/bait? → HIDE (regex, instant)
               Entertainment/video? → HIDE (prefilter)
                      ↓ passes
-              On screen 500ms? → classify with local AI
+              Already classified? → apply cached result
+                     ↓ cache miss
+              Ollama AI (up to 5 concurrent) → signal or noise
                      ↓
-              Signal (score 4-5/5) → SHOW
-              Noise  (score 0-3/5) → HIDE
+              Signal (score 3-4/4) → SHOW
+              Noise  (score 0-2/4) → HIDE
 ```
 
-**5-dimension scoring** (each 0 or 1):
-- **Relevant** — Is this about tech, AI, coding, startups?
+**4-dimension scoring** (each 0 or 1):
 - **Novelty** — New info or recycled take?
 - **Specificity** — Concrete details or vague claims?
 - **Density** — High insight-to-word ratio?
-- **Actionable** — Can you learn/use/apply this?
+- **Authenticity** — Genuine sharing or engagement farming?
 
 ## Setup
 
@@ -42,16 +43,16 @@ Download from [ollama.ai](https://ollama.ai). On Mac, it sits in the menubar and
 ### 2. Pull a model
 
 ```bash
-ollama pull gemma2:2b    # recommended: 93% accuracy, 210ms, 1.6GB
-ollama pull phi4-mini    # backup: 91% accuracy, 285ms, 2.5GB (optional)
+ollama pull phi4-mini    # recommended: 92% accuracy, 518ms, 2.5GB — best accuracy
+ollama pull gemma2:2b    # backup: 88% accuracy, 231ms, 1.6GB — fastest
 ```
 
-**Benchmarked models** (45 real tweets, Apple Silicon M5 Pro):
+**Benchmarked models** (89 real tweets, Apple Silicon):
 
 | Model | Accuracy | Speed | Size |
 |-------|----------|-------|------|
-| `gemma2:2b` | **93%** | **210ms** | 1.6 GB |
-| `phi4-mini` | 93% | 285ms | 2.5 GB |
+| `phi4-mini` | **92%** | 518ms | 2.5 GB |
+| `gemma2:2b` | 88% | **231ms** | 1.6 GB |
 
 ### 3. Load the extension
 
@@ -75,9 +76,9 @@ The collector runs on `localhost:11435`. The extension auto-sends every 100 clas
 
 - **Local-first** — All AI runs on your machine via Ollama. No cloud, no API keys
 - **Tech-focused** — Tuned for AI engineers and entrepreneurs. Tech/AI tweets safelisted
-- **Content memory** — Never see the same tweet twice across sessions (IndexedDB fingerprints)
-- **Pre-filter** — 7 regex categories catch obvious noise instantly: NSFW, spam, engagement bait, clickbait, entertainment, short-video-non-tech, ultra-short text
-- **Viewport-aware** — Only classifies tweets you actually look at (saves compute)
+- **Result cache** — Scroll back up? Cached result applied instantly, no re-classification
+- **Pre-filter** — 11 regex categories catch obvious noise instantly: NSFW, spam, engagement bait, clickbait, entertainment, crypto pumps, short-video/image, ultra-short text
+- **Concurrent classification** — Up to 5 Ollama calls in parallel, every tweet gets classified
 - **Reply generation** — Copy-paste only, never auto-posts
 - **Rate limited** — 20 model calls/min max, debounced DOM observer
 - **Self-improving** — Classification data collected automatically, feeds into improvement pipeline
@@ -146,16 +147,15 @@ xrai/
 │   ├── manifest.json        # Chrome Manifest V3
 │   ├── content/
 │   │   ├── detector.js      # Tweet detection (MutationObserver, debounced)
-│   │   ├── prefilter.js     # Regex noise filter (7 categories + tech safelist)
-│   │   ├── viewport.js      # Only classify visible tweets (IntersectionObserver)
-│   │   ├── classifier.js    # Ollama batch queue (rate limited)
+│   │   ├── prefilter.js     # Regex noise filter (11 categories + tech safelist)
+│   │   ├── classifier.js    # Concurrent queue (max 5) with result cache
 │   │   ├── hider.js         # Hide/blur/collapse noise tweets
 │   │   ├── reply.js         # Reply generation (copy-paste only)
 │   │   ├── indicator.js     # Status pill UI
-│   │   ├── main.js          # Orchestrator
+│   │   ├── main.js          # Orchestrator — flat pipeline, every tweet gets a decision
 │   │   └── styles.css
 │   ├── lib/
-│   │   ├── memory.js        # Fingerprints (IndexedDB) + classification log + corrections
+│   │   ├── memory.js        # Classification log + corrections (chrome.storage)
 │   │   ├── ollama.js        # Ollama API client + classification prompt
 │   │   └── config.js        # User preferences (chrome.storage.local)
 │   └── background/

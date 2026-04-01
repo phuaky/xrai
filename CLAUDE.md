@@ -10,9 +10,9 @@ xrai is a Chrome extension that filters Twitter/X feeds using local AI (Ollama).
 
 **Chrome Extension** (Manifest V3, vanilla JS, no build step):
 - Content scripts inject into x.com, detect tweets via MutationObserver
-- Classification pipeline: reply filter → memory dedup → prefilter (regex) → viewport gate → Ollama model
+- Classification pipeline: reply filter → prefilter (regex) → result cache → Ollama model (5 concurrent)
 - Service worker proxies HTTP calls to Ollama (content scripts can't call localhost in MV3)
-- All state in chrome.storage.local + IndexedDB
+- All state in chrome.storage.local + in-memory result cache (no IndexedDB dedup)
 
 **Ollama** (local, port 11434):
 - Default model: `phi4-mini` (92% accuracy, 518ms avg, 2.5GB) — best accuracy
@@ -31,14 +31,13 @@ xrai is a Chrome extension that filters Twitter/X feeds using local AI (Ollama).
 
 | File | Purpose |
 |------|---------|
-| `extension/content/main.js` | Orchestrator — wires the whole pipeline |
+| `extension/content/main.js` | Orchestrator — flat pipeline, every tweet gets a decision |
 | `extension/content/prefilter.js` | Regex noise filter with tech safelist |
 | `extension/lib/ollama.js` | Ollama API client + classification/reply prompts |
-| `extension/lib/memory.js` | IndexedDB fingerprints + classification log + corrections |
+| `extension/lib/memory.js` | Classification log + corrections (IndexedDB, no dedup) |
 | `extension/lib/config.js` | User preferences (model, threshold, hide method) |
 | `extension/content/detector.js` | MutationObserver tweet detection + media detection |
-| `extension/content/viewport.js` | IntersectionObserver — only classify visible tweets |
-| `extension/content/classifier.js` | Batch queue with rate limiting |
+| `extension/content/classifier.js` | Concurrent queue (max 5) with result cache |
 | `extension/background/worker.js` | Service worker — proxies Ollama HTTP calls |
 | `scripts/collector.js` | Local HTTP server for auto-exporting classification data |
 | `scripts/improve.js` | Meta-learning script — analyzes corrections for prompt improvement |
@@ -145,16 +144,14 @@ node scripts/collector.js  # receives data at localhost:11435, saves to data/cla
 
 ```javascript
 {
-  model: 'gemma2:2b',
+  model: 'phi4-mini',
   ollamaUrl: 'http://localhost:11434',
   confidenceThreshold: 0.7,
   contentFilter: 'posts-only',
   hideMethod: 'remove',      // 'remove' | 'collapse' | 'blur'
   replyStyle: 'curious',     // 'curious' | 'technical' | 'casual'
   memoryRetentionDays: 30,
-  maxModelCallsPerMinute: 20,
-  batchSize: 5,
-  batchFlushDelay: 2000
+  maxModelCallsPerMinute: 20
 }
 ```
 
