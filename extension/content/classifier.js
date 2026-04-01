@@ -1,89 +1,105 @@
-/* xrai — Classifier Queue (batching, rate limiting, worker messaging) */
+/* xrai — Classifier (concurrent queue with result cache) */
 var XraiClassifier = (function () {
   'use strict';
 
-  var queue = [];
-  var callbacks = {};  // id -> callback fn
-  var flushTimer = null;
-  var callTimestamps = [];  // rate limit tracking
-  var config = { batchSize: 5, batchFlushDelay: 2000, maxModelCallsPerMinute: 20 };
+  var MAX_CONCURRENT = 5;
+  var MAX_CALLS_PER_MINUTE = 20;
+
+  var resultCache = {};    // tweetId -> { prediction, confidence, source }
+  var queue = [];          // { id, text, mediaType, cb }
+  var activeCount = 0;
+  var callTimestamps = [];
 
   function configure(cfg) {
-    if (cfg.batchSize) config.batchSize = cfg.batchSize;
-    if (cfg.batchFlushDelay) config.batchFlushDelay = cfg.batchFlushDelay;
-    if (cfg.maxModelCallsPerMinute) config.maxModelCallsPerMinute = cfg.maxModelCallsPerMinute;
+    // Accept config but we only need maxModelCallsPerMinute
+    if (cfg.maxModelCallsPerMinute) MAX_CALLS_PER_MINUTE = cfg.maxModelCallsPerMinute;
+  }
+
+  function checkCache(id) {
+    return resultCache[id] || null;
+  }
+
+  function cacheResult(id, result) {
+    resultCache[id] = result;
   }
 
   function isRateLimited() {
     var now = Date.now();
-    // Remove timestamps older than 1 minute
     callTimestamps = callTimestamps.filter(function (t) { return now - t < 60000; });
-    return callTimestamps.length >= config.maxModelCallsPerMinute;
+    return callTimestamps.length >= MAX_CALLS_PER_MINUTE;
   }
 
-  function enqueue(id, text, mediaType, cb) {
-    queue.push({ id: id, text: text, mediaType: mediaType });
-    if (cb) callbacks[id] = cb;
-
-    if (queue.length >= config.batchSize) {
-      flush();
-    } else if (!flushTimer) {
-      flushTimer = setTimeout(flush, config.batchFlushDelay);
-    }
-  }
-
-  function flush() {
-    clearTimeout(flushTimer);
-    flushTimer = null;
-
-    if (queue.length === 0) return;
-    if (isRateLimited()) {
-      // Retry after a short delay
-      flushTimer = setTimeout(flush, 5000);
+  function classify(id, text, mediaType, cb) {
+    // Check cache first
+    var cached = checkCache(id);
+    if (cached) {
+      console.log('[xrai] CACHE hit:', cached.prediction, '(' + cached.confidence + ')', '|', (text || '').substring(0, 80));
+      if (cb) cb(cached);
       return;
     }
 
-    var batch = queue.splice(0, config.batchSize);
+    // Queue for Ollama
+    queue.push({ id: id, text: text, mediaType: mediaType, cb: cb });
+    drain();
+  }
+
+  function drain() {
+    while (queue.length > 0 && activeCount < MAX_CONCURRENT && !isRateLimited()) {
+      var item = queue.shift();
+      send(item);
+    }
+
+    // If rate limited and items remain, retry after delay
+    if (queue.length > 0 && isRateLimited()) {
+      setTimeout(drain, 3000);
+    }
+  }
+
+  function send(item) {
+    activeCount++;
     callTimestamps.push(Date.now());
 
-    var tweets = batch.map(function (t) {
-      return { id: t.id, text: t.text, mediaType: t.mediaType };
-    });
+    if (!chrome.runtime || !chrome.runtime.id) {
+      activeCount--;
+      return;
+    }
 
-    if (!chrome.runtime || !chrome.runtime.id) return;
     chrome.runtime.sendMessage(
-      { action: 'classifyBatch', tweets: tweets },
+      { action: 'classify', text: item.text, mediaType: item.mediaType },
       function (response) {
-        if (chrome.runtime.lastError) {
-          // On error, mark all as noise
-          batch.forEach(function (t) {
-            if (callbacks[t.id]) {
-              callbacks[t.id]({ id: t.id, prediction: 'noise', confidence: 0.5 });
-              delete callbacks[t.id];
-            }
-          });
-          return;
+        activeCount--;
+
+        if (chrome.runtime.lastError || !response) {
+          var fallback = { prediction: 'noise', confidence: 0.5, source: 'error' };
+          cacheResult(item.id, fallback);
+          console.log('[xrai] OLLAMA error, fallback noise |', (item.text || '').substring(0, 80));
+          if (item.cb) item.cb(fallback);
+        } else {
+          var result = {
+            prediction: response.prediction || 'noise',
+            confidence: response.confidence || 0.5,
+            source: 'model'
+          };
+          cacheResult(item.id, result);
+          console.log('[xrai] OLLAMA \u2192', result.prediction, '(' + result.confidence + ')', '|', (item.text || '').substring(0, 80));
+          if (item.cb) item.cb(result);
         }
-        var results = (response && response.results) || [];
-        batch.forEach(function (t, i) {
-          var result = results[i] || { id: t.id, prediction: 'noise', confidence: 0.5 };
-          if (callbacks[t.id]) {
-            callbacks[t.id](result);
-            delete callbacks[t.id];
-          }
-        });
+
+        // Drain next
+        drain();
       }
     );
+  }
 
-    // If more items remain, schedule next flush
-    if (queue.length > 0) {
-      flushTimer = setTimeout(flush, config.batchFlushDelay);
-    }
+  // Allow prefilter results to be cached too
+  function cachePrefilter(id, prediction, confidence, reason) {
+    cacheResult(id, { prediction: prediction, confidence: confidence, source: 'prefilter:' + reason });
   }
 
   return {
     configure: configure,
-    enqueue: enqueue,
-    flush: flush
+    classify: classify,
+    checkCache: checkCache,
+    cachePrefilter: cachePrefilter
   };
 })();

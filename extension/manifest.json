@@ -22,7 +22,6 @@
         "lib/config.js",
         "content/prefilter.js",
         "content/detector.js",
-        "content/viewport.js",
         "content/classifier.js",
         "content/hider.js",
         "content/reply.js",

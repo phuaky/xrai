@@ -1,4 +1,4 @@
-/* xrai — Main Orchestrator (wires everything together) */
+/* xrai — Main Orchestrator (flat pipeline, every tweet gets a decision) */
 var XraiMain = (function () {
   'use strict';
 
@@ -8,7 +8,7 @@ var XraiMain = (function () {
   function start() {
     console.log('[xrai] Starting...');
 
-    // 1. Init memory (for classification logging, not dedup)
+    // 1. Init memory (for classification logging)
     XraiMemory.init().catch(function (e) {
       console.warn('[xrai] Memory init error:', e);
     });
@@ -26,13 +26,16 @@ var XraiMain = (function () {
           XraiIndicator.update(null, { connected: false, label: 'offline' });
           return;
         }
-        ollamaAvailable = response && response.available;
-        if (ollamaAvailable) {
+        ollamaAvailable = response && response.available && response.classify;
+        if (response && response.available && response.classify) {
           console.log('[xrai] Ollama connected. Models:', (response.models || []).join(', '));
-          XraiIndicator.update(null, { connected: true, label: 'local' });
+          XraiIndicator.update(null, { connected: true, classify: true, reply: true });
+        } else if (response && response.available) {
+          console.warn('[xrai] Ollama running but classify POST failed (CORS?). Pre-filter only.');
+          XraiIndicator.update(null, { connected: true, classify: false, reply: false });
         } else {
           console.log('[xrai] Ollama not available. Pre-filter only mode.');
-          XraiIndicator.update(null, { connected: false, label: 'pre-filter only' });
+          XraiIndicator.update(null, { connected: false, classify: false, reply: false });
         }
       });
 
@@ -47,7 +50,6 @@ var XraiMain = (function () {
     });
 
     // Periodic health check (every 30s)
-    // Guard against "Extension context invalidated" after extension reload
     var healthInterval = setInterval(function () {
       if (!chrome.runtime || !chrome.runtime.id) {
         clearInterval(healthInterval);
@@ -57,11 +59,12 @@ var XraiMain = (function () {
         chrome.runtime.sendMessage({ action: 'checkHealth' }, function (response) {
           if (chrome.runtime.lastError) return;
           var wasAvailable = ollamaAvailable;
-          ollamaAvailable = response && response.available;
+          ollamaAvailable = response && response.available && response.classify;
           if (wasAvailable !== ollamaAvailable) {
             XraiIndicator.update(null, {
-              connected: ollamaAvailable,
-              label: ollamaAvailable ? 'local' : 'pre-filter only'
+              connected: response && response.available,
+              classify: response && response.classify,
+              reply: response && response.reply
             });
           }
         });
@@ -74,54 +77,51 @@ var XraiMain = (function () {
   function handleTweet(info) {
     var el = info.element;
     var data = info.data;
+    var threshold = (config && config.confidenceThreshold) || 0.7;
 
-    // Step 1: Reply filter — skip replies if config says posts-only
+    // Step 1: Reply filter
     if (config && config.contentFilter === 'posts-only' && data.isReply) {
+      console.log('[xrai] REPLY hide |', (data.text || '').substring(0, 80));
       XraiHider.hide(el, config.hideMethod);
       XraiIndicator.incrementHidden();
       return;
     }
 
-    // Step 2: Compute fingerprint (for logging only, no dedup hiding)
-    var fp = XraiMemory.computeFingerprint(data.text, data.mediaType);
-
-    // Step 3: Pre-filter
+    // Step 2: Pre-filter (regex)
     var pfResult = XraiPrefilter.prefilter(data);
     if (pfResult) {
+      console.log('[xrai] PREFILTER kill:', pfResult.reason, '|', (data.text || '').substring(0, 80));
       XraiHider.hide(el, config ? config.hideMethod : 'remove');
+      XraiClassifier.cachePrefilter(data.id, 'noise', pfResult.confidence, pfResult.reason);
       XraiMemory.logClassification(data.text, data.mediaType, 'noise', pfResult.confidence, 'prefilter:' + pfResult.reason);
       XraiIndicator.incrementHidden();
       return;
     }
 
-    // Step 4: If Ollama unavailable, show by default (pre-filter already caught obvious noise)
+    // Step 3: If Ollama unavailable, show by default
     if (!ollamaAvailable) {
+      console.log('[xrai] OLLAMA OFF \u2014 showing by default:', (data.text || '').substring(0, 80));
       XraiMemory.logClassification(data.text, data.mediaType, 'signal', 0.5, 'default');
       XraiIndicator.incrementShown();
       XraiReply.attachReplyButton(el, data);
       return;
     }
 
-    // Step 5: Viewport gate -> Classifier
-    XraiViewport.observe(el, data, function (viewportData) {
-      var threshold = (config && config.confidenceThreshold) || 0.7;
-
-      XraiClassifier.enqueue(viewportData.id, viewportData.text, viewportData.mediaType, function (result) {
-        if (result.prediction === 'noise' && result.confidence >= threshold) {
-          XraiHider.hide(el, config ? config.hideMethod : 'remove');
-          XraiMemory.logClassification(viewportData.text, viewportData.mediaType, 'noise', result.confidence, 'model');
-          XraiIndicator.incrementHidden();
-        } else {
-          XraiMemory.logClassification(viewportData.text, viewportData.mediaType, 'signal', result.confidence, 'model');
-          XraiIndicator.incrementShown();
-          XraiReply.attachReplyButton(el, viewportData);
-        }
-      });
+    // Step 4: Classify (cache hit = instant, cache miss = Ollama queue)
+    XraiClassifier.classify(data.id, data.text, data.mediaType, function (result) {
+      if (result.prediction === 'noise' && result.confidence >= threshold) {
+        XraiHider.hide(el, config ? config.hideMethod : 'remove');
+        XraiMemory.logClassification(data.text, data.mediaType, 'noise', result.confidence, result.source || 'model');
+        XraiIndicator.incrementHidden();
+      } else {
+        XraiMemory.logClassification(data.text, data.mediaType, 'signal', result.confidence, result.source || 'model');
+        XraiIndicator.incrementShown();
+        XraiReply.attachReplyButton(el, data);
+      }
     });
   }
 
   // DOM event bridge — allows page JS to request classification data
-  // Model I/O logs go directly to collector (data/model-io.jsonl), not chrome.storage
   window.addEventListener('xrai-export-request', function () {
     Promise.all([XraiMemory.getClassifications(), XraiMemory.getCorrections()])
       .then(function (results) {
