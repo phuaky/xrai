@@ -30,16 +30,24 @@ var XraiHider = (function () {
       };
       element.addEventListener('click', element._xraiExpandHandler);
     } else if (method === 'blur') {
-      element.style.filter = 'blur(8px)';
-      element.style.transition = 'filter 0.2s ease';
-      element._xraiBlurHandler = function () {
-        if (element.style.filter) {
-          element.style.filter = '';
+      element.style.position = 'relative';
+      // Blur is applied via CSS: article[data-xrai-hidden="blur"] > *:not(.xrai-peek-btn)
+      var btn = document.createElement('button');
+      btn.className = 'xrai-peek-btn';
+      btn.textContent = '\uD83D\uDC41 Show';
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (element.hasAttribute('data-xrai-revealed')) {
+          element.removeAttribute('data-xrai-revealed');
+          btn.textContent = '\uD83D\uDC41 Show';
         } else {
-          element.style.filter = 'blur(8px)';
+          element.setAttribute('data-xrai-revealed', '1');
+          btn.textContent = 'Hide';
         }
-      };
-      element.addEventListener('click', element._xraiBlurHandler);
+      });
+      element.appendChild(btn);
+      element._xraiPeekBtn = btn;
     }
   }
 
@@ -56,14 +64,15 @@ var XraiHider = (function () {
     element.style.cursor = '';
     element.style.filter = '';
     element.style.transition = '';
+    element.removeAttribute('data-xrai-revealed');
 
     if (element._xraiExpandHandler) {
       element.removeEventListener('click', element._xraiExpandHandler);
       delete element._xraiExpandHandler;
     }
-    if (element._xraiBlurHandler) {
-      element.removeEventListener('click', element._xraiBlurHandler);
-      delete element._xraiBlurHandler;
+    if (element._xraiPeekBtn) {
+      element._xraiPeekBtn.remove();
+      delete element._xraiPeekBtn;
     }
   }
 

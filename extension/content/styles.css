@@ -226,6 +226,41 @@ article:hover .xrai-reply-btn {
 }
 .xrai-reply-copy:hover { background: rgba(255, 255, 255, 0.2); }
 
+/* Peek button on blurred tweets */
+.xrai-peek-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  background: rgba(15, 15, 20, 0.85);
+  color: #ccc;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, color 0.15s;
+}
+.xrai-peek-btn:hover {
+  background: rgba(30, 30, 40, 0.95);
+  color: #fff;
+}
+
+/* Blur children of hidden tweets, but not the peek button */
+article[data-xrai-hidden="blur"] {
+  position: relative;
+}
+article[data-xrai-hidden="blur"] > *:not(.xrai-peek-btn) {
+  filter: blur(8px);
+  transition: filter 0.2s ease;
+}
+article[data-xrai-revealed] > *:not(.xrai-peek-btn) {
+  filter: none;
+}
+
 /* Fade-in animation */
 @keyframes xrai-fade-in {
   from { opacity: 0; transform: translateY(4px); }

@@ -74,6 +74,22 @@ var XraiMain = (function () {
     }, 30000);
   }
 
+  function attachNewTabHandler(el, data) {
+    if (!data.author || !data.id) return;
+    var tweetText = el.querySelector('[data-testid="tweetText"]');
+    if (!tweetText || tweetText._xraiNewTab) return;
+    tweetText._xraiNewTab = true;
+    tweetText.addEventListener('click', function (e) {
+      // Don't intercept if clicking inside interactive elements
+      if (e.target.closest('[data-testid="like"], [data-testid="retweet"], [data-testid="reply"], [data-testid="Tweet-User-Avatar"], [role="group"], video, [data-testid="videoPlayer"], [data-testid="tweetPhoto"]')) return;
+      // Don't open if tweet is blurred and not revealed
+      if (el.getAttribute('data-xrai-hidden') === 'blur' && !el.hasAttribute('data-xrai-revealed')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      window.open('https://x.com/' + data.author + '/status/' + data.id, '_blank');
+    });
+  }
+
   function handleTweet(info) {
     var el = info.element;
     var data = info.data;
@@ -84,6 +100,7 @@ var XraiMain = (function () {
       console.log('[xrai] REPLY hide |', (data.text || '').substring(0, 80));
       XraiHider.hide(el, config.hideMethod);
       XraiIndicator.incrementHidden();
+      attachNewTabHandler(el, data);
       return;
     }
 
@@ -95,6 +112,7 @@ var XraiMain = (function () {
       XraiClassifier.cachePrefilter(data.id, 'noise', pfResult.confidence, pfResult.reason);
       XraiMemory.logClassification(data.text, data.mediaType, 'noise', pfResult.confidence, 'prefilter:' + pfResult.reason);
       XraiIndicator.incrementHidden();
+      attachNewTabHandler(el, data);
       return;
     }
 
@@ -104,6 +122,7 @@ var XraiMain = (function () {
       XraiMemory.logClassification(data.text, data.mediaType, 'signal', 0.5, 'default');
       XraiIndicator.incrementShown();
       XraiReply.attachReplyButton(el, data);
+      attachNewTabHandler(el, data);
       return;
     }
 
@@ -118,6 +137,7 @@ var XraiMain = (function () {
         XraiIndicator.incrementShown();
         XraiReply.attachReplyButton(el, data);
       }
+      attachNewTabHandler(el, data);
     });
   }
 

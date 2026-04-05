@@ -1,0 +1,10 @@
+{
+  "name": "xrai",
+  "private": true,
+  "scripts": {
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^20.8.9"
+  }
+}
