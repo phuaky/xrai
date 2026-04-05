@@ -4,7 +4,7 @@ var XraiPrefilter = (function () {
 
   // === SIGNAL SAFELIST — never filter these ===
   // Tech/AI keywords that indicate the tweet is likely worth reading
-  var TECH_SIGNAL = /\b(ai|llm|gpt|claude|openai|anthropic|gemini|ollama|model|transformer|token|inference|fine\s*tun|embed|vector|rag|agent|mcp|sdk|api|deploy|ship|launch|release|v\d|open\s*source|github|repo|commit|merge|pr\b|pull\s*request|code|coding|vibe\s*cod|dev|engineer|architect|startup|saas|arr|mrr|revenue|valuation|funding|seed|series\s*[a-d]|yc|product|ux|ui|figma|react|next\.?js|vue|svelte|node|python|rust|typescript|swift|docker|kubernetes|k8s|aws|gcp|azure|cloudflare|vercel|supabase|postgres|redis|mongo|sql|database|benchmark|latency|throughput|gpu|cuda|metal|chip|silicon|diffusion|sora|runway|midjourney|flux|dall-e|stable\s*diffusion|video\s*gen|image\s*gen|text\s*to|speech|tts|stt|whisper|deepseek|qwen|gemma|llama|phi|mistral|grounding|retrieval|prompt|chain\s*of\s*thought|context\s*window|robot|autonom|self\s*driv|neural|machine\s*learn|deep\s*learn|reinforcement|crypto|bitcoin|ethereum|blockchain|web3|defi|nft|cursor|copilot|windsurf|karpathy|seedance|suno|kling|pika|luma|hailuo|minimax|comfyui|langchain|langgraph|crewai|autogen|n8n|make\.com|zapier|firecrawl|openclaw|clawdbot|state\s*machine)\b/i;
+  var TECH_SIGNAL = /\b(ai|llm|gpt|claude|openai|anthropic|gemini|ollama|model|transformer|token|inference|fine\s*tun|embed|vector|rag|agent|mcp|sdk|api|deploy|ship|launch|release|v\d|open\s*source|github|repo|commit|merge|pr\b|pull\s*request|code|coding|vibe\s*cod|dev|engineer|architect|startup|saas|arr|mrr|revenue|valuation|funding|seed|series\s*[a-d]|yc|product|ux|ui|figma|react|next\.?js|vue|svelte|node|python|rust|typescript|swift|docker|kubernetes|k8s|aws|gcp|azure|cloudflare|vercel|supabase|postgres|redis|mongo|sql|database|benchmark|latency|throughput|gpu|cuda|metal|chip|silicon|diffusion|sora|runway|midjourney|flux|dall-e|stable\s*diffusion|video\s*gen|image\s*gen|text\s*to|speech|tts|stt|whisper|deepseek|qwen|gemma|llama|phi|mistral|grounding|retrieval|prompt|chain\s*of\s*thought|context\s*window|robot|autonom|self\s*driv|neural|machine\s*learn|deep\s*learn|reinforcement|crypto|bitcoin|ethereum|blockchain|web3|defi|nft|cursor|copilot|windsurf|karpathy|seedance|suno|kling|pika|luma|hailuo|minimax|comfyui|langchain|langgraph|crewai|autogen|n8n|make\.com|zapier|firecrawl|openclaw|clawdbot|state\s*machine|harness|cli|terminal|rate\s*limit|usage\s*limit|billing|tier\s*limit)\b/i;
 
   // Entrepreneurship/business signal
   var BIZ_SIGNAL = /\b(founder|ceo|cto|coo|co-?found|bootstrap|profit|customer|churn|retention|conversion|growth|scale|pivot|acquisition|ipo|exit|cap\s*table|equity|vest|burn\s*rate|runway|market\s*fit|pmf|b2b|b2c|outbound|inbound|cold\s*email|sales|pipeline|onboard|pricing|freemium|enterprise)\b/i;
@@ -36,14 +36,9 @@ var XraiPrefilter = (function () {
       return null; // pass to AI
     }
 
-    // Empty text with media = likely engagement bait
-    if (!text && hasMedia) {
-      return { prediction: 'noise', confidence: 0.85, reason: 'media-only, no text', source: 'prefilter' };
-    }
-
-    // Ultra-short text without media = usually nothing useful
-    if (text.length < 15 && !hasMedia) {
-      return { prediction: 'noise', confidence: 0.80, reason: 'ultra-short text', source: 'prefilter' };
+    // Empty text with no media = truly empty, nothing for AI to classify
+    if (text === '' && !hasMedia) {
+      return { prediction: 'noise', confidence: 0.90, reason: 'empty-no-content', source: 'prefilter' };
     }
 
     // NSFW
@@ -79,17 +74,6 @@ var XraiPrefilter = (function () {
     // Entertainment/lifestyle content — not relevant to tech
     if (ENTERTAINMENT_NOISE.test(text)) {
       return { prediction: 'noise', confidence: 0.80, reason: 'entertainment', source: 'prefilter' };
-    }
-
-    // VIDEO + SHORT VAGUE TEXT (< 80 chars) without tech keywords = entertainment bait
-    // Tech keywords already caught by safelist above, so anything here is non-tech
-    if (data.hasVideo && text.length < 80) {
-      return { prediction: 'noise', confidence: 0.80, reason: 'short-video-non-tech', source: 'prefilter' };
-    }
-
-    // IMAGE + SHORT VAGUE TEXT (< 40 chars) without tech keywords
-    if (data.hasImage && text.length < 40) {
-      return { prediction: 'noise', confidence: 0.75, reason: 'short-image-non-tech', source: 'prefilter' };
     }
 
     // Not caught — pass to AI

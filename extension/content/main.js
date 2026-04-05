@@ -107,7 +107,7 @@ var XraiMain = (function () {
     // Step 2: Pre-filter (regex)
     var pfResult = XraiPrefilter.prefilter(data);
     if (pfResult) {
-      console.log('[xrai] PREFILTER kill:', pfResult.reason, '|', (data.text || '').substring(0, 80));
+      console.log('[xrai] PREFILTER kill:', pfResult.reason, '|', data.text || '');
       XraiHider.hide(el, config ? config.hideMethod : 'remove');
       XraiClassifier.cachePrefilter(data.id, 'noise', pfResult.confidence, pfResult.reason);
       XraiMemory.logClassification(data.text, data.mediaType, 'noise', pfResult.confidence, 'prefilter:' + pfResult.reason);
