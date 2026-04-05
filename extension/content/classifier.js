@@ -3,7 +3,7 @@ var XraiClassifier = (function () {
   'use strict';
 
   var MAX_CONCURRENT = 5;
-  var MAX_CALLS_PER_MINUTE = 20;
+  var MAX_CALLS_PER_MINUTE = 100;
 
   var resultCache = {};    // tweetId -> { prediction, confidence, source }
   var queue = [];          // { id, text, mediaType, cb }
