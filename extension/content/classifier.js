@@ -33,7 +33,7 @@ var XraiClassifier = (function () {
     // Check cache first
     var cached = checkCache(id);
     if (cached) {
-      console.log('[xrai] CACHE  | @' + (author || '?') + ' | id:' + id + ' | ' + cached.prediction + ' (' + cached.confidence + ') | ' + cached.source + ' | ' + (text || '').substring(0, 60));
+      console.log('[xrai] CACHE  | @' + (author || '?') + ' | id:' + id + ' | ' + (mediaType || 'text') + ' | ' + cached.prediction + ' (' + cached.confidence + ') | ' + cached.source + ' | ' + (text || '').substring(0, 60));
       if (cb) cb(cached);
       return;
     }
@@ -72,7 +72,7 @@ var XraiClassifier = (function () {
         if (chrome.runtime.lastError || !response) {
           var fallback = { prediction: 'noise', confidence: 0.5, source: 'error' };
           cacheResult(item.id, fallback);
-          console.log('[xrai] OLLAMA | @' + (item.author || '?') + ' | id:' + item.id + ' | ERROR fallback noise | ' + (item.text || '').substring(0, 60));
+          console.log('[xrai] OLLAMA | @' + (item.author || '?') + ' | id:' + item.id + ' | ' + (item.mediaType || 'text') + ' | ERROR fallback noise | ' + (item.text || '').substring(0, 60));
           if (item.cb) item.cb(fallback);
         } else {
           var result = {
@@ -83,7 +83,7 @@ var XraiClassifier = (function () {
           if (response.reason) result.reason = response.reason;
           cacheResult(item.id, result);
           var reasonTag = result.reason ? ' | ' + result.reason : '';
-          console.log('[xrai] OLLAMA | @' + (item.author || '?') + ' | id:' + item.id + ' | ' + result.prediction + ' (' + result.confidence + ')' + reasonTag + ' | ' + (item.text || '').substring(0, 60));
+          console.log('[xrai] OLLAMA | @' + (item.author || '?') + ' | id:' + item.id + ' | ' + (item.mediaType || 'text') + ' | ' + result.prediction + ' (' + result.confidence + ')' + reasonTag + ' | ' + (item.text || '').substring(0, 60));
           if (item.cb) item.cb(result);
         }
 

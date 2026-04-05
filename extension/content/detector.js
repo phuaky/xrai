@@ -47,8 +47,35 @@ var XraiDetector = (function () {
   }
 
   function extractText(el) {
-    var textEl = el.querySelector('[data-testid="tweetText"]');
+    // Get the tweet's own text, excluding quoted tweet text
+    var quoteTweet = el.querySelector('[data-testid="quoteTweet"]');
+    var tweetTexts = el.querySelectorAll('[data-testid="tweetText"]');
+    for (var i = 0; i < tweetTexts.length; i++) {
+      // Skip tweetText elements inside a quoted tweet
+      if (quoteTweet && quoteTweet.contains(tweetTexts[i])) continue;
+      return tweetTexts[i].textContent.trim();
+    }
+    return '';
+  }
+
+  function extractQuotedText(el) {
+    var quote = el.querySelector('[data-testid="quoteTweet"]');
+    if (!quote) return '';
+    var textEl = quote.querySelector('[data-testid="tweetText"]');
     return textEl ? textEl.textContent.trim() : '';
+  }
+
+  function extractCardText(el) {
+    var card = el.querySelector('[data-testid="card.wrapper"]');
+    if (!card) return '';
+    // Cards typically have a title and description in span/div elements
+    var parts = [];
+    var spans = card.querySelectorAll('span, div[dir="ltr"]');
+    for (var i = 0; i < spans.length; i++) {
+      var t = spans[i].textContent.trim();
+      if (t && parts.indexOf(t) === -1) parts.push(t);
+    }
+    return parts.join(' ').trim();
   }
 
   function detectMedia(el) {
@@ -92,10 +119,17 @@ var XraiDetector = (function () {
     var id = extractTweetId(el);
     if (!id) return null;
     var text = extractText(el);
+    var quotedText = extractQuotedText(el);
+    var cardText = extractCardText(el);
     var media = detectMedia(el);
+    var hasQuote = quotedText !== '';
+    var hasCard = cardText !== '';
+    var isMediaOnly = media.hasMedia && text === '' && !hasQuote && !hasCard;
     return {
       id: id,
       text: text,
+      quotedText: quotedText,
+      cardText: cardText,
       author: extractAuthor(el),
       authorName: extractAuthorName(el),
       isReply: detectReply(el),
@@ -103,7 +137,10 @@ var XraiDetector = (function () {
       hasImage: media.hasImage,
       hasGif: media.hasGif,
       hasMedia: media.hasMedia,
-      mediaType: media.mediaType
+      mediaType: media.mediaType,
+      hasQuote: hasQuote,
+      hasCard: hasCard,
+      isMediaOnly: isMediaOnly
     };
   }
 
