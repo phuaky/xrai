@@ -139,6 +139,10 @@ var XraiMain = (function () {
         XraiHider.hide(el, config ? config.hideMethod : 'remove', cachedReason);
         XraiIndicator.incrementHidden();
       } else {
+        var cachedSignalReason = cached.reason
+          ? 'AI: ' + cached.reason
+          : 'AI: signal (' + cached.confidence + ')';
+        XraiHider.addSignalLabel(el, cachedSignalReason);
         XraiIndicator.incrementShown();
         XraiReply.attachReplyButton(el, data);
       }
@@ -161,6 +165,10 @@ var XraiMain = (function () {
         XraiIndicator.incrementHidden();
       } else {
         XraiHider.unblurPending(el);
+        var signalLabel = result.reason
+          ? 'AI: ' + result.reason
+          : 'AI: signal (' + result.confidence + ')';
+        XraiHider.addSignalLabel(el, signalLabel);
         XraiMemory.logClassification(data.text, data.mediaType, 'signal', result.confidence, result.source || 'model');
         XraiIndicator.incrementShown();
         XraiReply.attachReplyButton(el, data);

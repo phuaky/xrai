@@ -230,7 +230,8 @@ article:hover .xrai-reply-btn {
 .xrai-peek-btn {
   position: absolute;
   top: 8px;
-  right: 8px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 10;
   background: rgba(15, 15, 20, 0.85);
   color: #ccc;
@@ -283,6 +284,28 @@ article[data-xrai-revealed] > *:not(.xrai-peek-btn):not(.xrai-blur-label) {
   padding: 3px 10px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  user-select: none;
+  pointer-events: none;
+  max-width: 80%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Signal label — shows classification reason on signal tweets */
+.xrai-signal-label {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 10;
+  background: rgba(15, 15, 20, 0.85);
+  color: #4ade80;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(74, 222, 128, 0.2);
   backdrop-filter: blur(8px);
   user-select: none;
   pointer-events: none;
