@@ -98,8 +98,8 @@ var XraiMain = (function () {
 
     // Step 1: Reply filter — blur stays (was applied or apply now)
     if (config && config.contentFilter === 'posts-only' && data.isReply) {
-      console.log('[xrai] REPLY hide |', (data.text || '').substring(0, 80));
-      XraiHider.hide(el, config.hideMethod);
+      console.log('[xrai] REPLY  | @' + (data.author || '?') + ' | id:' + data.id + ' | reply filtered | ' + (data.text || '').substring(0, 60));
+      XraiHider.hide(el, config.hideMethod, 'reply filtered');
       XraiIndicator.incrementHidden();
       attachNewTabHandler(el, data);
       return;
@@ -108,8 +108,8 @@ var XraiMain = (function () {
     // Step 2: Pre-filter (regex) — blur stays, apply confirmed hide
     var pfResult = XraiPrefilter.prefilter(data);
     if (pfResult) {
-      console.log('[xrai] PREFILTER kill:', pfResult.reason, '|', data.text || '');
-      XraiHider.hide(el, config ? config.hideMethod : 'remove');
+      console.log('[xrai] PREFLT | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + pfResult.reason + ' | ' + (data.text || '').substring(0, 60));
+      XraiHider.hide(el, config ? config.hideMethod : 'remove', 'prefilter: ' + pfResult.reason);
       XraiClassifier.cachePrefilter(data.id, 'noise', pfResult.confidence, pfResult.reason);
       XraiMemory.logClassification(data.text, data.mediaType, 'noise', pfResult.confidence, 'prefilter:' + pfResult.reason);
       XraiIndicator.incrementHidden();
@@ -119,7 +119,7 @@ var XraiMain = (function () {
 
     // Step 3: If Ollama unavailable, show by default (no blur)
     if (!ollamaAvailable) {
-      console.log('[xrai] OLLAMA OFF \u2014 showing by default:', (data.text || '').substring(0, 80));
+      console.log('[xrai] OFF    | @' + (data.author || '?') + ' | id:' + data.id + ' | showing by default | ' + (data.text || '').substring(0, 60));
       XraiMemory.logClassification(data.text, data.mediaType, 'signal', 0.5, 'default');
       XraiIndicator.incrementShown();
       XraiReply.attachReplyButton(el, data);
@@ -131,7 +131,12 @@ var XraiMain = (function () {
     var cached = XraiClassifier.checkCache(data.id);
     if (cached) {
       if (cached.prediction === 'noise' && cached.confidence >= threshold) {
-        XraiHider.hide(el, config ? config.hideMethod : 'remove');
+        var cachedReason = cached.reason
+          ? 'AI: ' + cached.reason
+          : cached.source && cached.source.indexOf('prefilter:') === 0
+            ? 'prefilter: ' + cached.source.substring(10)
+            : 'AI: noise (' + cached.confidence + ')';
+        XraiHider.hide(el, config ? config.hideMethod : 'remove', cachedReason);
         XraiIndicator.incrementHidden();
       } else {
         XraiIndicator.incrementShown();
@@ -145,10 +150,13 @@ var XraiMain = (function () {
     XraiHider.blurPending(el);
 
     // Step 6: Classify (Ollama queue)
-    XraiClassifier.classify(data.id, data.text, data.mediaType, function (result) {
+    XraiClassifier.classify(data.id, data.text, data.mediaType, data.author, function (result) {
       if (result.prediction === 'noise' && result.confidence >= threshold) {
+        var reasonLabel = result.reason
+          ? 'AI: ' + result.reason
+          : 'AI: noise (' + result.confidence + ')';
         XraiHider.unblurPending(el);
-        XraiHider.hide(el, config ? config.hideMethod : 'remove');
+        XraiHider.hide(el, config ? config.hideMethod : 'remove', reasonLabel);
         XraiMemory.logClassification(data.text, data.mediaType, 'noise', result.confidence, result.source || 'model');
         XraiIndicator.incrementHidden();
       } else {

@@ -3,7 +3,7 @@
 var DEFAULT_URL = 'http://localhost:11434';
 var DEFAULT_MODEL = 'phi4-mini';
 
-var CLASSIFY_SYSTEM = 'You classify tweets as signal or noise. Output ONLY valid JSON.\nScore 4 dimensions (0 or 1 each):\n- NOVELTY: New info (1) or recycled take (0)?\n- SPECIFICITY: Concrete details (1) or vague claims (0)?\n- DENSITY: High insight per word (1) or filler (0)?\n- AUTHENTICITY: Genuine sharing (1) or engagement farming (0)?\n\nNOISE indicators: ALL CAPS text, vague hype (\"insane\", \"wild\", \"crazy\"), video+short text, no concrete details, crypto pumps.\nSIGNAL indicators: specific numbers/tools/results, personal experience with details, technical content.\n\nScore 3-4 = signal (confidence 0.75-0.95). Score 0-2 = noise (confidence 0.75-0.95). Score 2 with some specifics = noise confidence 0.6.\nOutput: {"prediction":"signal"|"noise","confidence":0.6-0.95}';
+var CLASSIFY_SYSTEM = 'You classify tweets as signal or noise. Output ONLY valid JSON.\nScore 4 dimensions (0 or 1 each):\n- NOVELTY: New info (1) or recycled take (0)?\n- SPECIFICITY: Concrete details (1) or vague claims (0)?\n- DENSITY: High insight per word (1) or filler (0)?\n- AUTHENTICITY: Genuine sharing (1) or engagement farming (0)?\n\nNOISE indicators: ALL CAPS text, vague hype (\"insane\", \"wild\", \"crazy\"), video+short text, no concrete details, crypto pumps.\nSIGNAL indicators: specific numbers/tools/results, personal experience with details, technical content.\n\nScore 3-4 = signal (confidence 0.75-0.95). Score 0-2 = noise (confidence 0.75-0.95). Score 2 with some specifics = noise confidence 0.6.\nOutput: {"prediction":"signal"|"noise","confidence":0.6-0.95,"reason":"1-5 word summary"}';
 
 var REPLY_SYSTEM = 'Generate short reply options for a tweet. Output ONLY valid JSON array.\nRules: 5-15 words each, max 80 chars, no hashtags, match energy.\nOutput: [{"style":"curious","text":"..."},{"style":"insight","text":"..."},{"style":"connect","text":"..."}]';
 
@@ -198,10 +198,14 @@ function parseClassification(content) {
     var match = content.match(/\{[\s\S]*?\}/);
     if (match) {
       var obj = JSON.parse(match[0]);
-      return {
+      var result = {
         prediction: obj.prediction === 'signal' ? 'signal' : 'noise',
         confidence: Math.min(1, Math.max(0, parseFloat(obj.confidence) || 0.5))
       };
+      if (obj.reason && typeof obj.reason === 'string') {
+        result.reason = obj.reason.substring(0, 50);
+      }
+      return result;
     }
   } catch (e) { /* fallback */ }
   if (/signal/i.test(content)) return { prediction: 'signal', confidence: 0.6 };

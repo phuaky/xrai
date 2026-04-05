@@ -29,17 +29,17 @@ var XraiClassifier = (function () {
     return callTimestamps.length >= MAX_CALLS_PER_MINUTE;
   }
 
-  function classify(id, text, mediaType, cb) {
+  function classify(id, text, mediaType, author, cb) {
     // Check cache first
     var cached = checkCache(id);
     if (cached) {
-      console.log('[xrai] CACHE hit:', cached.prediction, '(' + cached.confidence + ')', '|', (text || '').substring(0, 80));
+      console.log('[xrai] CACHE  | @' + (author || '?') + ' | id:' + id + ' | ' + cached.prediction + ' (' + cached.confidence + ') | ' + cached.source + ' | ' + (text || '').substring(0, 60));
       if (cb) cb(cached);
       return;
     }
 
     // Queue for Ollama
-    queue.push({ id: id, text: text, mediaType: mediaType, cb: cb });
+    queue.push({ id: id, text: text, mediaType: mediaType, author: author, cb: cb });
     drain();
   }
 
@@ -72,7 +72,7 @@ var XraiClassifier = (function () {
         if (chrome.runtime.lastError || !response) {
           var fallback = { prediction: 'noise', confidence: 0.5, source: 'error' };
           cacheResult(item.id, fallback);
-          console.log('[xrai] OLLAMA error, fallback noise |', (item.text || '').substring(0, 80));
+          console.log('[xrai] OLLAMA | @' + (item.author || '?') + ' | id:' + item.id + ' | ERROR fallback noise | ' + (item.text || '').substring(0, 60));
           if (item.cb) item.cb(fallback);
         } else {
           var result = {
@@ -80,8 +80,10 @@ var XraiClassifier = (function () {
             confidence: response.confidence || 0.5,
             source: 'model'
           };
+          if (response.reason) result.reason = response.reason;
           cacheResult(item.id, result);
-          console.log('[xrai] OLLAMA \u2192', result.prediction, '(' + result.confidence + ')', '|', (item.text || '').substring(0, 80));
+          var reasonTag = result.reason ? ' | ' + result.reason : '';
+          console.log('[xrai] OLLAMA | @' + (item.author || '?') + ' | id:' + item.id + ' | ' + result.prediction + ' (' + result.confidence + ')' + reasonTag + ' | ' + (item.text || '').substring(0, 60));
           if (item.cb) item.cb(result);
         }
 

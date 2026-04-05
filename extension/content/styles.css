@@ -258,16 +258,38 @@ article[data-xrai-pending] > * {
   transition: filter 0.2s ease;
 }
 
-/* Blur children of hidden tweets, but not the peek button */
+/* Blur children of hidden tweets, but not the peek button or blur label */
 article[data-xrai-hidden="blur"] {
   position: relative;
 }
-article[data-xrai-hidden="blur"] > *:not(.xrai-peek-btn) {
+article[data-xrai-hidden="blur"] > *:not(.xrai-peek-btn):not(.xrai-blur-label) {
   filter: blur(8px);
   transition: filter 0.2s ease;
 }
-article[data-xrai-revealed] > *:not(.xrai-peek-btn) {
+article[data-xrai-revealed] > *:not(.xrai-peek-btn):not(.xrai-blur-label) {
   filter: none;
+}
+
+/* Blur overlay label — shows classification reason */
+.xrai-blur-label {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 10;
+  background: rgba(15, 15, 20, 0.85);
+  color: #ccc;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  user-select: none;
+  pointer-events: none;
+  max-width: 80%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Fade-in animation */
