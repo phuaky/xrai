@@ -103,10 +103,21 @@ var XraiHider = (function () {
     }
   }
 
+  function addSignalLabel(element, reason) {
+    if (!element || !reason || element._xraiSignalLabel) return;
+    element.style.position = 'relative';
+    var label = document.createElement('div');
+    label.className = 'xrai-signal-label';
+    label.textContent = reason;
+    element.appendChild(label);
+    element._xraiSignalLabel = label;
+  }
+
   return {
     blurPending: blurPending,
     unblurPending: unblurPending,
     hide: hide,
-    show: show
+    show: show,
+    addSignalLabel: addSignalLabel
   };
 })();
