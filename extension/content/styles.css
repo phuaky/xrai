@@ -249,6 +249,15 @@ article:hover .xrai-reply-btn {
   color: #fff;
 }
 
+/* Pending blur — applied immediately on detection, before classification */
+article[data-xrai-pending] {
+  position: relative;
+}
+article[data-xrai-pending] > * {
+  filter: blur(8px);
+  transition: filter 0.2s ease;
+}
+
 /* Blur children of hidden tweets, but not the peek button */
 article[data-xrai-hidden="blur"] {
   position: relative;
