@@ -151,7 +151,7 @@ node scripts/collector.js  # receives data at localhost:11435, saves to data/cla
   hideMethod: 'remove',      // 'remove' | 'collapse' | 'blur'
   replyStyle: 'curious',     // 'curious' | 'technical' | 'casual'
   memoryRetentionDays: 30,
-  maxModelCallsPerMinute: 20
+  maxModelCallsPerMinute: 100
 }
 ```
 

@@ -10,7 +10,7 @@ var XraiConfig = (function () {
     hideMethod: 'remove',
     replyStyle: 'curious',
     memoryRetentionDays: 30,
-    maxModelCallsPerMinute: 20,
+    maxModelCallsPerMinute: 100,
     batchSize: 5,
     batchFlushDelay: 2000
   };
