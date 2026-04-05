@@ -82,7 +82,8 @@ var XraiMain = (function () {
     tweetText.addEventListener('click', function (e) {
       // Don't intercept if clicking inside interactive elements
       if (e.target.closest('[data-testid="like"], [data-testid="retweet"], [data-testid="reply"], [data-testid="Tweet-User-Avatar"], [role="group"], video, [data-testid="videoPlayer"], [data-testid="tweetPhoto"]')) return;
-      // Don't open if tweet is blurred and not revealed
+      // Don't open if tweet is pending classification or blurred and not revealed
+      if (el.hasAttribute('data-xrai-pending')) return;
       if (el.getAttribute('data-xrai-hidden') === 'blur' && !el.hasAttribute('data-xrai-revealed')) return;
       e.preventDefault();
       e.stopPropagation();
@@ -95,7 +96,7 @@ var XraiMain = (function () {
     var data = info.data;
     var threshold = (config && config.confidenceThreshold) || 0.7;
 
-    // Step 1: Reply filter
+    // Step 1: Reply filter — blur stays (was applied or apply now)
     if (config && config.contentFilter === 'posts-only' && data.isReply) {
       console.log('[xrai] REPLY hide |', (data.text || '').substring(0, 80));
       XraiHider.hide(el, config.hideMethod);
@@ -104,7 +105,7 @@ var XraiMain = (function () {
       return;
     }
 
-    // Step 2: Pre-filter (regex)
+    // Step 2: Pre-filter (regex) — blur stays, apply confirmed hide
     var pfResult = XraiPrefilter.prefilter(data);
     if (pfResult) {
       console.log('[xrai] PREFILTER kill:', pfResult.reason, '|', data.text || '');
@@ -116,7 +117,7 @@ var XraiMain = (function () {
       return;
     }
 
-    // Step 3: If Ollama unavailable, show by default
+    // Step 3: If Ollama unavailable, show by default (no blur)
     if (!ollamaAvailable) {
       console.log('[xrai] OLLAMA OFF \u2014 showing by default:', (data.text || '').substring(0, 80));
       XraiMemory.logClassification(data.text, data.mediaType, 'signal', 0.5, 'default');
@@ -126,13 +127,32 @@ var XraiMain = (function () {
       return;
     }
 
-    // Step 4: Classify (cache hit = instant, cache miss = Ollama queue)
+    // Step 4: Check cache synchronously to avoid blur flash on cached signal tweets
+    var cached = XraiClassifier.checkCache(data.id);
+    if (cached) {
+      if (cached.prediction === 'noise' && cached.confidence >= threshold) {
+        XraiHider.hide(el, config ? config.hideMethod : 'remove');
+        XraiIndicator.incrementHidden();
+      } else {
+        XraiIndicator.incrementShown();
+        XraiReply.attachReplyButton(el, data);
+      }
+      attachNewTabHandler(el, data);
+      return;
+    }
+
+    // Step 5: Blur immediately while waiting for classification
+    XraiHider.blurPending(el);
+
+    // Step 6: Classify (Ollama queue)
     XraiClassifier.classify(data.id, data.text, data.mediaType, function (result) {
       if (result.prediction === 'noise' && result.confidence >= threshold) {
+        XraiHider.unblurPending(el);
         XraiHider.hide(el, config ? config.hideMethod : 'remove');
         XraiMemory.logClassification(data.text, data.mediaType, 'noise', result.confidence, result.source || 'model');
         XraiIndicator.incrementHidden();
       } else {
+        XraiHider.unblurPending(el);
         XraiMemory.logClassification(data.text, data.mediaType, 'signal', result.confidence, result.source || 'model');
         XraiIndicator.incrementShown();
         XraiReply.attachReplyButton(el, data);

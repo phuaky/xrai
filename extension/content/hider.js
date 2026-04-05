@@ -2,8 +2,22 @@
 var XraiHider = (function () {
   'use strict';
 
+  function blurPending(element) {
+    if (!element) return;
+    element.setAttribute('data-xrai-pending', '1');
+    element.style.position = 'relative';
+  }
+
+  function unblurPending(element) {
+    if (!element) return;
+    element.removeAttribute('data-xrai-pending');
+    element.style.position = '';
+  }
+
   function hide(element, method) {
     if (!element || element.getAttribute('data-xrai-hidden')) return;
+    // Clear pending blur state when transitioning to confirmed hide
+    element.removeAttribute('data-xrai-pending');
     method = method || 'remove';
     element.setAttribute('data-xrai-hidden', method);
 
@@ -77,6 +91,8 @@ var XraiHider = (function () {
   }
 
   return {
+    blurPending: blurPending,
+    unblurPending: unblurPending,
     hide: hide,
     show: show
   };
