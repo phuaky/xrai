@@ -91,14 +91,32 @@ var XraiMain = (function () {
     });
   }
 
+  function buildMediaTag(data) {
+    var parts = [data.mediaType || 'text'];
+    if (data.hasQuote) parts.push('quote');
+    if (data.hasCard) parts.push('card');
+    if (data.isMediaOnly) parts.push('media-only');
+    return parts.join('+');
+  }
+
+  function buildEnrichedText(data) {
+    var parts = [];
+    if (data.text) parts.push(data.text);
+    if (data.quotedText) parts.push('[quoted] ' + data.quotedText);
+    if (data.cardText) parts.push('[card] ' + data.cardText);
+    return parts.join(' ');
+  }
+
   function handleTweet(info) {
     var el = info.element;
     var data = info.data;
     var threshold = (config && config.confidenceThreshold) || 0.7;
+    var mediaTag = buildMediaTag(data);
+    var enrichedText = buildEnrichedText(data);
 
     // Step 1: Reply filter — blur stays (was applied or apply now)
     if (config && config.contentFilter === 'posts-only' && data.isReply) {
-      console.log('[xrai] REPLY  | @' + (data.author || '?') + ' | id:' + data.id + ' | reply filtered | ' + (data.text || '').substring(0, 60));
+      console.log('[xrai] REPLY  | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | reply filtered | ' + (enrichedText || '').substring(0, 80));
       XraiHider.hide(el, config.hideMethod, 'reply filtered');
       XraiIndicator.incrementHidden();
       attachNewTabHandler(el, data);
@@ -108,7 +126,7 @@ var XraiMain = (function () {
     // Step 2: Pre-filter (regex) — blur stays, apply confirmed hide
     var pfResult = XraiPrefilter.prefilter(data);
     if (pfResult) {
-      console.log('[xrai] PREFLT | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + pfResult.reason + ' | ' + (data.text || '').substring(0, 60));
+      console.log('[xrai] PREFLT | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | ' + pfResult.reason + ' | ' + (enrichedText || '').substring(0, 80));
       XraiHider.hide(el, config ? config.hideMethod : 'remove', 'prefilter: ' + pfResult.reason);
       XraiClassifier.cachePrefilter(data.id, 'noise', pfResult.confidence, pfResult.reason);
       XraiMemory.logClassification(data.text, data.mediaType, 'noise', pfResult.confidence, 'prefilter:' + pfResult.reason);
@@ -117,9 +135,22 @@ var XraiMain = (function () {
       return;
     }
 
+    // Step 2.5: Media-only tweets — has media but no text context at all
+    if (data.isMediaOnly) {
+      var mediaOnlyResult = { prediction: 'noise', confidence: 0.55, source: 'media-only' };
+      console.log('[xrai] MEDIA  | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | media-only, no text to classify');
+      XraiClassifier.cachePrefilter(data.id, 'noise', 0.55, 'media-only');
+      XraiMemory.logClassification('', data.mediaType, 'noise', 0.55, 'media-only');
+      // Low confidence — don't aggressively hide, use blur so user can reveal
+      XraiHider.hide(el, 'blur', 'media-only: no text to classify');
+      XraiIndicator.incrementHidden();
+      attachNewTabHandler(el, data);
+      return;
+    }
+
     // Step 3: If Ollama unavailable, show by default (no blur)
     if (!ollamaAvailable) {
-      console.log('[xrai] OFF    | @' + (data.author || '?') + ' | id:' + data.id + ' | showing by default | ' + (data.text || '').substring(0, 60));
+      console.log('[xrai] OFF    | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | showing by default | ' + (enrichedText || '').substring(0, 80));
       XraiMemory.logClassification(data.text, data.mediaType, 'signal', 0.5, 'default');
       XraiIndicator.incrementShown();
       XraiReply.attachReplyButton(el, data);
@@ -153,8 +184,8 @@ var XraiMain = (function () {
     // Step 5: Blur immediately while waiting for classification
     XraiHider.blurPending(el);
 
-    // Step 6: Classify (Ollama queue)
-    XraiClassifier.classify(data.id, data.text, data.mediaType, data.author, function (result) {
+    // Step 6: Classify (Ollama queue) — use enriched text for better context
+    XraiClassifier.classify(data.id, enrichedText, data.mediaType, data.author, function (result) {
       if (result.prediction === 'noise' && result.confidence >= threshold) {
         var reasonLabel = result.reason
           ? 'AI: ' + result.reason

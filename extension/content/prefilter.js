@@ -28,16 +28,19 @@ var XraiPrefilter = (function () {
 
   function prefilter(data) {
     var text = (data.text || '').trim();
+    var quotedText = (data.quotedText || '').trim();
+    var cardText = (data.cardText || '').trim();
+    var allText = text || quotedText || cardText;
     var hasMedia = data.hasMedia || data.hasVideo || data.hasImage || data.hasGif;
 
     // === SAFELIST CHECK FIRST ===
-    // If text contains tech/AI/biz keywords, NEVER prefilter — let AI decide
-    if (TECH_SIGNAL.test(text) || BIZ_SIGNAL.test(text)) {
+    // If any available text contains tech/AI/biz keywords, NEVER prefilter — let AI decide
+    if (TECH_SIGNAL.test(allText) || BIZ_SIGNAL.test(allText)) {
       return null; // pass to AI
     }
 
-    // Empty text with no media = truly empty, nothing for AI to classify
-    if (text === '' && !hasMedia) {
+    // Empty text with no media and no quoted/card text = truly empty
+    if (text === '' && !hasMedia && !quotedText && !cardText) {
       return { prediction: 'noise', confidence: 0.90, reason: 'empty-no-content', source: 'prefilter' };
     }
 
