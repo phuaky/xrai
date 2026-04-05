@@ -14,7 +14,7 @@ var XraiHider = (function () {
     element.style.position = '';
   }
 
-  function hide(element, method) {
+  function hide(element, method, reason) {
     if (!element || element.getAttribute('data-xrai-hidden')) return;
     // Clear pending blur state when transitioning to confirmed hide
     element.removeAttribute('data-xrai-pending');
@@ -62,6 +62,15 @@ var XraiHider = (function () {
       });
       element.appendChild(btn);
       element._xraiPeekBtn = btn;
+
+      // Add reason overlay label
+      if (reason) {
+        var label = document.createElement('div');
+        label.className = 'xrai-blur-label';
+        label.textContent = reason;
+        element.appendChild(label);
+        element._xraiBlurLabel = label;
+      }
     }
   }
 
@@ -87,6 +96,10 @@ var XraiHider = (function () {
     if (element._xraiPeekBtn) {
       element._xraiPeekBtn.remove();
       delete element._xraiPeekBtn;
+    }
+    if (element._xraiBlurLabel) {
+      element._xraiBlurLabel.remove();
+      delete element._xraiBlurLabel;
     }
   }
 
