@@ -46,6 +46,95 @@ var XraiDetector = (function () {
     return '';
   }
 
+  // Detect and click "Show more" to expand truncated text within a container
+  function findShowMore(container) {
+    // Primary: X's data-testid for show-more link
+    var btn = container.querySelector('[data-testid="tweet-text-show-more-link"]');
+    if (btn) return btn;
+    // Fallback: role="link" with "Show more" text (but not inside quoted tweets for main text)
+    var links = container.querySelectorAll('[role="link"]');
+    for (var i = 0; i < links.length; i++) {
+      if (/^show more$/i.test(links[i].textContent.trim())) return links[i];
+    }
+    // Fallback: span/button containing "Show more"
+    var spans = container.querySelectorAll('span');
+    for (var j = 0; j < spans.length; j++) {
+      if (/^show more$/i.test(spans[j].textContent.trim()) && spans[j].closest('a, [role="link"], [role="button"]')) {
+        return spans[j].closest('a, [role="link"], [role="button"]');
+      }
+    }
+    return null;
+  }
+
+  // Expand truncated text in a container, returns a promise that resolves when done
+  function expandTruncated(container, label) {
+    var quoteTweet = container.querySelector('[data-testid="quoteTweet"]');
+
+    // For main tweet: find show-more NOT inside quoted tweet
+    var showMore = null;
+    var candidates = container.querySelectorAll('[data-testid="tweet-text-show-more-link"], [role="link"]');
+    for (var i = 0; i < candidates.length; i++) {
+      if (quoteTweet && quoteTweet.contains(candidates[i])) continue;
+      if (candidates[i].getAttribute('data-testid') === 'tweet-text-show-more-link' ||
+          /^show more$/i.test(candidates[i].textContent.trim())) {
+        showMore = candidates[i];
+        break;
+      }
+    }
+
+    if (!showMore) return Promise.resolve(false);
+
+    // Click to expand
+    showMore.click();
+    console.log('[xrai] EXPAND | ' + (label || 'tweet') + ' | clicked Show more');
+
+    // Wait for DOM to update (text element to change)
+    return new Promise(function (resolve) {
+      var timeout = setTimeout(function () { resolve(true); }, 500);
+      var obs = new MutationObserver(function () {
+        clearTimeout(timeout);
+        obs.disconnect();
+        resolve(true);
+      });
+      // Watch for text content changes in the container
+      var textEl = container.querySelector('[data-testid="tweetText"]');
+      if (textEl) {
+        obs.observe(textEl, { childList: true, subtree: true, characterData: true });
+      } else {
+        obs.observe(container, { childList: true, subtree: true });
+      }
+      // Safety: disconnect after max wait
+      setTimeout(function () { obs.disconnect(); }, 600);
+    });
+  }
+
+  // Expand truncated text inside a quoted tweet
+  function expandQuotedTruncated(el) {
+    var quote = el.querySelector('[data-testid="quoteTweet"]');
+    if (!quote) return Promise.resolve(false);
+    var showMore = findShowMore(quote);
+    if (!showMore) return Promise.resolve(false);
+
+    showMore.click();
+    console.log('[xrai] EXPAND | quoted tweet | clicked Show more');
+
+    return new Promise(function (resolve) {
+      var timeout = setTimeout(function () { resolve(true); }, 500);
+      var obs = new MutationObserver(function () {
+        clearTimeout(timeout);
+        obs.disconnect();
+        resolve(true);
+      });
+      var textEl = quote.querySelector('[data-testid="tweetText"]');
+      if (textEl) {
+        obs.observe(textEl, { childList: true, subtree: true, characterData: true });
+      } else {
+        obs.observe(quote, { childList: true, subtree: true });
+      }
+      setTimeout(function () { obs.disconnect(); }, 600);
+    });
+  }
+
   function extractText(el) {
     // Get the tweet's own text, excluding quoted tweet text
     var quoteTweet = el.querySelector('[data-testid="quoteTweet"]');
@@ -117,44 +206,93 @@ var XraiDetector = (function () {
 
   function extractData(el) {
     var id = extractTweetId(el);
-    if (!id) return null;
-    var text = extractText(el);
-    var quotedText = extractQuotedText(el);
-    var cardText = extractCardText(el);
-    var media = detectMedia(el);
-    var hasQuote = quotedText !== '';
-    var hasCard = cardText !== '';
-    var isMediaOnly = media.hasMedia && text === '' && !hasQuote && !hasCard;
-    return {
-      id: id,
-      text: text,
-      quotedText: quotedText,
-      cardText: cardText,
-      author: extractAuthor(el),
-      authorName: extractAuthorName(el),
-      isReply: detectReply(el),
-      hasVideo: media.hasVideo,
-      hasImage: media.hasImage,
-      hasGif: media.hasGif,
-      hasMedia: media.hasMedia,
-      mediaType: media.mediaType,
-      hasQuote: hasQuote,
-      hasCard: hasCard,
-      isMediaOnly: isMediaOnly
-    };
+    if (!id) return Promise.resolve(null);
+
+    // Expand truncated text before extraction (main + quoted)
+    var mainExpand = expandTruncated(el, 'id:' + id);
+    var quoteExpand = expandQuotedTruncated(el);
+
+    return Promise.all([mainExpand, quoteExpand]).then(function (results) {
+      var mainExpanded = results[0];
+      var quoteExpanded = results[1];
+
+      var text = extractText(el);
+      var quotedText = extractQuotedText(el);
+      var cardText = extractCardText(el);
+      var media = detectMedia(el);
+      var hasQuote = quotedText !== '';
+      var hasCard = cardText !== '';
+      var isMediaOnly = media.hasMedia && text === '' && !hasQuote && !hasCard;
+      return {
+        id: id,
+        text: text,
+        quotedText: quotedText,
+        cardText: cardText,
+        author: extractAuthor(el),
+        authorName: extractAuthorName(el),
+        isReply: detectReply(el),
+        hasVideo: media.hasVideo,
+        hasImage: media.hasImage,
+        hasGif: media.hasGif,
+        hasMedia: media.hasMedia,
+        mediaType: media.mediaType,
+        hasQuote: hasQuote,
+        hasCard: hasCard,
+        isMediaOnly: isMediaOnly,
+        wasExpanded: mainExpanded,
+        wasQuoteExpanded: quoteExpanded
+      };
+    }).catch(function () {
+      // Graceful fallback: extract whatever text is available without expansion
+      var text = extractText(el);
+      var quotedText = extractQuotedText(el);
+      var cardText = extractCardText(el);
+      var media = detectMedia(el);
+      var hasQuote = quotedText !== '';
+      var hasCard = cardText !== '';
+      var isMediaOnly = media.hasMedia && text === '' && !hasQuote && !hasCard;
+      return {
+        id: id,
+        text: text,
+        quotedText: quotedText,
+        cardText: cardText,
+        author: extractAuthor(el),
+        authorName: extractAuthorName(el),
+        isReply: detectReply(el),
+        hasVideo: media.hasVideo,
+        hasImage: media.hasImage,
+        hasGif: media.hasGif,
+        hasMedia: media.hasMedia,
+        mediaType: media.mediaType,
+        hasQuote: hasQuote,
+        hasCard: hasCard,
+        isMediaOnly: isMediaOnly,
+        wasExpanded: false,
+        wasQuoteExpanded: false
+      };
+    });
   }
 
   function scanArticles() {
     var articles = document.querySelectorAll('article[data-testid="tweet"]');
+    var promises = [];
     articles.forEach(function (el) {
-      var data = extractData(el);
-      if (!data || !data.id) return;
-      if (processed.has(data.id)) return;
-      processed.add(data.id);
-      callbacks.forEach(function (cb) {
-        try { cb({ element: el, data: data }); } catch (e) { /* silent */ }
-      });
+      // Quick ID check before async work to avoid unnecessary expansion
+      var id = extractTweetId(el);
+      if (!id || processed.has(id)) return;
+      processed.add(id);
+
+      promises.push(
+        extractData(el).then(function (data) {
+          if (!data || !data.id) return;
+          callbacks.forEach(function (cb) {
+            try { cb({ element: el, data: data }); } catch (e) { /* silent */ }
+          });
+        })
+      );
     });
+    // All extractions run concurrently
+    Promise.all(promises).catch(function () { /* silent */ });
   }
 
   function handleMutations() {
