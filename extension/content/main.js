@@ -114,6 +114,14 @@ var XraiMain = (function () {
     var mediaTag = buildMediaTag(data);
     var enrichedText = buildEnrichedText(data);
 
+    // Log when tweet text was expanded from truncated state
+    if (data.wasExpanded) {
+      console.log('[xrai] EXPAND | @' + (data.author || '?') + ' | id:' + data.id + ' | main tweet text was expanded');
+    }
+    if (data.wasQuoteExpanded) {
+      console.log('[xrai] EXPAND | @' + (data.author || '?') + ' | id:' + data.id + ' | quoted tweet text was expanded');
+    }
+
     // Step 1: Reply filter — blur stays (was applied or apply now)
     if (config && config.contentFilter === 'posts-only' && data.isReply) {
       console.log('[xrai] REPLY  | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | reply filtered | ' + (enrichedText || '').substring(0, 80));

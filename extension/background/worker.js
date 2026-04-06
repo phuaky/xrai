@@ -122,7 +122,7 @@ function classifyBatch(tweets, model, ollamaUrl) {
 
   var lines = tweets.map(function (t, i) {
     var tag = t.mediaType && t.mediaType !== 'text' ? ' [' + t.mediaType + ']' : '';
-    return (i + 1) + '. "' + (t.text || '').substring(0, 200) + '"' + tag;
+    return (i + 1) + '. "' + (t.text || '') + '"' + tag;
   });
   var userMsg = 'Classify each tweet:\n' + lines.join('\n') + '\nOutput JSON array: [{"id":1,"prediction":"signal"|"noise","confidence":0.0-1.0},...]';
 
