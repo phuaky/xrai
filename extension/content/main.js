@@ -8,10 +8,11 @@ var XraiMain = (function () {
   function start() {
     console.log('[xrai] Starting...');
 
-    // 1. Init memory (for classification logging)
+    // 1. Init memory (for classification logging) + start time tracking
     XraiMemory.init().catch(function (e) {
       console.warn('[xrai] Memory init error:', e);
     });
+    XraiMemory.startSession();
 
     // 2. Load config
     XraiConfig.getConfig().then(function (cfg) {
@@ -138,6 +139,8 @@ var XraiMain = (function () {
       XraiHider.hide(el, config ? config.hideMethod : 'remove', 'prefilter: ' + pfResult.reason);
       XraiClassifier.cachePrefilter(data.id, 'noise', pfResult.confidence, pfResult.reason);
       XraiMemory.logClassification(data.text, data.mediaType, 'noise', pfResult.confidence, 'prefilter:' + pfResult.reason);
+      XraiMemory.incrementStats('noise');
+      XraiMemory.markSeen(XraiMemory.computeFingerprint(data.text, data.mediaType), 'noise');
       XraiIndicator.incrementHidden();
       attachNewTabHandler(el, data);
       return;
@@ -149,6 +152,8 @@ var XraiMain = (function () {
       console.log('[xrai] MEDIA  | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | media-only, no text to classify');
       XraiClassifier.cachePrefilter(data.id, 'noise', 0.55, 'media-only');
       XraiMemory.logClassification('', data.mediaType, 'noise', 0.55, 'media-only');
+      XraiMemory.incrementStats('noise');
+      XraiMemory.markSeen(XraiMemory.computeFingerprint('', data.mediaType), 'noise');
       // Low confidence — don't aggressively hide, use blur so user can reveal
       XraiHider.hide(el, 'blur', 'media-only: no text to classify');
       XraiIndicator.incrementHidden();
@@ -160,6 +165,8 @@ var XraiMain = (function () {
     if (!ollamaAvailable) {
       console.log('[xrai] OFF    | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | showing by default | ' + (enrichedText || '').substring(0, 80));
       XraiMemory.logClassification(data.text, data.mediaType, 'signal', 0.5, 'default');
+      XraiMemory.incrementStats('signal');
+      XraiMemory.markSeen(XraiMemory.computeFingerprint(data.text, data.mediaType), 'signal');
       XraiIndicator.incrementShown();
       XraiReply.attachReplyButton(el, data);
       attachNewTabHandler(el, data);
@@ -201,6 +208,8 @@ var XraiMain = (function () {
         XraiHider.unblurPending(el);
         XraiHider.hide(el, config ? config.hideMethod : 'remove', reasonLabel);
         XraiMemory.logClassification(data.text, data.mediaType, 'noise', result.confidence, result.source || 'model');
+        XraiMemory.incrementStats('noise');
+        XraiMemory.markSeen(XraiMemory.computeFingerprint(data.text, data.mediaType), 'noise');
         XraiIndicator.incrementHidden();
       } else {
         XraiHider.unblurPending(el);
@@ -209,6 +218,8 @@ var XraiMain = (function () {
           : 'AI: signal (' + result.confidence + ')';
         XraiHider.addSignalLabel(el, signalLabel);
         XraiMemory.logClassification(data.text, data.mediaType, 'signal', result.confidence, result.source || 'model');
+        XraiMemory.incrementStats('signal');
+        XraiMemory.markSeen(XraiMemory.computeFingerprint(data.text, data.mediaType), 'signal');
         XraiIndicator.incrementShown();
         XraiReply.attachReplyButton(el, data);
       }

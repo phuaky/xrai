@@ -157,15 +157,22 @@ var XraiIndicator = (function () {
       });
     });
 
-    // Load stats
-    XraiMemory.getStats().then(function (stats) {
+    // Load stats and daily time
+    Promise.all([XraiMemory.getStats(), XraiMemory.getDailyTime()]).then(function (results) {
+      var stats = results[0];
+      var dailySecs = results[1];
       var statsEl = popup.querySelector('#xrai-s-stats');
       if (!statsEl) return;
       var timeSaved = Math.round(stats.noise * 3); // ~3s per hidden tweet
+      var dailyMin = Math.floor(dailySecs / 60);
+      var dailyLabel = dailyMin < 60
+        ? dailyMin + 'm'
+        : Math.floor(dailyMin / 60) + 'h ' + (dailyMin % 60) + 'm';
       statsEl.textContent = 'Processed: ' + stats.total +
         ' | Signal: ' + stats.signal +
         ' | Noise: ' + stats.noise +
-        ' | ~' + timeSaved + 's saved';
+        ' | ~' + timeSaved + 's saved' +
+        '\nToday on X: ' + dailyLabel;
     });
   }
 

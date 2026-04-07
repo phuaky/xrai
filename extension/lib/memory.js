@@ -103,25 +103,86 @@ const XraiMemory = (function () {
     });
   }
 
+  var STATS_KEY = 'xrai_stats_totals';
+
   function getStats() {
     return new Promise(function (resolve) {
-      if (!db) { resolve({ total: 0, signal: 0, noise: 0 }); return; }
-      var tx = db.transaction(STORE_NAME, 'readonly');
-      var store = tx.objectStore(STORE_NAME);
-      var stats = { total: 0, signal: 0, noise: 0 };
-      var cursor = store.openCursor();
-      cursor.onsuccess = function (e) {
-        var c = e.target.result;
-        if (c) {
-          stats.total++;
-          if (c.value.classification === 'signal') stats.signal++;
-          else if (c.value.classification === 'noise') stats.noise++;
-          c.continue();
+      chrome.storage.local.get(STATS_KEY, function (result) {
+        var stats = result[STATS_KEY] || { total: 0, signal: 0, noise: 0 };
+        resolve(stats);
+      });
+    });
+  }
+
+  function incrementStats(prediction) {
+    return new Promise(function (resolve) {
+      chrome.storage.local.get(STATS_KEY, function (result) {
+        var stats = result[STATS_KEY] || { total: 0, signal: 0, noise: 0 };
+        stats.total++;
+        if (prediction === 'signal') stats.signal++;
+        else if (prediction === 'noise') stats.noise++;
+        var obj = {};
+        obj[STATS_KEY] = stats;
+        chrome.storage.local.set(obj, function () { resolve(stats); });
+      });
+    });
+  }
+
+  // === Daily time tracking ===
+  var DAILY_TIME_KEY = 'xrai_daily_time';
+  var _timeInterval = null;
+
+  function _todayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function startSession() {
+    var now = Date.now();
+    // Save time every 30s while page is visible
+    _timeInterval = setInterval(function () {
+      if (!document.hidden) {
+        _saveTimeIncrement(30);
+      }
+    }, 30000);
+
+    // Pause/resume on visibility change
+    document.addEventListener('visibilitychange', function () {
+      // No action needed — the interval simply skips hidden ticks
+    });
+
+    // Save on page unload
+    window.addEventListener('beforeunload', function () {
+      if (_timeInterval) clearInterval(_timeInterval);
+    });
+  }
+
+  function _saveTimeIncrement(seconds) {
+    chrome.storage.local.get(DAILY_TIME_KEY, function (result) {
+      var data = result[DAILY_TIME_KEY] || {};
+      var today = _todayStr();
+      if (data.date !== today) {
+        // New day — reset
+        data = { date: today, seconds: 0 };
+      }
+      data.seconds += seconds;
+      var obj = {};
+      obj[DAILY_TIME_KEY] = data;
+      chrome.storage.local.set(obj);
+    });
+  }
+
+  function getDailyTime() {
+    return new Promise(function (resolve) {
+      chrome.storage.local.get(DAILY_TIME_KEY, function (result) {
+        var data = result[DAILY_TIME_KEY] || {};
+        var today = _todayStr();
+        if (data.date !== today) {
+          resolve(0);
         } else {
-          resolve(stats);
+          resolve(data.seconds || 0);
         }
-      };
-      cursor.onerror = function () { resolve(stats); };
+      });
     });
   }
 
@@ -264,6 +325,9 @@ const XraiMemory = (function () {
     getCorrections: getCorrections,
     getCorrectionCount: getCorrectionCount,
     clearCorrections: clearCorrections,
-    exportCorrections: exportCorrections
+    exportCorrections: exportCorrections,
+    incrementStats: incrementStats,
+    startSession: startSession,
+    getDailyTime: getDailyTime
   };
 })();
