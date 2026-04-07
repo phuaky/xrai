@@ -104,9 +104,38 @@ const XraiMemory = (function () {
   }
 
   var STATS_KEY = 'xrai_stats_totals';
+  // In-memory stats accumulator — avoids async read-modify-write races
+  var _memStats = null; // loaded from storage on first increment
+  var _statsFlushTimer = null;
+  var STATS_FLUSH_INTERVAL = 10000; // flush to storage every 10s
+
+  function _ensureStatsLoaded() {
+    return new Promise(function (resolve) {
+      if (_memStats) { resolve(); return; }
+      chrome.storage.local.get(STATS_KEY, function (result) {
+        if (!_memStats) {
+          _memStats = result[STATS_KEY] || { total: 0, signal: 0, noise: 0 };
+        }
+        resolve();
+      });
+    });
+  }
+
+  function _flushStats() {
+    if (!_memStats) return;
+    var obj = {};
+    obj[STATS_KEY] = { total: _memStats.total, signal: _memStats.signal, noise: _memStats.noise };
+    chrome.storage.local.set(obj);
+  }
+
+  function _startStatsFlush() {
+    if (_statsFlushTimer) return;
+    _statsFlushTimer = setInterval(_flushStats, STATS_FLUSH_INTERVAL);
+  }
 
   function getStats() {
     return new Promise(function (resolve) {
+      if (_memStats) { resolve({ total: _memStats.total, signal: _memStats.signal, noise: _memStats.noise }); return; }
       chrome.storage.local.get(STATS_KEY, function (result) {
         var stats = result[STATS_KEY] || { total: 0, signal: 0, noise: 0 };
         resolve(stats);
@@ -115,64 +144,99 @@ const XraiMemory = (function () {
   }
 
   function incrementStats(prediction) {
-    return new Promise(function (resolve) {
-      chrome.storage.local.get(STATS_KEY, function (result) {
-        var stats = result[STATS_KEY] || { total: 0, signal: 0, noise: 0 };
-        stats.total++;
-        if (prediction === 'signal') stats.signal++;
-        else if (prediction === 'noise') stats.noise++;
-        var obj = {};
-        obj[STATS_KEY] = stats;
-        chrome.storage.local.set(obj, function () { resolve(stats); });
-      });
+    return _ensureStatsLoaded().then(function () {
+      _memStats.total++;
+      if (prediction === 'signal') _memStats.signal++;
+      else if (prediction === 'noise') _memStats.noise++;
+      _startStatsFlush();
+      return { total: _memStats.total, signal: _memStats.signal, noise: _memStats.noise };
     });
   }
 
   // === Daily time tracking ===
   var DAILY_TIME_KEY = 'xrai_daily_time';
   var _timeInterval = null;
+  // In-memory time accumulator — avoids async read-modify-write races
+  var _memTime = null; // { date, seconds }
+  var _lastTickTime = 0;
 
   function _todayStr() {
     var d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
-  function startSession() {
-    var now = Date.now();
-    // Save time every 30s while page is visible
-    _timeInterval = setInterval(function () {
-      if (!document.hidden) {
-        _saveTimeIncrement(30);
-      }
-    }, 30000);
+  function _ensureTimeLoaded() {
+    return new Promise(function (resolve) {
+      if (_memTime) { resolve(); return; }
+      chrome.storage.local.get(DAILY_TIME_KEY, function (result) {
+        if (!_memTime) {
+          var data = result[DAILY_TIME_KEY] || {};
+          var today = _todayStr();
+          if (data.date === today) {
+            _memTime = { date: today, seconds: data.seconds || 0 };
+          } else {
+            _memTime = { date: today, seconds: 0 };
+          }
+        }
+        resolve();
+      });
+    });
+  }
 
-    // Pause/resume on visibility change
-    document.addEventListener('visibilitychange', function () {
-      // No action needed — the interval simply skips hidden ticks
+  function startSession() {
+    if (_timeInterval) return; // guard against duplicate calls
+    _lastTickTime = Date.now();
+
+    _ensureTimeLoaded().then(function () {
+      // Save time every 30s while page is visible
+      _timeInterval = setInterval(function () {
+        if (!document.hidden) {
+          var now = Date.now();
+          var elapsed = Math.round((now - _lastTickTime) / 1000);
+          _lastTickTime = now;
+          _saveTimeIncrement(elapsed);
+        } else {
+          _lastTickTime = Date.now(); // reset so hidden time isn't counted on resume
+        }
+      }, 30000);
     });
 
-    // Save on page unload
+    // Flush partial interval + stats on page unload
     window.addEventListener('beforeunload', function () {
-      if (_timeInterval) clearInterval(_timeInterval);
+      if (_timeInterval) {
+        clearInterval(_timeInterval);
+        _timeInterval = null;
+      }
+      // Save any accumulated time since last tick
+      if (_lastTickTime && !document.hidden) {
+        var elapsed = Math.round((Date.now() - _lastTickTime) / 1000);
+        if (elapsed > 0) _saveTimeIncrement(elapsed);
+      }
+      _flushStats();
     });
   }
 
   function _saveTimeIncrement(seconds) {
-    chrome.storage.local.get(DAILY_TIME_KEY, function (result) {
-      var data = result[DAILY_TIME_KEY] || {};
-      var today = _todayStr();
-      if (data.date !== today) {
-        // New day — reset
-        data = { date: today, seconds: 0 };
-      }
-      data.seconds += seconds;
-      var obj = {};
-      obj[DAILY_TIME_KEY] = data;
-      chrome.storage.local.set(obj);
-    });
+    if (!_memTime) return;
+    var today = _todayStr();
+    if (_memTime.date !== today) {
+      // New day — reset
+      _memTime = { date: today, seconds: 0 };
+    }
+    _memTime.seconds += seconds;
+    var obj = {};
+    obj[DAILY_TIME_KEY] = { date: _memTime.date, seconds: _memTime.seconds };
+    chrome.storage.local.set(obj);
   }
 
   function getDailyTime() {
+    if (_memTime) {
+      var today = _todayStr();
+      if (_memTime.date === today) {
+        return Promise.resolve(_memTime.seconds);
+      }
+      return Promise.resolve(0);
+    }
     return new Promise(function (resolve) {
       chrome.storage.local.get(DAILY_TIME_KEY, function (result) {
         var data = result[DAILY_TIME_KEY] || {};
@@ -188,6 +252,10 @@ const XraiMemory = (function () {
 
   function clearAll() {
     return new Promise(function (resolve) {
+      // Clear chrome.storage stats and time tracking
+      chrome.storage.local.remove([STATS_KEY, DAILY_TIME_KEY]);
+      _memStats = { total: 0, signal: 0, noise: 0 };
+      _memTime = { date: _todayStr(), seconds: 0 };
       if (!db) { resolve(); return; }
       var tx = db.transaction(STORE_NAME, 'readwrite');
       tx.objectStore(STORE_NAME).clear();

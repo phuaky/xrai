@@ -127,6 +127,7 @@ var XraiMain = (function () {
     if (config && config.contentFilter === 'posts-only' && data.isReply) {
       console.log('[xrai] REPLY  | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | reply filtered | ' + (enrichedText || '').substring(0, 80));
       XraiHider.hide(el, config.hideMethod, 'reply filtered');
+      XraiMemory.incrementStats('noise');
       XraiIndicator.incrementHidden();
       attachNewTabHandler(el, data);
       return;
