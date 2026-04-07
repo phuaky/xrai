@@ -103,30 +103,159 @@ const XraiMemory = (function () {
     });
   }
 
+  var STATS_KEY = 'xrai_stats_totals';
+  // In-memory stats accumulator — avoids async read-modify-write races
+  var _memStats = null; // loaded from storage on first increment
+  var _statsFlushTimer = null;
+  var STATS_FLUSH_INTERVAL = 10000; // flush to storage every 10s
+
+  function _ensureStatsLoaded() {
+    return new Promise(function (resolve) {
+      if (_memStats) { resolve(); return; }
+      chrome.storage.local.get(STATS_KEY, function (result) {
+        if (!_memStats) {
+          _memStats = result[STATS_KEY] || { total: 0, signal: 0, noise: 0 };
+        }
+        resolve();
+      });
+    });
+  }
+
+  function _flushStats() {
+    if (!_memStats) return;
+    var obj = {};
+    obj[STATS_KEY] = { total: _memStats.total, signal: _memStats.signal, noise: _memStats.noise };
+    chrome.storage.local.set(obj);
+  }
+
+  function _startStatsFlush() {
+    if (_statsFlushTimer) return;
+    _statsFlushTimer = setInterval(_flushStats, STATS_FLUSH_INTERVAL);
+  }
+
   function getStats() {
     return new Promise(function (resolve) {
-      if (!db) { resolve({ total: 0, signal: 0, noise: 0 }); return; }
-      var tx = db.transaction(STORE_NAME, 'readonly');
-      var store = tx.objectStore(STORE_NAME);
-      var stats = { total: 0, signal: 0, noise: 0 };
-      var cursor = store.openCursor();
-      cursor.onsuccess = function (e) {
-        var c = e.target.result;
-        if (c) {
-          stats.total++;
-          if (c.value.classification === 'signal') stats.signal++;
-          else if (c.value.classification === 'noise') stats.noise++;
-          c.continue();
-        } else {
-          resolve(stats);
+      if (_memStats) { resolve({ total: _memStats.total, signal: _memStats.signal, noise: _memStats.noise }); return; }
+      chrome.storage.local.get(STATS_KEY, function (result) {
+        var stats = result[STATS_KEY] || { total: 0, signal: 0, noise: 0 };
+        resolve(stats);
+      });
+    });
+  }
+
+  function incrementStats(prediction) {
+    return _ensureStatsLoaded().then(function () {
+      _memStats.total++;
+      if (prediction === 'signal') _memStats.signal++;
+      else if (prediction === 'noise') _memStats.noise++;
+      _startStatsFlush();
+      return { total: _memStats.total, signal: _memStats.signal, noise: _memStats.noise };
+    });
+  }
+
+  // === Daily time tracking ===
+  var DAILY_TIME_KEY = 'xrai_daily_time';
+  var _timeInterval = null;
+  // In-memory time accumulator — avoids async read-modify-write races
+  var _memTime = null; // { date, seconds }
+  var _lastTickTime = 0;
+
+  function _todayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function _ensureTimeLoaded() {
+    return new Promise(function (resolve) {
+      if (_memTime) { resolve(); return; }
+      chrome.storage.local.get(DAILY_TIME_KEY, function (result) {
+        if (!_memTime) {
+          var data = result[DAILY_TIME_KEY] || {};
+          var today = _todayStr();
+          if (data.date === today) {
+            _memTime = { date: today, seconds: data.seconds || 0 };
+          } else {
+            _memTime = { date: today, seconds: 0 };
+          }
         }
-      };
-      cursor.onerror = function () { resolve(stats); };
+        resolve();
+      });
+    });
+  }
+
+  function startSession() {
+    if (_timeInterval) return; // guard against duplicate calls
+    _lastTickTime = Date.now();
+
+    _ensureTimeLoaded().then(function () {
+      // Save time every 30s while page is visible
+      _timeInterval = setInterval(function () {
+        if (!document.hidden) {
+          var now = Date.now();
+          var elapsed = Math.round((now - _lastTickTime) / 1000);
+          _lastTickTime = now;
+          _saveTimeIncrement(elapsed);
+        } else {
+          _lastTickTime = Date.now(); // reset so hidden time isn't counted on resume
+        }
+      }, 30000);
+    });
+
+    // Flush partial interval + stats on page unload
+    window.addEventListener('beforeunload', function () {
+      if (_timeInterval) {
+        clearInterval(_timeInterval);
+        _timeInterval = null;
+      }
+      // Save any accumulated time since last tick
+      if (_lastTickTime && !document.hidden) {
+        var elapsed = Math.round((Date.now() - _lastTickTime) / 1000);
+        if (elapsed > 0) _saveTimeIncrement(elapsed);
+      }
+      _flushStats();
+    });
+  }
+
+  function _saveTimeIncrement(seconds) {
+    if (!_memTime) return;
+    var today = _todayStr();
+    if (_memTime.date !== today) {
+      // New day — reset
+      _memTime = { date: today, seconds: 0 };
+    }
+    _memTime.seconds += seconds;
+    var obj = {};
+    obj[DAILY_TIME_KEY] = { date: _memTime.date, seconds: _memTime.seconds };
+    chrome.storage.local.set(obj);
+  }
+
+  function getDailyTime() {
+    if (_memTime) {
+      var today = _todayStr();
+      if (_memTime.date === today) {
+        return Promise.resolve(_memTime.seconds);
+      }
+      return Promise.resolve(0);
+    }
+    return new Promise(function (resolve) {
+      chrome.storage.local.get(DAILY_TIME_KEY, function (result) {
+        var data = result[DAILY_TIME_KEY] || {};
+        var today = _todayStr();
+        if (data.date !== today) {
+          resolve(0);
+        } else {
+          resolve(data.seconds || 0);
+        }
+      });
     });
   }
 
   function clearAll() {
     return new Promise(function (resolve) {
+      // Clear chrome.storage stats and time tracking
+      chrome.storage.local.remove([STATS_KEY, DAILY_TIME_KEY]);
+      _memStats = { total: 0, signal: 0, noise: 0 };
+      _memTime = { date: _todayStr(), seconds: 0 };
       if (!db) { resolve(); return; }
       var tx = db.transaction(STORE_NAME, 'readwrite');
       tx.objectStore(STORE_NAME).clear();
@@ -264,6 +393,9 @@ const XraiMemory = (function () {
     getCorrections: getCorrections,
     getCorrectionCount: getCorrectionCount,
     clearCorrections: clearCorrections,
-    exportCorrections: exportCorrections
+    exportCorrections: exportCorrections,
+    incrementStats: incrementStats,
+    startSession: startSession,
+    getDailyTime: getDailyTime
   };
 })();
