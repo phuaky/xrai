@@ -36,7 +36,7 @@ function checkHealth(ollamaUrl, model) {
       return fetch(ollamaUrl + '/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(15000),
         body: JSON.stringify({
           model: model || DEFAULT_MODEL,
           messages: [{ role: 'user', content: 'ping' }],
@@ -49,10 +49,15 @@ function checkHealth(ollamaUrl, model) {
       if (r.ok) {
         result.classify = true;
         result.reply = true; // same endpoint, if classify works reply works
+      } else {
+        result.postStatus = r.status;
+        console.warn('[xrai-worker] Health POST failed: HTTP ' + r.status);
       }
       return result;
     })
-    .catch(function () {
+    .catch(function (e) {
+      result.postError = e && e.message || 'unknown';
+      console.warn('[xrai-worker] Health check error:', result.postError);
       return result;
     });
 }

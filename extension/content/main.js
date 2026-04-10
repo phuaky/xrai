@@ -32,7 +32,8 @@ var XraiMain = (function () {
           console.log('[xrai] Ollama connected. Models:', (response.models || []).join(', '));
           XraiIndicator.update(null, { connected: true, classify: true, reply: true });
         } else if (response && response.available) {
-          console.warn('[xrai] Ollama running but classify POST failed (CORS?). Pre-filter only.');
+          var detail = response.postStatus ? 'HTTP ' + response.postStatus : response.postError || 'unknown';
+          console.warn('[xrai] Ollama running but classify POST failed (' + detail + '). Pre-filter only.');
           XraiIndicator.update(null, { connected: true, classify: false, reply: false });
         } else {
           console.log('[xrai] Ollama not available. Pre-filter only mode.');
@@ -86,6 +87,8 @@ var XraiMain = (function () {
       // Don't open if tweet is pending classification or blurred and not revealed
       if (el.hasAttribute('data-xrai-pending')) return;
       if (el.getAttribute('data-xrai-hidden') === 'blur' && !el.hasAttribute('data-xrai-revealed')) return;
+      // Don't open new tab if already viewing this tweet
+      if (window.location.pathname.indexOf('/status/' + data.id) !== -1) return;
       e.preventDefault();
       e.stopPropagation();
       window.open('https://x.com/' + data.author + '/status/' + data.id, '_blank');
