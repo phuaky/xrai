@@ -3,7 +3,7 @@ var XraiConfig = (function () {
   'use strict';
 
   var DEFAULTS = {
-    model: 'phi4-mini',
+    model: 'dhiltgen/gemma4:e2b-mlx-bf16',
     ollamaUrl: 'http://localhost:11434',
     confidenceThreshold: 0.7,
     contentFilter: 'posts-only',

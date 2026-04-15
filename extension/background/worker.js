@@ -1,7 +1,7 @@
 /* xrai — Service Worker (proxies Ollama HTTP calls for content scripts) */
 
 var DEFAULT_URL = 'http://localhost:11434';
-var DEFAULT_MODEL = 'phi4-mini';
+var DEFAULT_MODEL = 'dhiltgen/gemma4:e2b-mlx-bf16';
 
 var CLASSIFY_SYSTEM = 'You classify tweets as signal or noise. Output ONLY valid JSON.\nScore 4 dimensions (0 or 1 each):\n- NOVELTY: New info (1) or recycled take (0)?\n- SPECIFICITY: Concrete details (1) or vague claims (0)?\n- DENSITY: High insight per word (1) or filler (0)?\n- AUTHENTICITY: Genuine sharing (1) or engagement farming (0)?\n\nNOISE indicators: ALL CAPS text, vague hype (\"insane\", \"wild\", \"crazy\"), video+short text, no concrete details, crypto pumps.\nSIGNAL indicators: specific numbers/tools/results, personal experience with details, technical content.\n\nScore 3-4 = signal (confidence 0.75-0.95). Score 0-2 = noise (confidence 0.75-0.95). Score 2 with some specifics = noise confidence 0.6.\nOutput: {"prediction":"signal"|"noise","confidence":0.6-0.95,"reason":"1-5 word summary"}';
 
@@ -41,6 +41,7 @@ function checkHealth(ollamaUrl, model) {
           model: model || DEFAULT_MODEL,
           messages: [{ role: 'user', content: 'ping' }],
           stream: false,
+          think: false,
           options: { num_predict: 1 }
         })
       });
@@ -100,6 +101,7 @@ function classifySingle(text, mediaType, model, ollamaUrl) {
         { role: 'user', content: userMsg }
       ],
       stream: false,
+      think: false,
       options: { temperature: 0.1, num_predict: 80 }
     })
   })
@@ -142,6 +144,7 @@ function classifyBatch(tweets, model, ollamaUrl) {
         { role: 'user', content: userMsg }
       ],
       stream: false,
+      think: false,
       options: { temperature: 0.1, num_predict: 60 * tweets.length }
     })
   })
@@ -174,6 +177,7 @@ function generateReply(tweetText, authorHandle, style, model, ollamaUrl) {
         { role: 'user', content: userMsg }
       ],
       stream: false,
+      think: false,
       options: { temperature: 0.7, num_predict: 200 }
     })
   })
