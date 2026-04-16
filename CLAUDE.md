@@ -11,6 +11,7 @@ xrai is a Chrome extension that filters Twitter/X feeds using local AI (Ollama).
 **Chrome Extension** (Manifest V3, vanilla JS, no build step):
 - Content scripts inject into x.com, detect tweets via MutationObserver
 - Classification pipeline: reply filter → prefilter (regex) → result cache → Ollama model (5 concurrent)
+- Filtering is scoped to `/home*` (and `/`) only — status detail, profile, explore, notifications, search, bookmarks, lists, and messages render tweets untouched (no blur, hide, or classify). Detection + reply-button + new-tab handlers still attach everywhere.
 - Service worker proxies HTTP calls to Ollama (content scripts can't call localhost in MV3)
 - All state in chrome.storage.local + in-memory result cache (no IndexedDB dedup)
 
