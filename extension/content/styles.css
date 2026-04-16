@@ -139,24 +139,32 @@
   color: #888;
 }
 
-/* Reply button on signal tweets */
+/* Reply button on signal tweets — persistent, visible, easy to click */
 .xrai-reply-btn {
-  display: none;
   position: absolute;
-  right: -8px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  font-size: 14px;
-  opacity: 0.5;
-  transition: opacity 0.15s;
+  font-size: 16px;
+  opacity: 0.85;
+  background: rgba(15, 15, 20, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  backdrop-filter: blur(6px);
+  transition: opacity 0.15s, transform 0.15s, background 0.15s;
   z-index: 10;
+  user-select: none;
 }
-[role="group"]:hover .xrai-reply-btn,
-article:hover .xrai-reply-btn {
-  display: block;
+.xrai-reply-btn:hover {
+  opacity: 1;
+  transform: scale(1.08);
+  background: rgba(30, 30, 40, 0.95);
 }
-.xrai-reply-btn:hover { opacity: 1; }
 
 /* Reply card */
 .xrai-reply-card {
@@ -226,28 +234,32 @@ article:hover .xrai-reply-btn {
 }
 .xrai-reply-copy:hover { background: rgba(255, 255, 255, 0.2); }
 
-/* Peek button on blurred tweets */
+/* Peek button on blurred tweets — large, centered, high contrast */
 .xrai-peek-btn {
   position: absolute;
-  top: 8px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  background: rgba(15, 15, 20, 0.85);
-  color: #ccc;
+  transform: translate(-50%, -50%);
+  min-width: 100px;
+  min-height: 44px;
+  padding: 10px 20px;
+  z-index: 11;
+  background: rgba(15, 15, 20, 0.92);
+  color: #eee;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(8px);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(10px);
   cursor: pointer;
   user-select: none;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, transform 0.15s;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
 }
 .xrai-peek-btn:hover {
-  background: rgba(30, 30, 40, 0.95);
-  color: #fff;
+  background: rgba(40, 40, 55, 0.98);
+  transform: translate(-50%, -50%) scale(1.04);
 }
 
 /* Pending blur — applied immediately on detection, before classification */

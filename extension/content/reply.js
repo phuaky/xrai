@@ -8,23 +8,16 @@ var XraiReply = (function () {
   function attachReplyButton(element, data) {
     if (element.querySelector('.xrai-reply-btn')) return;
     var btn = document.createElement('div');
-    btn.className = 'xrai-reply-btn';
-    btn.innerHTML = '&#x1F4CB;'; // clipboard emoji
+    btn.className = 'xrai-reply-btn xrai-reply-btn-persistent';
+    btn.innerHTML = '&#x1F4CB;';
     btn.title = 'Generate reply';
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
       e.preventDefault();
       showReplyCard(element, data);
     });
-    // Position relative to tweet actions area
-    var actions = element.querySelector('[role="group"]');
-    if (actions) {
-      actions.style.position = 'relative';
-      actions.appendChild(btn);
-    } else {
-      element.style.position = 'relative';
-      element.appendChild(btn);
-    }
+    element.style.position = 'relative';
+    element.appendChild(btn);
   }
 
   function showReplyCard(tweetEl, data) {
