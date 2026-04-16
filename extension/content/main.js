@@ -4,6 +4,12 @@ var XraiMain = (function () {
 
   var config = null;
   var ollamaAvailable = false;
+  var offHomeLogged = Object.create(null);
+
+  function isHomeFeed() {
+    var path = window.location.pathname;
+    return path === '/' || path === '/home' || path.indexOf('/home/') === 0;
+  }
 
   function start() {
     console.log('[xrai] Starting...');
@@ -124,6 +130,18 @@ var XraiMain = (function () {
     }
     if (data.wasQuoteExpanded) {
       console.log('[xrai] EXPAND | @' + (data.author || '?') + ' | id:' + data.id + ' | quoted tweet text was expanded');
+    }
+
+    // Off-home routes (status detail, profile, explore, etc.): user is reading intentionally,
+    // so skip the entire filtering pipeline. Keep reply button + new-tab handlers available.
+    if (!isHomeFeed()) {
+      if (data.id && !offHomeLogged[data.id]) {
+        offHomeLogged[data.id] = true;
+        console.log('[xrai] SKIP   | path=' + window.location.pathname + ' | off-home, no filtering | id:' + data.id);
+      }
+      XraiReply.attachReplyButton(el, data);
+      attachNewTabHandler(el, data);
+      return;
     }
 
     // Step 1: Reply filter — blur stays (was applied or apply now)
