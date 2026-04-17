@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>xrai · Your timeline, without the noise.</title>
+  <meta name="description" content="A Chrome extension that filters your X feed with a local LLM. No cloud, no API keys, no data leaves your machine.">
+  <meta property="og:title" content="xrai · Your timeline, without the noise.">
+  <meta property="og:description" content="A Chrome extension that filters your X feed with a local LLM. No cloud, no API keys, no data leaves your machine.">
+  <meta property="og:type" content="website">
+  <style>
+    :root {
+      --bg: #0A0A0B;
+      --surface: #111114;
+      --elevated: #1F1F22;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --fg: #F5F5F4;
+      --muted: #A1A1AA;
+      --dim: #6B6B72;
+      --accent: #4ADE80;
+      --accent-dim: rgba(74, 222, 128, 0.15);
+      --danger: #F87171;
+
+      --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+
+      --r-sm: 4px;
+      --r-md: 8px;
+      --r-lg: 12px;
+
+      --max: 1100px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-sans);
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      font-feature-settings: 'cv11', 'ss01', 'ss03';
+    }
+
+    a { color: inherit; text-decoration: none; }
+    a:hover { color: var(--accent); }
+
+    code, pre, .mono { font-family: var(--font-mono); }
+
+    .container {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ========== NAV ========== */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(10, 10, 11, 0.8);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      max-width: var(--max);
+      margin: 0 auto;
+    }
+    .logo {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--fg);
+    }
+    .logo::before {
+      content: '▸ ';
+      color: var(--accent);
+    }
+    .nav-links {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .nav-links a:hover { color: var(--fg); }
+    .btn-nav {
+      padding: 8px 14px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--r-md);
+      color: var(--fg);
+      font-size: 14px;
+      transition: border-color 150ms ease;
+    }
+    .btn-nav:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ========== HERO ========== */
+    .hero {
+      padding: 96px 0 64px;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 55% 45%;
+      gap: 48px;
+      align-items: center;
+    }
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+    .hero-tag .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+    h1 {
+      font-size: 72px;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+    h1 .green { color: var(--accent); }
+    .hero-sub {
+      font-size: 18px;
+      color: var(--muted);
+      margin-bottom: 32px;
+      max-width: 500px;
+    }
+    .hero-cta {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 18px;
+      border-radius: var(--r-md);
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 150ms ease;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #0A0A0B;
+    }
+    .btn-primary:hover {
+      background: #5ef48e;
+      color: #0A0A0B;
+    }
+    .btn-secondary {
+      background: transparent;
+      color: var(--fg);
+      border-color: var(--border-strong);
+    }
+    .btn-secondary:hover {
+      border-color: var(--fg);
+      color: var(--fg);
+    }
+
+    /* Hero visual */
+    .hero-visual {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-family: var(--font-mono);
+      position: relative;
+    }
+    .tweet-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 12px 14px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--fg);
+      position: relative;
+      transition: all 400ms ease-out;
+    }
+    .tweet-card .handle {
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+    .tweet-card .body { transition: filter 400ms ease, opacity 400ms ease; }
+    .tweet-card.noise .body {
+      opacity: 0.25;
+      filter: blur(2.5px);
+    }
+    .tweet-card.noise::after {
+      content: attr(data-tag);
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 2px 8px;
+      background: rgba(248, 113, 113, 0.15);
+      color: var(--danger);
+      border: 1px solid rgba(248, 113, 113, 0.35);
+      border-radius: var(--r-sm);
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      font-family: var(--font-mono);
+      z-index: 2;
+    }
+    .tweet-card.signal::after {
+      content: 'signal';
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 2px 8px;
+      background: rgba(74, 222, 128, 0.12);
+      color: var(--accent);
+      border: 1px solid rgba(74, 222, 128, 0.3);
+      border-radius: var(--r-sm);
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      font-family: var(--font-mono);
+      z-index: 2;
+    }
+
+    .visual-caption {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--dim);
+      text-align: right;
+      margin-top: 8px;
+      letter-spacing: 0.04em;
+    }
+
+    /* ========== SECTIONS ========== */
+    section { padding: 96px 0; border-bottom: 1px solid var(--border); }
+    .section-head { margin-bottom: 48px; }
+    .section-tag {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--accent);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      display: block;
+    }
+    h2 {
+      font-size: 48px;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      font-weight: 600;
+      margin-bottom: 16px;
+      max-width: 720px;
+    }
+    .section-sub {
+      font-size: 18px;
+      color: var(--muted);
+      max-width: 640px;
+    }
+
+    /* ========== PROBLEM ========== */
+    .problem-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .feed-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 20px;
+    }
+    .feed-panel h3 {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 16px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .feed-item {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+    }
+    .feed-item:last-child { border-bottom: none; }
+    .feed-item.kept { color: var(--fg); }
+    .feed-item.kept::before { content: '✓ '; color: var(--accent); }
+    .feed-item.killed {
+      text-decoration: line-through;
+      color: var(--dim);
+      opacity: 0.6;
+    }
+    .feed-item.killed::before { content: '× '; color: var(--danger); }
+    .feed-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--dim);
+      float: right;
+    }
+
+    /* ========== HOW IT WORKS ========== */
+    .pipeline {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 32px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--muted);
+      overflow-x: auto;
+    }
+    .pipeline .step {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 0;
+    }
+    .pipeline .step-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--elevated);
+      border: 1px solid var(--border-strong);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .pipeline .step-body { flex: 1; color: var(--fg); }
+    .pipeline .step-body .arrow {
+      color: var(--dim);
+      font-family: var(--font-mono);
+      display: block;
+      font-size: 12px;
+      margin: 4px 0 4px 0;
+    }
+    .pipeline .outcome {
+      color: var(--accent);
+      font-weight: 500;
+    }
+    .pipeline .outcome.bad { color: var(--danger); }
+
+    .dimensions {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 32px;
+    }
+    .dim-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 16px;
+    }
+    .dim-card .score {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .dim-card h4 {
+      font-size: 16px;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .dim-card p {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    /* ========== FEATURES ========== */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+    }
+    .feature {
+      background: var(--bg);
+      padding: 32px 24px;
+      transition: background 150ms ease;
+    }
+    .feature:hover { background: var(--surface); }
+    .feature-icon {
+      font-family: var(--font-mono);
+      color: var(--accent);
+      font-size: 14px;
+      margin-bottom: 12px;
+      display: inline-block;
+    }
+    .feature h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .feature p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* ========== BENCHMARKS ========== */
+    .bench-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 32px;
+    }
+    .bench-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 14px;
+    }
+    .bench-table th {
+      text-align: left;
+      color: var(--dim);
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .bench-table td {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--fg);
+    }
+    .bench-table tr:last-child td { border-bottom: none; }
+    .bench-table .model-name {
+      font-weight: 600;
+    }
+    .bench-table .winner {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .bench-note {
+      font-size: 13px;
+      color: var(--dim);
+      margin-top: 16px;
+      font-family: var(--font-mono);
+    }
+
+    /* ========== INSTALL ========== */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 28px;
+      position: relative;
+    }
+    .step-card .n {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+    .step-card h3 {
+      font-size: 20px;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .step-card p {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .code-block {
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--accent);
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .code-block .muted { color: var(--muted); }
+
+    /* ========== COMPLIANCE ========== */
+    .compliance-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px 32px;
+      list-style: none;
+    }
+    .compliance-list li {
+      padding-left: 24px;
+      position: relative;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .compliance-list li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-family: var(--font-mono);
+    }
+    .compliance-list li strong {
+      color: var(--fg);
+      font-weight: 600;
+    }
+
+    /* ========== FOOTER ========== */
+    footer {
+      padding: 48px 0 64px;
+      color: var(--dim);
+      font-size: 14px;
+    }
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .footer-links {
+      display: flex;
+      gap: 24px;
+    }
+    .footer-links a { color: var(--muted); }
+    .footer-links a:hover { color: var(--accent); }
+
+    /* ========== RESPONSIVE ========== */
+    @media (max-width: 768px) {
+      .hero { padding: 64px 0 48px; }
+      .hero-grid { grid-template-columns: 1fr; gap: 48px; }
+      h1 { font-size: 44px; }
+      h2 { font-size: 32px; }
+      section { padding: 64px 0; }
+      .problem-grid { grid-template-columns: 1fr; }
+      .dimensions { grid-template-columns: repeat(2, 1fr); }
+      .features-grid { grid-template-columns: 1fr; }
+      .steps { grid-template-columns: 1fr; }
+      .compliance-list { grid-template-columns: 1fr; }
+      .nav-links { gap: 12px; font-size: 13px; }
+      .bench-wrap { padding: 16px; overflow-x: auto; }
+      .bench-table { min-width: 480px; }
+      .hero-visual { margin: 0 -8px; }
+    }
+
+    @media (max-width: 480px) {
+      h1 { font-size: 36px; }
+      .hero-sub { font-size: 16px; }
+      .container { padding: 0 16px; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="nav-inner">
+      <a href="#top" class="logo">xrai</a>
+      <div class="nav-links">
+        <a href="#how">How it works</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/phuaky/xrai" class="btn-nav">GitHub →</a>
+      </div>
+    </div>
+  </nav>
+
+  <main id="top">
+    <section class="hero" style="border-bottom: 1px solid var(--border);">
+      <div class="container">
+        <div class="hero-grid">
+          <div>
+            <div class="hero-tag">
+              <span class="dot"></span>
+              <span>runs 100% on your machine</span>
+            </div>
+            <h1>Your timeline, <span class="green">without the noise.</span></h1>
+            <p class="hero-sub">xrai runs a local LLM against every tweet and hides the garbage. Nothing leaves your machine. No cloud, no API keys, no accounts.</p>
+            <div class="hero-cta">
+              <a href="#install" class="btn btn-primary">
+                Install
+                <span class="mono" style="font-size: 13px;">→</span>
+              </a>
+              <a href="https://github.com/phuaky/xrai" class="btn btn-secondary">
+                View on GitHub
+              </a>
+            </div>
+          </div>
+
+          <div class="hero-visual" aria-hidden="true">
+            <div class="tweet-card signal">
+              <div class="body">
+                <div class="handle">@patio11</div>
+                Just shipped our migration to Postgres 16. The logical replication story is dramatically better than pg_dump for zero-downtime moves.
+              </div>
+            </div>
+            <div class="tweet-card noise" data-tag="noise 0.94">
+              <div class="body">
+                <div class="handle">@engagementbait</div>
+                RT if you believe in yourself 🚀 Drop a ❤️ if you're grinding tonight
+              </div>
+            </div>
+            <div class="tweet-card signal">
+              <div class="body">
+                <div class="handle">@karpathy</div>
+                nanoGPT's new speedrun record: 3 min on 8xH100. The optimizer changes alone shaved 20%.
+              </div>
+            </div>
+            <div class="tweet-card noise" data-tag="noise 0.88">
+              <div class="body">
+                <div class="handle">@viralvids</div>
+                this is so good 😂😂 wait for it
+              </div>
+            </div>
+            <div class="tweet-card signal">
+              <div class="body">
+                <div class="handle">@simonw</div>
+                LLM 0.22 out. Added tool-use for local models via Ollama. The schema handling was the hardest part.
+              </div>
+            </div>
+            <div class="tweet-card noise" data-tag="noise 0.91">
+              <div class="body">
+                <div class="handle">@crypto_moonboy</div>
+                $PEPE is about to 100x trust me bro
+              </div>
+            </div>
+            <div class="visual-caption">phi4-mini · 518ms avg · local</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="section-head">
+          <span class="section-tag">The problem</span>
+          <h2>X is 90% noise now.</h2>
+          <p class="section-sub">Engagement bait, clickbait videos, recycled takes, crypto pumps, rage posts. Scrolling it all costs you hours a week and trashes your attention.</p>
+        </div>
+
+        <div class="problem-grid">
+          <div class="feed-panel">
+            <h3>Feed without xrai</h3>
+            <div class="feed-item">"this changed my life" (thread)</div>
+            <div class="feed-item">RT if you agree</div>
+            <div class="feed-item">New MCP server released</div>
+            <div class="feed-item">wait for it 😂 [video]</div>
+            <div class="feed-item">Your morning routine sucks</div>
+            <div class="feed-item">GPT-5 speculation #4,812</div>
+            <div class="feed-item">Postgres 16 replication tips</div>
+            <div class="feed-item">$PEPE to the moon</div>
+          </div>
+
+          <div class="feed-panel">
+            <h3>Feed with xrai</h3>
+            <div class="feed-item killed">"this changed my life" (thread) <span class="feed-label">noise</span></div>
+            <div class="feed-item killed">RT if you agree <span class="feed-label">prefilter</span></div>
+            <div class="feed-item kept">New MCP server released <span class="feed-label">signal</span></div>
+            <div class="feed-item killed">wait for it 😂 [video] <span class="feed-label">prefilter</span></div>
+            <div class="feed-item killed">Your morning routine sucks <span class="feed-label">noise</span></div>
+            <div class="feed-item killed">GPT-5 speculation #4,812 <span class="feed-label">noise</span></div>
+            <div class="feed-item kept">Postgres 16 replication tips <span class="feed-label">signal</span></div>
+            <div class="feed-item killed">$PEPE to the moon <span class="feed-label">prefilter</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="container">
+        <div class="section-head">
+          <span class="section-tag">How it works</span>
+          <h2>Four dimensions. One local model.</h2>
+          <p class="section-sub">Every tweet runs a fast pipeline. Regex kills obvious junk. The LLM scores the rest on four axes. 3 or 4 out of 4 means signal. 0 to 2 means hide.</p>
+        </div>
+
+        <div class="pipeline">
+          <div class="step">
+            <span class="step-num">1</span>
+            <div class="step-body">
+              Tweet rendered in DOM
+              <span class="arrow">↓</span>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-num">2</span>
+            <div class="step-body">
+              Reply or retweet? Has tech keyword? Already cached?
+              <span class="arrow">↓  if no</span>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-num">3</span>
+            <div class="step-body">
+              Regex prefilter catches obvious spam, NSFW, clickbait-video, crypto pump
+              <span class="arrow">↓  passes</span>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-num">4</span>
+            <div class="step-body">
+              Ollama scores tweet on Novelty / Specificity / Density / Authenticity
+              <span class="arrow">↓</span>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-num">5</span>
+            <div class="step-body">
+              Score <span class="outcome">3-4 → SHOW</span> · Score <span class="outcome bad">0-2 → HIDE</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="dimensions">
+          <div class="dim-card">
+            <div class="score">N · 0 or 1</div>
+            <h4>Novelty</h4>
+            <p>New information or the 412th recycled take?</p>
+          </div>
+          <div class="dim-card">
+            <div class="score">S · 0 or 1</div>
+            <h4>Specificity</h4>
+            <p>Concrete numbers and details, or vague claims?</p>
+          </div>
+          <div class="dim-card">
+            <div class="score">D · 0 or 1</div>
+            <h4>Density</h4>
+            <p>High insight-to-word ratio, or padded word count?</p>
+          </div>
+          <div class="dim-card">
+            <div class="score">A · 0 or 1</div>
+            <h4>Authenticity</h4>
+            <p>Genuine sharing, or engagement farming?</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="section-head">
+          <span class="section-tag">Features</span>
+          <h2>What it actually does.</h2>
+          <p class="section-sub">No accounts, no telemetry, no cloud. The whole thing is ~2,000 lines of vanilla JS running in a Chrome extension and a local Ollama instance.</p>
+        </div>
+
+        <div class="features-grid">
+          <div class="feature">
+            <span class="feature-icon">[01]</span>
+            <h3>100% local</h3>
+            <p>All classification runs through Ollama on your machine. Zero API calls, zero accounts, zero billing.</p>
+          </div>
+          <div class="feature">
+            <span class="feature-icon">[02]</span>
+            <h3>Tech-tuned</h3>
+            <p>Safelist for AI, startup, and engineering content. The model has been benchmarked on 89 real tweets from founders and devs.</p>
+          </div>
+          <div class="feature">
+            <span class="feature-icon">[03]</span>
+            <h3>Result cache</h3>
+            <p>Scroll back up? Cached verdict applied instantly. No re-classification on the same tweet ever.</p>
+          </div>
+          <div class="feature">
+            <span class="feature-icon">[04]</span>
+            <h3>Regex prefilter</h3>
+            <p>Eleven categories catch obvious junk instantly. No model call wasted on "RT if you agree".</p>
+          </div>
+          <div class="feature">
+            <span class="feature-icon">[05]</span>
+            <h3>Self-improving</h3>
+            <p>Classification logs stream to a local collector. Run the improve script to generate prompt fixes from misclassifications.</p>
+          </div>
+          <div class="feature">
+            <span class="feature-icon">[06]</span>
+            <h3>Copy-paste replies</h3>
+            <p>Generate replies in your voice. Copy them. Paste them yourself. xrai never touches X's compose box.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="section-head">
+          <span class="section-tag">Benchmarks</span>
+          <h2>Real numbers. 89 tweets. Apple Silicon.</h2>
+          <p class="section-sub">Models scored against hand-labeled tweets pulled from actual timelines and bookmarks. Pick speed or pick accuracy.</p>
+        </div>
+
+        <div class="bench-wrap">
+          <table class="bench-table">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Accuracy</th>
+                <th>Avg speed</th>
+                <th>Size</th>
+                <th>Use when</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="model-name">phi4-mini</td>
+                <td class="winner">92%</td>
+                <td>518ms</td>
+                <td>2.5 GB</td>
+                <td>you want the best signal-noise call</td>
+              </tr>
+              <tr>
+                <td class="model-name">gemma2:2b</td>
+                <td>88%</td>
+                <td class="winner">231ms</td>
+                <td>1.6 GB</td>
+                <td>you want the fastest feed response</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="bench-note"># node benchmarks/benchmark.js</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="install">
+      <div class="container">
+        <div class="section-head">
+          <span class="section-tag">Install</span>
+          <h2>Three steps. About four minutes.</h2>
+          <p class="section-sub">You need a Mac or a machine that can run Ollama. No other setup. No CLI knowledge beyond copying one command.</p>
+        </div>
+
+        <div class="steps">
+          <div class="step-card">
+            <div class="n">STEP 01</div>
+            <h3>Install Ollama</h3>
+            <p>Download from ollama.ai. On Mac it auto-starts on login and lives in your menubar.</p>
+            <a href="https://ollama.ai" class="code-block" style="display: block; color: var(--accent);">
+              <span class="muted">→</span> ollama.ai
+            </a>
+          </div>
+
+          <div class="step-card">
+            <div class="n">STEP 02</div>
+            <h3>Pull a model</h3>
+            <p>phi4-mini for best accuracy, gemma2:2b for best speed. Either works.</p>
+            <div class="code-block">
+              <span class="muted">$</span> ollama pull phi4-mini
+            </div>
+          </div>
+
+          <div class="step-card">
+            <div class="n">STEP 03</div>
+            <h3>Load the extension</h3>
+            <p>Open chrome://extensions, turn on Developer mode, click "Load unpacked", pick the extension folder. Visit x.com.</p>
+            <a href="https://github.com/phuaky/xrai" class="code-block" style="display: block; color: var(--accent);">
+              <span class="muted">→</span> github.com/phuaky/xrai
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="section-head">
+          <span class="section-tag">ToS posture</span>
+          <h2>Not a bot. Not a scraper.</h2>
+          <p class="section-sub">xrai reads the same DOM your browser is already rendering. It hides things with CSS, same as an ad blocker. Here's what it does not do.</p>
+        </div>
+
+        <ul class="compliance-list">
+          <li><strong>No API access.</strong> Never calls X's API. Only reads your own rendered feed.</li>
+          <li><strong>No automation.</strong> Never clicks, likes, follows, or submits forms.</li>
+          <li><strong>No auto-posting.</strong> Reply text is generated. You copy and paste it yourself.</li>
+          <li><strong>No scraping.</strong> Processes only what you are currently viewing.</li>
+          <li><strong>CSS hide only.</strong> Same technique ad blockers use. Widely accepted.</li>
+          <li><strong>User-initiated.</strong> Activates when you open x.com. Inactive otherwise.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <div>
+          <span class="mono">xrai</span> · MIT License · Built by <a href="https://github.com/phuaky" style="color: var(--muted);">phuaky</a>
+        </div>
+        <div class="footer-links">
+          <a href="https://github.com/phuaky/xrai">GitHub</a>
+          <a href="https://github.com/phuaky/xrai/blob/main/SPEC.md">Spec</a>
+          <a href="https://github.com/phuaky/xrai/blob/main/LICENSE">License</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
