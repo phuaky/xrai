@@ -61,6 +61,8 @@ ollama pull gemma2:2b    # backup: 88% accuracy, 231ms, 1.6GB — fastest
 3. Click **Load unpacked** → select the `extension/` folder
 4. Go to [x.com](https://x.com) and scroll
 
+> **macOS:** After a reboot, Ollama (launched as a Login Item) does not inherit the `OLLAMA_ORIGINS` env var, so the extension gets **HTTP 403** and falls back to prefilter-only. See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for the one-time LaunchAgent fix that makes it persist across reboots.
+
 ### 4. Start the data collector (optional)
 
 The extension logs every classification. To save this data to your local machine for improving filters:
