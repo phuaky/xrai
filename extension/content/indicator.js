@@ -107,6 +107,7 @@ var XraiIndicator = (function () {
       '<label>Aggressiveness<input type="range" id="xrai-s-threshold" min="0.5" max="0.9" step="0.05" value="' + cfg.confidenceThreshold + '"><span id="xrai-s-threshold-val">' + cfg.confidenceThreshold + '</span></label>' +
       '<label>Content<select id="xrai-s-filter"><option value="posts-only"' + (cfg.contentFilter === 'posts-only' ? ' selected' : '') + '>Posts only</option><option value="all"' + (cfg.contentFilter === 'all' ? ' selected' : '') + '>All</option></select></label>' +
       '<label>Hide method<select id="xrai-s-hide"><option value="remove"' + (cfg.hideMethod === 'remove' ? ' selected' : '') + '>Remove</option><option value="collapse"' + (cfg.hideMethod === 'collapse' ? ' selected' : '') + '>Collapse</option><option value="blur"' + (cfg.hideMethod === 'blur' ? ' selected' : '') + '>Blur</option></select></label>' +
+      '<label class="xrai-s-toggle"><input type="checkbox" id="xrai-s-bluroff"' + (cfg.blurOff ? ' checked' : '') + '> Show blurred tweets (un-blur all)</label>' +
       '<div class="xrai-settings-actions">' +
       '<button id="xrai-s-save">Save</button>' +
       '<button id="xrai-s-clear">Clear memory</button>' +
@@ -143,7 +144,8 @@ var XraiIndicator = (function () {
         model: popup.querySelector('#xrai-s-model').value,
         confidenceThreshold: parseFloat(slider.value),
         contentFilter: popup.querySelector('#xrai-s-filter').value,
-        hideMethod: popup.querySelector('#xrai-s-hide').value
+        hideMethod: popup.querySelector('#xrai-s-hide').value,
+        blurOff: popup.querySelector('#xrai-s-bluroff').checked
       }).then(function () {
         closePopup();
       });

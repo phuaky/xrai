@@ -57,6 +57,25 @@ var XraiMain = (function () {
       console.log('[xrai] Running. Filter: ' + cfg.contentFilter + ', Hide: ' + cfg.hideMethod);
     });
 
+    // Reactive config updates (popup save triggers onChanged)
+    if (chrome.storage && chrome.storage.onChanged) {
+      chrome.storage.onChanged.addListener(function (changes, area) {
+        if (area !== 'local' || !changes.xrai_config) return;
+        var newCfg = changes.xrai_config.newValue;
+        if (!newCfg) return;
+        var wasBlurOff = !!(config && config.blurOff);
+        config = newCfg;
+        XraiClassifier.configure(newCfg);
+        if (newCfg.blurOff && !wasBlurOff) {
+          var blurred = document.querySelectorAll('article[data-xrai-hidden="blur"]');
+          for (var i = 0; i < blurred.length; i++) XraiHider.show(blurred[i]);
+          var pending = document.querySelectorAll('article[data-xrai-pending]');
+          for (var j = 0; j < pending.length; j++) XraiHider.unblurPending(pending[j]);
+          console.log('[xrai] blurOff ON — un-blurred ' + blurred.length + ' tweet(s)');
+        }
+      });
+    }
+
     // Periodic health check (every 30s)
     var healthInterval = setInterval(function () {
       if (!chrome.runtime || !chrome.runtime.id) {
@@ -117,6 +136,11 @@ var XraiMain = (function () {
     return parts.join(' ');
   }
 
+  function applyHide(el, method, reason) {
+    if (method === 'blur' && config && config.blurOff) return;
+    XraiHider.hide(el, method, reason);
+  }
+
   function handleTweet(info) {
     var el = info.element;
     var data = info.data;
@@ -147,7 +171,7 @@ var XraiMain = (function () {
     // Step 1: Reply filter — blur stays (was applied or apply now)
     if (config && config.contentFilter === 'posts-only' && data.isReply) {
       console.log('[xrai] REPLY  | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | reply filtered | ' + (enrichedText || '').substring(0, 80));
-      XraiHider.hide(el, config.hideMethod, 'reply filtered');
+      applyHide(el, config.hideMethod, 'reply filtered');
       XraiMemory.incrementStats('noise');
       XraiIndicator.incrementHidden();
       attachNewTabHandler(el, data);
@@ -158,7 +182,7 @@ var XraiMain = (function () {
     var pfResult = XraiPrefilter.prefilter(data);
     if (pfResult) {
       console.log('[xrai] PREFLT | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | ' + pfResult.reason + ' | ' + (enrichedText || '').substring(0, 80));
-      XraiHider.hide(el, config ? config.hideMethod : 'remove', 'prefilter: ' + pfResult.reason);
+      applyHide(el, config ? config.hideMethod : 'remove', 'prefilter: ' + pfResult.reason);
       XraiClassifier.cachePrefilter(data.id, 'noise', pfResult.confidence, pfResult.reason);
       XraiMemory.logClassification(data.text, data.mediaType, 'noise', pfResult.confidence, 'prefilter:' + pfResult.reason);
       XraiMemory.incrementStats('noise');
@@ -177,7 +201,7 @@ var XraiMain = (function () {
       XraiMemory.incrementStats('noise');
       XraiMemory.markSeen(XraiMemory.computeFingerprint('', data.mediaType), 'noise');
       // Low confidence — don't aggressively hide, use blur so user can reveal
-      XraiHider.hide(el, 'blur', 'media-only: no text to classify');
+      applyHide(el, 'blur', 'media-only: no text to classify');
       XraiIndicator.incrementHidden();
       attachNewTabHandler(el, data);
       return;
@@ -204,7 +228,7 @@ var XraiMain = (function () {
           : cached.source && cached.source.indexOf('prefilter:') === 0
             ? 'prefilter: ' + cached.source.substring(10)
             : 'AI: noise (' + cached.confidence + ')';
-        XraiHider.hide(el, config ? config.hideMethod : 'remove', cachedReason);
+        applyHide(el, config ? config.hideMethod : 'remove', cachedReason);
         XraiIndicator.incrementHidden();
       } else {
         var cachedSignalReason = cached.reason
@@ -219,7 +243,7 @@ var XraiMain = (function () {
     }
 
     // Step 5: Blur immediately while waiting for classification
-    XraiHider.blurPending(el);
+    if (!(config && config.blurOff)) XraiHider.blurPending(el);
 
     // Step 6: Classify (Ollama queue) — use enriched text for better context
     XraiClassifier.classify(data.id, enrichedText, data.mediaType, data.author, function (result) {
@@ -228,7 +252,7 @@ var XraiMain = (function () {
           ? 'AI: ' + result.reason
           : 'AI: noise (' + result.confidence + ')';
         XraiHider.unblurPending(el);
-        XraiHider.hide(el, config ? config.hideMethod : 'remove', reasonLabel);
+        applyHide(el, config ? config.hideMethod : 'remove', reasonLabel);
         XraiMemory.logClassification(data.text, data.mediaType, 'noise', result.confidence, result.source || 'model');
         XraiMemory.incrementStats('noise');
         XraiMemory.markSeen(XraiMemory.computeFingerprint(data.text, data.mediaType), 'noise');

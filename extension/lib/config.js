@@ -8,6 +8,7 @@ var XraiConfig = (function () {
     confidenceThreshold: 0.7,
     contentFilter: 'posts-only',
     hideMethod: 'remove',
+    blurOff: false,
     replyStyle: 'curious',
     memoryRetentionDays: 30,
     maxModelCallsPerMinute: 100,
