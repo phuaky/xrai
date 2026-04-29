@@ -2,14 +2,24 @@
 var XraiHider = (function () {
   'use strict';
 
+  var PENDING_BLUR_DELAY_MS = 300;
+
   function blurPending(element) {
     if (!element) return;
-    element.setAttribute('data-xrai-pending', '1');
-    element.style.position = 'relative';
+    if (element._xraiPendingTimer || element.hasAttribute('data-xrai-pending')) return;
+    element._xraiPendingTimer = setTimeout(function () {
+      element._xraiPendingTimer = null;
+      element.setAttribute('data-xrai-pending', '1');
+      element.style.position = 'relative';
+    }, PENDING_BLUR_DELAY_MS);
   }
 
   function unblurPending(element) {
     if (!element) return;
+    if (element._xraiPendingTimer) {
+      clearTimeout(element._xraiPendingTimer);
+      element._xraiPendingTimer = null;
+    }
     element.removeAttribute('data-xrai-pending');
     element.style.position = '';
   }
@@ -45,7 +55,6 @@ var XraiHider = (function () {
       element.addEventListener('click', element._xraiExpandHandler);
     } else if (method === 'blur') {
       element.style.position = 'relative';
-      // Blur is applied via CSS: article[data-xrai-hidden="blur"] > *:not(.xrai-peek-btn)
       var btn = document.createElement('button');
       btn.className = 'xrai-peek-btn';
       btn.textContent = '\uD83D\uDC41 Show';
@@ -63,7 +72,6 @@ var XraiHider = (function () {
       element.appendChild(btn);
       element._xraiPeekBtn = btn;
 
-      // Add reason overlay label
       if (reason) {
         var label = document.createElement('div');
         label.className = 'xrai-blur-label';
@@ -71,6 +79,18 @@ var XraiHider = (function () {
         element.appendChild(label);
         element._xraiBlurLabel = label;
       }
+
+      // Guard: swallow clicks on the blurred article so X's link handlers don't
+      // navigate away when the user misses the peek button.
+      var guard = function (e) {
+        if (element.hasAttribute('data-xrai-revealed')) return;
+        var t = e.target;
+        if (t && (t.closest('.xrai-peek-btn') || t.closest('.xrai-blur-label'))) return;
+        e.preventDefault();
+        e.stopPropagation();
+      };
+      element.addEventListener('click', guard, true);
+      element._xraiBlurGuard = guard;
     }
   }
 
@@ -100,6 +120,10 @@ var XraiHider = (function () {
     if (element._xraiBlurLabel) {
       element._xraiBlurLabel.remove();
       delete element._xraiBlurLabel;
+    }
+    if (element._xraiBlurGuard) {
+      element.removeEventListener('click', element._xraiBlurGuard, true);
+      delete element._xraiBlurGuard;
     }
   }
 

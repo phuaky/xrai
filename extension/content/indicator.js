@@ -3,6 +3,10 @@ var XraiIndicator = (function () {
   'use strict';
 
   var pill = null;
+  var countsEl = null;
+  var statusEl = null;
+  var dotEl = null;
+  var gearEl = null;
   var popup = null;
   var counts = { shown: 0, hidden: 0 };
   var status = { connected: false, classify: false, reply: false, label: 'offline' };
@@ -12,40 +16,69 @@ var XraiIndicator = (function () {
     if (pill) return;
     pill = document.createElement('div');
     pill.id = 'xrai-pill';
-    pill.innerHTML = buildPillHtml();
-    document.body.appendChild(pill);
 
-    pill.querySelector('.xrai-pill-gear').addEventListener('click', function (e) {
+    countsEl = document.createElement('span');
+    countsEl.className = 'xrai-pill-text';
+
+    dotEl = document.createElement('span');
+    dotEl.className = 'xrai-dot xrai-dot-red';
+
+    statusEl = document.createElement('span');
+    statusEl.className = 'xrai-pill-status';
+
+    gearEl = document.createElement('span');
+    gearEl.className = 'xrai-pill-gear';
+    gearEl.textContent = '\u2699';
+    gearEl.addEventListener('click', function (e) {
       e.stopPropagation();
       togglePopup();
     });
-  }
 
-  function buildPillHtml() {
-    var dotClass = 'xrai-dot-red';
-    if (status.connected && status.classify) dotClass = 'xrai-dot-green';
-    else if (status.connected) dotClass = 'xrai-dot-orange';
+    pill.appendChild(countsEl);
+    pill.appendChild(document.createTextNode(' '));
+    pill.appendChild(dotEl);
+    pill.appendChild(statusEl);
+    pill.appendChild(document.createTextNode(' '));
+    pill.appendChild(gearEl);
 
-    var statusParts = [];
-    if (!status.connected) {
-      statusParts.push('ollama offline');
-    } else if (!status.classify) {
-      statusParts.push('ollama up · classify ✗ (CORS?)');
-    } else {
-      statusParts.push('local');
+    document.body.appendChild(pill);
+
+    // Hydrate counts from lifetime stats (fix #25)
+    if (typeof XraiMemory !== 'undefined' && XraiMemory.getStats) {
+      XraiMemory.getStats().then(function (stats) {
+        if (!stats) return;
+        counts.shown = stats.signal || 0;
+        counts.hidden = stats.noise || 0;
+        render();
+      });
     }
 
-    return '<span class="xrai-pill-text">xrai: ' +
-      counts.shown + ' shown | ' + counts.hidden + ' hidden</span>' +
-      ' <span class="xrai-dot ' + dotClass + '" title="server: ' + (status.connected ? '✓' : '✗') + ' classify: ' + (status.classify ? '✓' : '✗') + ' reply: ' + (status.reply ? '✓' : '✗') + '"></span>' +
-      '<span class="xrai-pill-status">' + statusParts.join('') + '</span>' +
-      ' <span class="xrai-pill-gear">&#x2699;</span>';
+    render();
+  }
+
+  function render() {
+    if (!pill) return;
+    countsEl.textContent = 'xrai: ' + counts.shown + ' shown | ' + counts.hidden + ' hidden';
+
+    var dotClass = 'xrai-dot xrai-dot-red';
+    if (status.connected && status.classify) dotClass = 'xrai-dot xrai-dot-green';
+    else if (status.connected) dotClass = 'xrai-dot xrai-dot-orange';
+    dotEl.className = dotClass;
+    dotEl.title = 'server: ' + (status.connected ? '\u2713' : '\u2717') +
+      ' classify: ' + (status.classify ? '\u2713' : '\u2717') +
+      ' reply: ' + (status.reply ? '\u2713' : '\u2717');
+
+    var statusText = '';
+    if (!status.connected) statusText = 'ollama offline';
+    else if (!status.classify) statusText = 'ollama up \u00b7 classify \u2717 (CORS?)';
+    else statusText = 'local';
+    statusEl.textContent = statusText;
   }
 
   function update(newCounts, newStatus) {
     if (newCounts) {
-      counts.shown = newCounts.shown || counts.shown;
-      counts.hidden = newCounts.hidden || counts.hidden;
+      if (typeof newCounts.shown === 'number') counts.shown = newCounts.shown;
+      if (typeof newCounts.hidden === 'number') counts.hidden = newCounts.hidden;
     }
     if (newStatus) {
       status.connected = newStatus.connected !== undefined ? newStatus.connected : status.connected;
@@ -53,18 +86,11 @@ var XraiIndicator = (function () {
       status.reply = newStatus.reply !== undefined ? newStatus.reply : status.reply;
       status.label = newStatus.label || status.label;
     }
-    if (pill) pill.innerHTML = buildPillHtml();
-    // Re-attach gear listener
-    if (pill) {
-      pill.querySelector('.xrai-pill-gear').addEventListener('click', function (e) {
-        e.stopPropagation();
-        togglePopup();
-      });
-    }
+    render();
   }
 
-  function incrementShown() { counts.shown++; update(); }
-  function incrementHidden() { counts.hidden++; update(); }
+  function incrementShown() { counts.shown++; render(); }
+  function incrementHidden() { counts.hidden++; render(); }
 
   function togglePopup() {
     if (popupOpen) { closePopup(); return; }
@@ -75,12 +101,10 @@ var XraiIndicator = (function () {
     popup.innerHTML = '<div class="xrai-settings-loading">Loading...</div>';
     document.body.appendChild(popup);
 
-    // Close on outside click
     setTimeout(function () {
       document.addEventListener('click', outsideClickHandler);
     }, 100);
 
-    // Load config and render
     XraiConfig.getConfig().then(function (cfg) {
       renderSettings(cfg);
     });
@@ -113,7 +137,6 @@ var XraiIndicator = (function () {
       '</div>' +
       '<div class="xrai-settings-stats" id="xrai-s-stats">Loading stats...</div>';
 
-    // Populate model dropdown from Ollama
     if (chrome.runtime && chrome.runtime.id) {
       chrome.runtime.sendMessage({ action: 'listModels' }, function (response) {
         if (chrome.runtime.lastError || !response) return;
@@ -130,14 +153,12 @@ var XraiIndicator = (function () {
       });
     }
 
-    // Threshold slider feedback
     var slider = popup.querySelector('#xrai-s-threshold');
     var sliderVal = popup.querySelector('#xrai-s-threshold-val');
     slider.addEventListener('input', function () {
       sliderVal.textContent = slider.value;
     });
 
-    // Save
     popup.querySelector('#xrai-s-save').addEventListener('click', function () {
       XraiConfig.saveConfig({
         model: popup.querySelector('#xrai-s-model').value,
@@ -149,7 +170,6 @@ var XraiIndicator = (function () {
       });
     });
 
-    // Clear memory
     popup.querySelector('#xrai-s-clear').addEventListener('click', function () {
       XraiMemory.clearAll().then(function () {
         var statsEl = popup.querySelector('#xrai-s-stats');
@@ -157,13 +177,12 @@ var XraiIndicator = (function () {
       });
     });
 
-    // Load stats and daily time
     Promise.all([XraiMemory.getStats(), XraiMemory.getDailyTime()]).then(function (results) {
       var stats = results[0];
       var dailySecs = results[1];
       var statsEl = popup.querySelector('#xrai-s-stats');
       if (!statsEl) return;
-      var timeSaved = Math.round(stats.noise * 3); // ~3s per hidden tweet
+      var timeSaved = Math.round(stats.noise * 3);
       var dailyMin = Math.floor(dailySecs / 60);
       var dailyLabel = dailyMin < 60
         ? dailyMin + 'm'
