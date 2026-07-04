@@ -1,0 +1,650 @@
+{
+  "version": 1,
+  "platform": "x",
+  "note": "Golden eval set. Tiers: critical-signal (must NEVER be hidden), signal (should be shown), tempting-noise (tech-flavored bait the model must catch), noise (should be hidden). Source of truth is THIS file; benchmark.js is legacy.",
+  "items": [
+    {
+      "id": "x-001",
+      "tier": "signal",
+      "text": "Just shipped a feature that reduced latency by 40% using connection pooling in Postgres. The key was pgBouncer with transaction-level pooling."
+    },
+    {
+      "id": "x-002",
+      "tier": "signal",
+      "text": "We hit 10k users today. Biggest lesson: the feature we almost cut (dark mode) drives 60% of retention."
+    },
+    {
+      "id": "x-003",
+      "tier": "signal",
+      "text": "New paper from DeepMind shows that chain-of-thought prompting works because it reduces the effective complexity of the task, not because it mimics human reasoning."
+    },
+    {
+      "id": "x-004",
+      "tier": "signal",
+      "text": "After 3 years of running Kubernetes in production: just use a managed service. The operational overhead of self-hosting is never worth it below 50 engineers."
+    },
+    {
+      "id": "x-005",
+      "tier": "signal",
+      "text": "TIL you can use CSS container queries instead of media queries for component-level responsive design. Game changer for design systems."
+    },
+    {
+      "id": "x-006",
+      "tier": "signal",
+      "text": "Cloudflare just announced R2 egress is now completely free. This changes the economics of serving static assets significantly."
+    },
+    {
+      "id": "x-007",
+      "tier": "signal",
+      "text": "We moved from microservices back to a monolith. Deployment time went from 45min to 3min. Sometimes boring tech wins."
+    },
+    {
+      "id": "x-008",
+      "tier": "signal",
+      "text": "Released v2.0 of our open source CLI tool. Added streaming output, plugin system, and cut binary size by 70%."
+    },
+    {
+      "id": "x-009",
+      "tier": "signal",
+      "text": "The real bottleneck in most AI apps isn't the model, it's the data pipeline. We spent 3 months on data quality and accuracy jumped from 72% to 94%."
+    },
+    {
+      "id": "x-010",
+      "tier": "signal",
+      "text": "SQLite can handle 100k+ concurrent readers. Most apps don't need Postgres. We switched and our infrastructure cost dropped to $0."
+    },
+    {
+      "id": "x-011",
+      "tier": "signal",
+      "text": "Just because someone trusts you quickly doesn't mean you need to trust them quickly. It's a more advanced manipulation move, typically from people who need something from you.",
+      "author": "@AlexHormozi"
+    },
+    {
+      "id": "x-012",
+      "tier": "signal",
+      "text": "The sun was free. They sold you SPF 50 and a vitamin D deficiency. Sleep was free. They sold you an app, a pill, and a wearable that tells you your sleep was bad. Walking was free. They sold you a treadmill, a fitness tracker, and a £180 pair of trainers. Fasting was free. They sold you meal replacement shakes and the anxiety that skipping breakfast would wreck your metabolism. The 20th century removed access to everything the body needs to function. The 21st century is selling it back, one subscription at a time.",
+      "author": "@SamaHoole"
+    },
+    {
+      "id": "x-013",
+      "tier": "signal",
+      "text": "I actively vibe/code apps to 5000+ customers at my SaaS companies (one at 40 millish ARR). I built and now maintain 3-4 apps/core parts of our business with it. I am a turbo claude code user. I'm not saying it's not useful. I saying that despite being incredibly useful, its also stupid as hell. Even with extreme guardrails/watching its a competent junior dev who does whatever it wants and you have to watch like a hawk. At somepoint making code fast is NOT an advantage and if your using claude/codex to push and review its own code...your actually an insane person.",
+      "author": "@ZssBecker"
+    },
+    {
+      "id": "x-014",
+      "tier": "signal",
+      "text": "The next version of OpenClaw is also an MCP, you can use it instead of Anthropic's message channel MCP to connect to a much wider range of message providers.",
+      "author": "@steipete"
+    },
+    {
+      "id": "x-015",
+      "tier": "signal",
+      "text": "Thesis: the problem with AI working in every domain = all the edge cases. Antithesis: domains with lots of edge cases = difficult & time consuming to practically impossible for error-prone people. Synthesis: such domains = where AI agents will do best. (Such as SAAS migration…)",
+      "author": "@pmarca"
+    },
+    {
+      "id": "x-016",
+      "tier": "signal",
+      "text": "the more I've been digging into the new Figma MCP, the more excited I am about it. something new I'm trying is starting with a very ugly sketch in Figma, and then having Claude Code flesh it out in Figma so I can tweak and edit before sending the final back to Claude Code",
+      "author": "@trq212"
+    },
+    {
+      "id": "x-017",
+      "tier": "signal",
+      "text": "1.5M views with 800 comments. shocked UGC face with a snapchat caption -> app demo. remember, simple formats scale well",
+      "author": "@jaxxdwyer"
+    },
+    {
+      "id": "x-018",
+      "tier": "signal",
+      "text": "Claire Vo's first day with OpenClaw it deleted her family calendar. Now she runs 9 agents across 3 Mac Minis, and said \"I haven't felt like this since I was a teenager learning to code.\" Her sales agent Sam does a daily CRM sweep, identifies decision-makers from new signups.",
+      "author": "@lennysan"
+    },
+    {
+      "id": "x-019",
+      "tier": "signal",
+      "text": "The only 4 jobs that will remain at tech companies.",
+      "media": "image",
+      "author": "@chintanzalani"
+    },
+    {
+      "id": "x-020",
+      "tier": "signal",
+      "text": "No electricity, no battery, Swiss movement tropical fan from 1910. The full wind lasts about 30 minutes. It still works.",
+      "media": "video",
+      "author": "@BrianRoemmele"
+    },
+    {
+      "id": "x-021",
+      "tier": "signal",
+      "text": "prediction re the end of spreadsheets. AI code gen means that anything that is currently modeled as a spreadsheet is better modeled in code. You get all the advantages of software - libraries, open source, AI, all the complexity and expressiveness.",
+      "author": "@andrewchen"
+    },
+    {
+      "id": "x-022",
+      "tier": "signal",
+      "text": "people are buying rigs worth thousands of dollars while your five year old GPUs can run 9B parameter open source LLMs",
+      "media": "image",
+      "author": "@aviral10x"
+    },
+    {
+      "id": "x-023",
+      "tier": "signal",
+      "text": "I'm not the only one doing this. - karpathy best thought leader, best person to learn from imo. Nanochat is the best way to get into training LLMs its the simplest and most digestible source for building your first AI model",
+      "media": "image",
+      "author": "@0xSero"
+    },
+    {
+      "id": "x-024",
+      "tier": "signal",
+      "text": "When someone signs up to your SaaS, grab their email domain, get a summary from Firecrawl, have an LLM generate you the best starting keywords/configuration/demo project",
+      "author": "@arvidkahl"
+    },
+    {
+      "id": "x-025",
+      "tier": "signal",
+      "text": "I mass launched 70+ startups since 2013. Here's my stack: a $5/month VPS, PHP, jQuery, SQLite. No frameworks. No dependencies. No team. $2.7M ARR.",
+      "author": "@levelsio"
+    },
+    {
+      "id": "x-026",
+      "tier": "signal",
+      "text": "Every page on all of my sites has a screenshot for og:image social media cards. Remote OK has 1.7 million user profiles, millions of job filter combo pages.",
+      "author": "@levelsio"
+    },
+    {
+      "id": "x-027",
+      "tier": "signal",
+      "text": "Structured outputs are the most underrated feature in LLM APIs. Stop parsing markdown. Just define a schema.",
+      "author": "@jxnlco"
+    },
+    {
+      "id": "x-028",
+      "tier": "signal",
+      "text": "LangGraph just hit 1M downloads. The shift from chains to graphs is real. Agents need cycles, not pipelines.",
+      "author": "@hwchase17"
+    },
+    {
+      "id": "x-029",
+      "tier": "signal",
+      "text": "Tailwind CSS v4 alpha is out. New engine, 10x faster builds, and native CSS cascade layers.",
+      "author": "@adamwathan"
+    },
+    {
+      "id": "x-030",
+      "tier": "signal",
+      "text": "Gumroad hit $200M in creator payouts. Our team is 3 people. SaaS doesn't need to be complicated.",
+      "author": "@shl"
+    },
+    {
+      "id": "x-031",
+      "tier": "signal",
+      "text": "DeepSeek-R1 is here! Performance on par with OpenAI-o1. Fully open-source model.",
+      "author": "@deepseek_ai"
+    },
+    {
+      "id": "x-032",
+      "tier": "signal",
+      "text": "Firecrawl v2 can now extract structured data from any website. No more parsing HTML. Just define your schema and go.",
+      "author": "@nickscamara_"
+    },
+    {
+      "id": "x-033",
+      "tier": "signal",
+      "text": "80% of auditing is codebase understanding. How can you make someone faster at understanding code?",
+      "author": "@0xjimmyk"
+    },
+    {
+      "id": "x-034",
+      "tier": "signal",
+      "text": "Used deep research to extract common keywords, product mentions, and painpoints from subreddits",
+      "author": "@mayowaoshin"
+    },
+    {
+      "id": "x-035",
+      "tier": "signal",
+      "text": "Crazy story how we built Cursor Directory in 3 hours and gathered over 1.1M views.",
+      "media": "image",
+      "author": "@pontusab"
+    },
+    {
+      "id": "x-036",
+      "tier": "signal",
+      "text": "the only things you need to know: your account has a base score and it runs before your tweet is evaluated: verified accounts: +100 automatic unverified accounts: max +55 then multiplied by your follower ratio",
+      "author": "@retardmode"
+    },
+    {
+      "id": "x-037",
+      "tier": "signal",
+      "text": "If only someone told me this before my 1st startup: 1. Validate. I wasted at least 5 years building things nobody wanted.",
+      "author": "@johnrushx"
+    },
+    {
+      "id": "x-038",
+      "tier": "signal",
+      "text": "I spent 6 months building an AI writing tool nobody wanted. Then I pivoted to a simple grammar checker and got 50k users in 2 weeks.",
+      "author": "@JamesBorrell"
+    },
+    {
+      "id": "x-039",
+      "tier": "noise",
+      "text": "this is so good 😂",
+      "media": "video"
+    },
+    {
+      "id": "x-040",
+      "tier": "noise",
+      "text": "Jamaican girl almost gets Ray cancelled but Kai saves him",
+      "media": "video"
+    },
+    {
+      "id": "x-041",
+      "tier": "noise",
+      "text": "My Italian grandma taught me this.",
+      "media": "video"
+    },
+    {
+      "id": "x-042",
+      "tier": "noise",
+      "text": "The coke ruined it",
+      "media": "video"
+    },
+    {
+      "id": "x-043",
+      "tier": "noise",
+      "text": "You won't believe what happened next 🤯"
+    },
+    {
+      "id": "x-044",
+      "tier": "noise",
+      "text": "Follow me for daily motivation 💪 Like if you agree! RT to spread the word!"
+    },
+    {
+      "id": "x-045",
+      "tier": "noise",
+      "text": "Unpopular opinion: hard work beats talent every time. Who agrees?"
+    },
+    {
+      "id": "x-046",
+      "tier": "noise",
+      "text": "I made $10k in my first month with this one simple trick. DM me to learn how!"
+    },
+    {
+      "id": "x-047",
+      "tier": "noise",
+      "text": "She's so beautiful 😍🔥",
+      "media": "image"
+    },
+    {
+      "id": "x-048",
+      "tier": "noise",
+      "text": "How football is made",
+      "media": "video"
+    },
+    {
+      "id": "x-049",
+      "tier": "noise",
+      "text": "The best way to end something is to starve it... 💯",
+      "media": "video",
+      "author": "@ModernxDad"
+    },
+    {
+      "id": "x-050",
+      "tier": "noise",
+      "text": "She literally explained why you must keep going.",
+      "media": "video",
+      "author": "@parveen__tyagi"
+    },
+    {
+      "id": "x-051",
+      "tier": "noise",
+      "text": "I need one of these.",
+      "media": "image",
+      "author": "@DefiantLs"
+    },
+    {
+      "id": "x-052",
+      "tier": "noise",
+      "text": "Before you ask AI another dumb coding question… watch this.",
+      "media": "video",
+      "author": "@IamKyros69"
+    },
+    {
+      "id": "x-053",
+      "tier": "noise",
+      "text": "Woman logic:",
+      "media": "image",
+      "author": "@ZherkaOfficial"
+    },
+    {
+      "id": "x-054",
+      "tier": "noise",
+      "text": "If Lionel Messi had perfect side profile",
+      "media": "image",
+      "author": "@interesting_aIl"
+    },
+    {
+      "id": "x-055",
+      "tier": "noise",
+      "text": "True",
+      "author": "@elonmusk"
+    },
+    {
+      "id": "x-056",
+      "tier": "noise",
+      "text": "The fraudsters always come up with the most sympathetic excuses and do so very loudly, because that is what swindlers do",
+      "author": "@elonmusk"
+    },
+    {
+      "id": "x-057",
+      "tier": "noise",
+      "text": "To succeed you just need to do so many reps is unreasonable that you fail.",
+      "author": "@AlexHormozi"
+    },
+    {
+      "id": "x-058",
+      "tier": "noise",
+      "text": "I have a theory that life meets you at your level of audacity",
+      "author": "@ashebytes"
+    },
+    {
+      "id": "x-059",
+      "tier": "noise",
+      "text": "Palantir CEO, Alex Karp says only 2 types of people will survive the AI era..",
+      "media": "video",
+      "author": "@damianplayer"
+    },
+    {
+      "id": "x-060",
+      "tier": "noise",
+      "text": "i often think about this..",
+      "media": "image",
+      "author": "@oprydai"
+    },
+    {
+      "id": "x-061",
+      "tier": "noise",
+      "text": "One great thing about SF is that you can see criminals just roaming the street!",
+      "author": "@mil0theminer"
+    },
+    {
+      "id": "x-062",
+      "tier": "noise",
+      "text": "A moving man will meet his luck",
+      "author": "@Adikastakes"
+    },
+    {
+      "id": "x-063",
+      "tier": "noise",
+      "text": "Ever wondered how Olympics can become more sustainable, efficient and intelligent?",
+      "author": "@AlibabaGroup"
+    },
+    {
+      "id": "x-064",
+      "tier": "noise",
+      "text": "Test if you can read at 900 words per minute with this technique",
+      "media": "video",
+      "author": "@InternetH0F"
+    },
+    {
+      "id": "x-065",
+      "tier": "noise",
+      "text": "iPhone 13 battery cell replacement",
+      "media": "video",
+      "author": "@_Brainboxx"
+    },
+    {
+      "id": "x-066",
+      "tier": "noise",
+      "text": "Gym etiquette final boss",
+      "media": "video",
+      "author": "@unhingedfeed"
+    },
+    {
+      "id": "x-067",
+      "tier": "noise",
+      "text": "your favorite founders' favorite founder",
+      "media": "video",
+      "author": "@jacobandreou"
+    },
+    {
+      "id": "x-068",
+      "tier": "noise",
+      "text": "This new anime season is looking cool. Would you watch this?",
+      "media": "video",
+      "author": "@Leaflit"
+    },
+    {
+      "id": "x-069",
+      "tier": "noise",
+      "text": "Ever heard of the Michelangelo effect?",
+      "media": "video",
+      "author": "@manly_mentor"
+    },
+    {
+      "id": "x-070",
+      "tier": "noise",
+      "text": "goodnight",
+      "author": "@Abhinavstwt"
+    },
+    {
+      "id": "x-071",
+      "tier": "noise",
+      "text": "The danger that's killing your long term health: Muscle loss. Here's what happens: Memory loss, Trouble walking, Chronic disease. But luckily there is a simple answer. Here is your ultimate guide.",
+      "media": "image",
+      "author": "@theoliveranwar"
+    },
+    {
+      "id": "x-072",
+      "tier": "tempting-noise",
+      "text": "Start building your moat now it's not too late",
+      "media": "image",
+      "author": "@boringmarketer"
+    },
+    {
+      "id": "x-073",
+      "tier": "noise",
+      "text": "The fastest way to change your life isn't: Starting a business, Investing in crypto. It's fixing your sleep.",
+      "author": "@edendotso"
+    },
+    {
+      "id": "x-074",
+      "tier": "noise",
+      "text": "How to do marketing (If you are Solopreneurs who sucks at marketing)",
+      "media": "image",
+      "author": "@DanKulkov"
+    },
+    {
+      "id": "x-075",
+      "tier": "noise",
+      "text": "Back pain? This is the one book you need. I know someone who only read the description and got better.",
+      "media": "image",
+      "author": "@julianweisser"
+    },
+    {
+      "id": "x-076",
+      "tier": "tempting-noise",
+      "text": "Your pitch deck is losing you money.",
+      "media": "image",
+      "author": "@KevinHenrikson"
+    },
+    {
+      "id": "x-077",
+      "tier": "tempting-noise",
+      "text": "The 7 best free AI tools that will save you 100+ hours a week",
+      "media": "image",
+      "author": "@alexfinnx"
+    },
+    {
+      "id": "x-078",
+      "tier": "tempting-noise",
+      "text": "Everything you need to know about building a $1M agency",
+      "media": "image",
+      "author": "@charlierward"
+    },
+    {
+      "id": "x-079",
+      "tier": "tempting-noise",
+      "text": "THIS GUY BUILT AN APP MASCOT THAT CAN EAT, SLEEP, AND CHANGE COLOR USING A STATE MACHINE.",
+      "media": "video"
+    },
+    {
+      "id": "x-080",
+      "tier": "tempting-noise",
+      "text": "2098x 209,700% gain in one call. Someone in our private tg channel caught $PIXEL at $2.4K before flying to $10m",
+      "media": "image"
+    },
+    {
+      "id": "x-081",
+      "tier": "tempting-noise",
+      "text": "THE TICKER IS $___"
+    },
+    {
+      "id": "x-082",
+      "tier": "tempting-noise",
+      "text": "WEB 3 SOCIAL MEDIA JUST GOT A LOT EASIER TO BUILD",
+      "media": "video"
+    },
+    {
+      "id": "x-083",
+      "tier": "noise",
+      "text": "NOTHING BEATS A MONDAY MORNING PUMP",
+      "media": "image"
+    },
+    {
+      "id": "x-084",
+      "tier": "tempting-noise",
+      "text": "If you want to build a startup that makes real money, here's what actually works"
+    },
+    {
+      "id": "x-085",
+      "tier": "tempting-noise",
+      "text": "Every SaaS founder should know this pricing trick"
+    },
+    {
+      "id": "x-086",
+      "tier": "noise",
+      "text": "GM CT SAY IT BACK",
+      "media": "image"
+    },
+    {
+      "id": "x-087",
+      "tier": "signal",
+      "text": "DefiLlama launched an MCP that brings onchain data directly to AI agent. 23 tools covering data across protocols.",
+      "media": "video"
+    },
+    {
+      "id": "x-088",
+      "tier": "signal",
+      "text": "This is nuts: Clawdbot figured out how to transcribe and respond to a voice message on its own, detecting the Opus format, converting to wav, transcribing"
+    },
+    {
+      "id": "x-089",
+      "tier": "signal",
+      "text": "PimEyes has been doing this since 2017. The scary part isn't the technology. It's that most people are only finding out now."
+    },
+    {
+      "id": "x-090",
+      "tier": "critical-signal",
+      "text": "Anthropic is hiring Forward Deployed Engineers in Singapore. If you've built agent systems on Claude and can sit with customers, DM me."
+    },
+    {
+      "id": "x-091",
+      "tier": "critical-signal",
+      "text": "OpenAI is hiring forward deployed engineers in APAC. The interview is a 2-day build sprint with a real customer problem."
+    },
+    {
+      "id": "x-092",
+      "tier": "critical-signal",
+      "text": "We're paying $15k for a 6-week pilot to anyone who can make our compliance Q&A cite sources or abstain. Serious builders only."
+    },
+    {
+      "id": "x-093",
+      "tier": "critical-signal",
+      "text": "Claude Code now lets workflows orchestrate subagents deterministically. This changes how you structure long-running agent tasks. Docs in reply."
+    },
+    {
+      "id": "x-094",
+      "tier": "critical-signal",
+      "text": "MCP now supports streaming tool results. Long-running agent tasks no longer need polling hacks."
+    },
+    {
+      "id": "x-095",
+      "tier": "critical-signal",
+      "text": "Ollama just added an MLX backend on Apple Silicon: roughly 2x tokens/sec on M-series for gemma-class models."
+    },
+    {
+      "id": "x-096",
+      "tier": "critical-signal",
+      "text": "How we closed our first 10 enterprise pilots: we stopped doing free demos and started charging a $5k deposit before building anything."
+    },
+    {
+      "id": "x-097",
+      "tier": "critical-signal",
+      "text": "I built a citation-verification layer for RAG that abstains when retrieval confidence is low. 94% fewer hallucinated answers in production."
+    },
+    {
+      "id": "x-098",
+      "tier": "critical-signal",
+      "text": "Singapore MAS published new guidance on AI in regulated financial advice: every generated claim must be traceable to a source document."
+    },
+    {
+      "id": "x-099",
+      "tier": "critical-signal",
+      "text": "Cloudflare Workers can now run 4B-parameter models at the edge. Local-first AI just got a real deployment path."
+    },
+    {
+      "id": "x-100",
+      "tier": "critical-signal",
+      "text": "Live demo: our agent verifies every claim against source documents before answering, and abstains when it cannot.",
+      "media": "video"
+    },
+    {
+      "id": "x-101",
+      "tier": "critical-signal",
+      "text": "Forward deployed engineering is the best job in AI right now: customer problems, real stakes, and you ship weekly. Here is how to break in without big-lab experience."
+    },
+    {
+      "id": "x-102",
+      "tier": "tempting-noise",
+      "text": "AI will replace 90% of developers by 2027. If you're not building with it you're already behind."
+    },
+    {
+      "id": "x-103",
+      "tier": "tempting-noise",
+      "text": "The AI bubble is about to pop. I've never been more sure of anything."
+    },
+    {
+      "id": "x-104",
+      "tier": "tempting-noise",
+      "text": "10 ChatGPT prompts that will save you 40 hours a week 🧵"
+    },
+    {
+      "id": "x-105",
+      "tier": "tempting-noise",
+      "text": "Everyone is sleeping on this AI coding tool. I can't say the name yet. Follow me for the reveal."
+    },
+    {
+      "id": "x-106",
+      "tier": "tempting-noise",
+      "text": "Just spent 8 hours with Claude Code. My mind is blown. That's it. That's the tweet."
+    },
+    {
+      "id": "x-107",
+      "tier": "tempting-noise",
+      "text": "Hot take: SaaS is dead. AI agents killed it. Discuss."
+    },
+    {
+      "id": "x-108",
+      "tier": "tempting-noise",
+      "text": "This founder makes $80k/month with a one-person AI agency. Here is the playbook 🧵"
+    },
+    {
+      "id": "x-109",
+      "tier": "tempting-noise",
+      "text": "BREAKING: OpenAI just changed everything again.",
+      "media": "video"
+    }
+  ]
+}
