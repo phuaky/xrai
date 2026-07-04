@@ -279,16 +279,44 @@
   transition: filter 0.2s ease;
 }
 
-/* Blur children of hidden cards, but not the peek button or blur label */
+/* Blur children of hidden cards, but not the peek button, blur label, or wrong button */
 [data-xrai-hidden="blur"] {
   position: relative;
 }
-[data-xrai-hidden="blur"] > *:not(.xrai-peek-btn):not(.xrai-blur-label) {
+[data-xrai-hidden="blur"] > *:not(.xrai-peek-btn):not(.xrai-blur-label):not(.xrai-wrong-btn) {
   filter: blur(8px);
   transition: filter 0.2s ease;
 }
-[data-xrai-revealed] > *:not(.xrai-peek-btn):not(.xrai-blur-label) {
+[data-xrai-revealed] > *:not(.xrai-peek-btn):not(.xrai-blur-label):not(.xrai-wrong-btn) {
   filter: none;
+}
+
+/* Wrong button — one-tap correction, bottom-right of the card */
+.xrai-wrong-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 11;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 15, 20, 0.85);
+  color: #f87171;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  border-radius: 50%;
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  opacity: 0.55;
+  user-select: none;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.xrai-wrong-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
 }
 
 /* Blur overlay label — shows classification reason */

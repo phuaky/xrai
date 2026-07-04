@@ -13,7 +13,10 @@ var RaiConfig = (function () {
       ollamaUrl: 'http://localhost:11434',
       confidenceThreshold: 0.7,
       contentFilter: 'posts-only',
-      hideMethod: 'remove',
+      // 'blur' keeps hidden cards visible-but-quiet: the ✗ correction button
+      // stays reachable, so false-hides can be caught. 'remove' hides them
+      // completely and silently (no correction possible).
+      hideMethod: 'blur',
       replyStyle: 'curious',
       memoryRetentionDays: 30,
       maxModelCallsPerMinute: 100,

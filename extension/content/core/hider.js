@@ -93,7 +93,7 @@ var RaiHider = (function () {
       var guard = function (e) {
         if (element.hasAttribute('data-xrai-revealed')) return;
         var t = e.target;
-        if (t && (t.closest('.xrai-peek-btn') || t.closest('.xrai-blur-label'))) return;
+        if (t && (t.closest('.xrai-peek-btn') || t.closest('.xrai-blur-label') || t.closest('.xrai-wrong-btn'))) return;
         e.preventDefault();
         e.stopPropagation();
       };
@@ -136,6 +136,34 @@ var RaiHider = (function () {
       element._xraiSignalLabel.remove();
       delete element._xraiSignalLabel;
     }
+    removeWrongButton(element);
+  }
+
+  // One-tap correction affordance ("✗" bottom-right). The click both fixes the
+  // card AND records ground truth — the only path that ever surfaces false-hides
+  // from live browsing, so it feeds the eval golden set.
+  function addWrongButton(element, onWrong, titleText) {
+    if (!element || element._xraiWrongBtn) return;
+    element.style.position = 'relative';
+    var btn = document.createElement('button');
+    btn.className = 'xrai-wrong-btn';
+    btn.textContent = '✗';
+    btn.title = titleText || 'Wrong call? Click to correct';
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      removeWrongButton(element);
+      onWrong();
+    });
+    element.appendChild(btn);
+    element._xraiWrongBtn = btn;
+  }
+
+  function removeWrongButton(element) {
+    if (element && element._xraiWrongBtn) {
+      element._xraiWrongBtn.remove();
+      delete element._xraiWrongBtn;
+    }
   }
 
   // Small green badge on kept cards (X: "signal"; YouTube: "♪ music" / "motivation")
@@ -155,6 +183,8 @@ var RaiHider = (function () {
     hide: hide,
     show: show,
     addKeepLabel: addKeepLabel,
-    addSignalLabel: addKeepLabel // back-compat alias
+    addSignalLabel: addKeepLabel, // back-compat alias
+    addWrongButton: addWrongButton,
+    removeWrongButton: removeWrongButton
   };
 })();

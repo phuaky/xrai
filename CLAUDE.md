@@ -178,14 +178,14 @@ X records carry `prediction`/`text`/`author`/`tweetId` instead of `category`/`ti
 
 **Optional collector** (`scripts/collector.js`, port 11435) still receives a best-effort live mirror → `data/classifications-<platform>.jsonl` + `data/model-io.jsonl`, but is no longer required for durability.
 
-> **Next lever for the study:** ground truth (was the decision correct?) is not captured yet. A one-tap "wrong" affordance calling `RaiMemory.saveCorrection` would turn this into a supervised dataset; corrections join the log on `videoId`/`tweetId`.
+> **Ground truth (X, shipped):** a one-tap ✗ button on every kept and blur-hidden tweet calls `RaiMemory.saveCorrection` and writes a `{kind:"correction", was, correctedTo, source, tweetId}` event to the durable log — corrections join decisions on `tweetId`. This is the only live source of false-hide evidence, which is why X `hideMethod` defaults to `blur` (a `remove`-hidden tweet can never be corrected). Mined corrections should graduate into `benchmarks/golden-x.json`. YouTube does not have the affordance yet.
 
 ## Configuration Defaults
 
 ```javascript
 // X (xrai_config)
 { model: 'dhiltgen/gemma4:e2b-mlx-bf16', confidenceThreshold: 0.7,
-  contentFilter: 'posts-only', hideMethod: 'remove', replyStyle: 'curious',
+  contentFilter: 'posts-only', hideMethod: 'blur', replyStyle: 'curious',
   maxModelCallsPerMinute: 100 }
 
 // YouTube (ytrai_config)

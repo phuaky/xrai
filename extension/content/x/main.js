@@ -128,6 +128,39 @@ var XraiMain = (function () {
     });
   }
 
+  // === One-tap corrections — the ground-truth loop ===
+  // Correction events join the durable log on tweetId (see CLAUDE.md Data
+  // Pipeline). They are the ONLY live source of false-hide evidence: hidden
+  // signal is invisible in daily use unless the user can peek and object.
+
+  function attachWrongOnKept(el, data, text, confidence, source) {
+    RaiHider.addWrongButton(el, function () {
+      RaiMemory.saveCorrection(text, data.mediaType, 'signal', 'noise');
+      RaiMemory.logEvent({
+        platform: 'x', kind: 'correction', was: 'shown', correctedTo: 'noise',
+        source: source, confidence: confidence,
+        text: (text || '').substring(0, 500), author: data.author, tweetId: data.id
+      });
+      RaiHider.hide(el, 'blur', 'you marked: noise');
+    }, 'Noise? Click to hide it and record the correction');
+  }
+
+  function attachWrongOnHidden(el, data, text, confidence, source) {
+    // Only blur-hidden cards have visible UI to correct from.
+    if (el.getAttribute('data-xrai-hidden') !== 'blur') return;
+    RaiHider.addWrongButton(el, function () {
+      RaiMemory.saveCorrection(text, data.mediaType, 'noise', 'signal');
+      RaiMemory.logEvent({
+        platform: 'x', kind: 'correction', was: 'hidden', correctedTo: 'signal',
+        source: source, confidence: confidence,
+        text: (text || '').substring(0, 500), author: data.author, tweetId: data.id
+      });
+      RaiHider.show(el);
+      RaiHider.addKeepLabel(el, 'corrected: signal');
+      XraiReply.attachReplyButton(el, data);
+    }, 'Worth seeing? Click to reveal it and record the correction');
+  }
+
   function handleTweet(info) {
     var el = info.element;
     var data = info.data;
@@ -174,6 +207,7 @@ var XraiMain = (function () {
       RaiMemory.incrementStats('hidden');
       RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'noise');
       RaiIndicator.incrementHidden();
+      attachWrongOnHidden(el, data, enrichedText, pfResult.confidence, 'prefilter:' + pfResult.reason);
       attachNewTabHandler(el, data);
       return;
     }
@@ -187,6 +221,7 @@ var XraiMain = (function () {
       RaiMemory.markSeen(RaiMemory.computeFingerprint('', data.mediaType), 'noise');
       RaiHider.hide(el, 'blur', 'media-only: no text to classify');
       RaiIndicator.incrementHidden();
+      attachWrongOnHidden(el, data, '', 0.55, 'media-only');
       attachNewTabHandler(el, data);
       return;
     }
@@ -214,6 +249,7 @@ var XraiMain = (function () {
             : 'AI: noise (' + cached.confidence + ')';
         RaiHider.hide(el, config ? config.hideMethod : 'remove', cachedReason);
         RaiIndicator.incrementHidden();
+        attachWrongOnHidden(el, data, enrichedText, cached.confidence, cached.source || 'cache');
       } else {
         var cachedSignalReason = cached.reason
           ? 'AI: ' + cached.reason
@@ -221,6 +257,7 @@ var XraiMain = (function () {
         RaiHider.addKeepLabel(el, cachedSignalReason);
         RaiIndicator.incrementKept();
         XraiReply.attachReplyButton(el, data);
+        attachWrongOnKept(el, data, enrichedText, cached.confidence, cached.source || 'cache');
       }
       attachNewTabHandler(el, data);
       return;
@@ -241,6 +278,7 @@ var XraiMain = (function () {
         RaiMemory.incrementStats('hidden');
         RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'noise');
         RaiIndicator.incrementHidden();
+        attachWrongOnHidden(el, data, enrichedText, result.confidence, result.source || 'model');
       } else {
         RaiHider.unblurPending(el);
         var signalLabel = result.reason
@@ -252,6 +290,7 @@ var XraiMain = (function () {
         RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'signal');
         RaiIndicator.incrementKept();
         XraiReply.attachReplyButton(el, data);
+        attachWrongOnKept(el, data, enrichedText, result.confidence || 0.5, result.source || 'model');
       }
       attachNewTabHandler(el, data);
     });
