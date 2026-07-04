@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 // Load detector source
-const detectorSrc = readFileSync(join(import.meta.dir, '../extension/content/detector.js'), 'utf8');
+const detectorSrc = readFileSync(join(import.meta.dir, '../extension/content/x/detector.js'), 'utf8');
 
 // We need to extract the pure functions. The IIFE only exposes onTweet/start/stop,
 // but we can eval a modified version that also exposes internal helpers for testing.
@@ -95,18 +95,18 @@ describe('XraiDetector internals', () => {
   });
 
   describe('permalink construction', () => {
-    it('can construct a valid permalink from extracted data', () => {
+    it('can construct a valid permalink from extracted data', async () => {
       const article = createTweetArticle('elonmusk', '1799999999999');
-      const data = detector._extractData(article);
+      const data = await detector._extractData(article);
       expect(data).not.toBeNull();
       const permalink = 'https://x.com/' + data.author + '/status/' + data.id;
       expect(permalink).toBe('https://x.com/elonmusk/status/1799999999999');
     });
 
-    it('extractData returns null for tweets without IDs', () => {
+    it('extractData returns null for tweets without IDs', async () => {
       const article = document.createElement('article');
       article.innerHTML = '<div>No tweet data</div>';
-      const data = detector._extractData(article);
+      const data = await detector._extractData(article);
       expect(data).toBeNull();
     });
   });

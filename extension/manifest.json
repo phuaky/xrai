@@ -1,12 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "xrai",
-  "version": "1.0.0",
-  "description": "Local AI tweet filter. Signal stays, noise disappears.",
-  "permissions": ["storage"],
+  "name": "rai — local AI feed filter",
+  "version": "2.0.0",
+  "description": "Local AI feed filter. On X: signal stays, noise disappears. On YouTube: only music + motivational videos show, everything else blurs.",
+  "permissions": ["storage", "unlimitedStorage"],
   "host_permissions": [
     "https://x.com/*",
     "https://twitter.com/*",
+    "https://www.youtube.com/*",
+    "https://m.youtube.com/*",
     "http://localhost:11434/*",
     "http://localhost:11435/*"
   ],
@@ -18,17 +20,32 @@
       "matches": ["https://x.com/*", "https://twitter.com/*"],
       "js": [
         "lib/memory.js",
-        "lib/ollama.js",
         "lib/config.js",
-        "content/prefilter.js",
-        "content/detector.js",
-        "content/classifier.js",
-        "content/hider.js",
-        "content/reply.js",
-        "content/indicator.js",
-        "content/main.js"
+        "content/core/classifier.js",
+        "content/core/hider.js",
+        "content/core/indicator.js",
+        "content/x/prefilter.js",
+        "content/x/detector.js",
+        "content/x/reply.js",
+        "content/x/main.js"
       ],
-      "css": ["content/styles.css"],
+      "css": ["content/core/styles.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": [
+        "lib/memory.js",
+        "lib/config.js",
+        "content/core/classifier.js",
+        "content/core/hider.js",
+        "content/core/indicator.js",
+        "content/youtube/prefilter.js",
+        "content/youtube/detector.js",
+        "content/youtube/shorts.js",
+        "content/youtube/main.js"
+      ],
+      "css": ["content/core/styles.css"],
       "run_at": "document_idle"
     }
   ],

@@ -1,14 +1,17 @@
-# xrai
+# rai
 
-X-ray your Twitter/X feed with local AI. Noise disappears. Signal stays.
+Filter your feeds with local AI. One Chrome extension, two platforms:
+
+- **X / Twitter** — noise disappears, signal stays.
+- **YouTube** — everything blurs except **music** and **motivational** videos.
 
 **Everything runs on your machine.** No cloud APIs. No accounts. No data leaves your computer.
 
 ## What it does
 
-A Chrome extension that classifies every tweet in your feed as **signal** (worth reading) or **noise** (skip) using a local AI model via [Ollama](https://ollama.ai). Noise tweets are hidden instantly.
+**On X:** classifies every tweet as **signal** (worth reading) or **noise** (skip) using a local AI model via [Ollama](https://ollama.ai). Noise tweets are hidden instantly. For signal tweets worth replying to, rai generates reply suggestions you **copy-paste manually** — zero automation.
 
-When you find a signal tweet worth replying to, xrai generates reply suggestions that you **copy-paste manually** — zero automation, zero bot behavior.
+**On YouTube:** classifies every video by its **title + channel** as `music`, `motivational`, or `other`, and **blurs everything that isn't music or motivational**. For when you open YouTube to listen to music but keep getting pulled into videos. Hit "👁 Show" on any blurred card to reveal it.
 
 ## How it works
 
@@ -33,6 +36,26 @@ Tweet appears → Reply? (posts-only mode) → HIDE
 - **Specificity** — Concrete details or vague claims?
 - **Density** — High insight-to-word ratio?
 - **Authenticity** — Genuine sharing or engagement farming?
+
+## YouTube: music-only mode
+
+```
+Video card appears (home / subscriptions / watch sidebar)
+        ↓
+  Obvious music? ("Official Video", "feat.", "- Topic", VEVO, lofi…) → SHOW (instant, regex)
+  Obvious motivational? ("motivation", "discipline", Goggins…)       → SHOW (instant, regex)
+        ↓ not obvious
+  Blur immediately → Ollama classifies title+channel
+        ↓
+  music         → SHOW (♪ music badge)
+  motivational  → SHOW (💪 badge, if enabled)
+  other         → stays BLURRED ("👁 Show" to peek)
+```
+
+- **Scoped** to the home feed, subscriptions, and the watch-page "up next" sidebar — the surfaces that distract you. The video you're actually watching, search results, and channel pages are left alone.
+- **Default model** `gemma2:2b` (fast — titles are short and the regex prefilter handles obvious music, so the model only sees ambiguous cases).
+- **Keep motivational** is a toggle in settings (on by default). Turn it off for music only.
+- **Fail-open** — if Ollama is down, nothing is blurred (YouTube stays usable).
 
 ## Setup
 
@@ -144,32 +167,36 @@ xrai is designed to comply with X's ToS:
 ## Project structure
 
 ```
-xrai/
+xrai/                          # repo (named for history; extension is "rai")
 ├── extension/
-│   ├── manifest.json        # Chrome Manifest V3
+│   ├── manifest.json          # Chrome MV3 — 2 content_script blocks (x.com, youtube.com)
 │   ├── content/
-│   │   ├── detector.js      # Tweet detection (MutationObserver, debounced)
-│   │   ├── prefilter.js     # Regex noise filter (11 categories + tech safelist)
-│   │   ├── classifier.js    # Concurrent queue (max 5) with result cache
-│   │   ├── hider.js         # Hide/blur/collapse noise tweets
-│   │   ├── reply.js         # Reply generation (copy-paste only)
-│   │   ├── indicator.js     # Status pill UI
-│   │   ├── main.js          # Orchestrator — flat pipeline, every tweet gets a decision
-│   │   └── styles.css
+│   │   ├── core/              # SHARED across both platforms
+│   │   │   ├── classifier.js  # Concurrent queue (max 5) + result cache
+│   │   │   ├── hider.js       # Hide/blur/collapse + peek button
+│   │   │   ├── indicator.js   # Status pill + per-platform settings
+│   │   │   └── styles.css
+│   │   ├── x/                 # X-specific
+│   │   │   ├── detector.js    # Tweet detection (MutationObserver)
+│   │   │   ├── prefilter.js   # Regex noise filter + tech safelist
+│   │   │   ├── reply.js       # Reply generation (copy-paste only)
+│   │   │   └── main.js        # Pipeline: hide noise, keep signal
+│   │   └── youtube/           # YouTube-specific
+│   │       ├── detector.js    # Video-card detection (recycle-aware)
+│   │       ├── prefilter.js   # Regex KEEP for obvious music/motivational
+│   │       └── main.js        # Inverted pipeline: blur all, reveal music
 │   ├── lib/
-│   │   ├── memory.js        # Classification log + corrections (chrome.storage)
-│   │   ├── ollama.js        # Ollama API client + classification prompt
-│   │   └── config.js        # User preferences (chrome.storage.local)
+│   │   ├── memory.js          # Per-platform stats/log + IndexedDB (RaiMemory)
+│   │   └── config.js          # Per-platform preferences (RaiConfig)
 │   └── background/
-│       └── worker.js        # Service worker (Ollama HTTP proxy)
+│       └── worker.js          # Service worker — platform-routed Ollama proxy
 ├── scripts/
-│   ├── collector.js         # Local data collector (port 11435)
-│   └── improve.js           # Meta-learning analysis script
-├── benchmarks/
-│   └── benchmark.js         # Model speed/accuracy tests (45 tweets)
-├── data/                    # Local classification data (gitignored)
-├── SPEC.md                  # Full architecture spec
-└── CLAUDE.md                # Dev instructions for AI assistants
+│   ├── collector.js           # Local data collector (port 11435)
+│   └── improve.js             # Meta-learning analysis (X)
+├── benchmarks/benchmark.js    # X model speed/accuracy tests
+├── data/                      # Local classification data (gitignored)
+├── SPEC.md                    # Architecture spec (X)
+└── CLAUDE.md                  # Dev instructions for AI assistants
 ```
 
 ## License

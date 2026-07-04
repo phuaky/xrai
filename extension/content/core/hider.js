@@ -1,22 +1,40 @@
-/* xrai — Hider (CSS manipulation to hide/show noise tweets) */
-var XraiHider = (function () {
+/* rai — Hider (CSS manipulation to hide/blur/collapse cards, platform-agnostic) */
+var RaiHider = (function () {
   'use strict';
 
-  function blurPending(element) {
+  var PENDING_BLUR_DELAY_MS = 300;
+
+  // blurPending(el)        -> blur after a short delay (X: avoids flashing cached signal)
+  // blurPending(el, 0)     -> blur immediately/synchronously (YouTube: blur-first UX)
+  function blurPending(element, delayMs) {
     if (!element) return;
-    element.setAttribute('data-xrai-pending', '1');
-    element.style.position = 'relative';
+    if (element._raiPendingTimer || element.hasAttribute('data-xrai-pending')) return;
+    if (delayMs === undefined) delayMs = PENDING_BLUR_DELAY_MS;
+
+    if (delayMs <= 0) {
+      element.setAttribute('data-xrai-pending', '1');
+      element.style.position = 'relative';
+      return;
+    }
+    element._raiPendingTimer = setTimeout(function () {
+      element._raiPendingTimer = null;
+      element.setAttribute('data-xrai-pending', '1');
+      element.style.position = 'relative';
+    }, delayMs);
   }
 
   function unblurPending(element) {
     if (!element) return;
+    if (element._raiPendingTimer) {
+      clearTimeout(element._raiPendingTimer);
+      element._raiPendingTimer = null;
+    }
     element.removeAttribute('data-xrai-pending');
     element.style.position = '';
   }
 
   function hide(element, method, reason) {
     if (!element || element.getAttribute('data-xrai-hidden')) return;
-    // Clear pending blur state when transitioning to confirmed hide
     element.removeAttribute('data-xrai-pending');
     method = method || 'remove';
     element.setAttribute('data-xrai-hidden', method);
@@ -45,16 +63,15 @@ var XraiHider = (function () {
       element.addEventListener('click', element._xraiExpandHandler);
     } else if (method === 'blur') {
       element.style.position = 'relative';
-      // Blur is applied via CSS: article[data-xrai-hidden="blur"] > *:not(.xrai-peek-btn)
       var btn = document.createElement('button');
       btn.className = 'xrai-peek-btn';
-      btn.textContent = '\uD83D\uDC41 Show';
+      btn.textContent = '👁 Show';
       btn.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
         if (element.hasAttribute('data-xrai-revealed')) {
           element.removeAttribute('data-xrai-revealed');
-          btn.textContent = '\uD83D\uDC41 Show';
+          btn.textContent = '👁 Show';
         } else {
           element.setAttribute('data-xrai-revealed', '1');
           btn.textContent = 'Hide';
@@ -63,7 +80,6 @@ var XraiHider = (function () {
       element.appendChild(btn);
       element._xraiPeekBtn = btn;
 
-      // Add reason overlay label
       if (reason) {
         var label = document.createElement('div');
         label.className = 'xrai-blur-label';
@@ -71,12 +87,23 @@ var XraiHider = (function () {
         element.appendChild(label);
         element._xraiBlurLabel = label;
       }
+
+      // Guard: swallow clicks on the blurred card so the site's link handlers
+      // don't navigate away when the user misses the peek button.
+      var guard = function (e) {
+        if (element.hasAttribute('data-xrai-revealed')) return;
+        var t = e.target;
+        if (t && (t.closest('.xrai-peek-btn') || t.closest('.xrai-blur-label'))) return;
+        e.preventDefault();
+        e.stopPropagation();
+      };
+      element.addEventListener('click', guard, true);
+      element._xraiBlurGuard = guard;
     }
   }
 
   function show(element) {
     if (!element) return;
-    var method = element.getAttribute('data-xrai-hidden');
     element.removeAttribute('data-xrai-hidden');
     element.removeAttribute('data-xrai-expanded');
 
@@ -101,9 +128,18 @@ var XraiHider = (function () {
       element._xraiBlurLabel.remove();
       delete element._xraiBlurLabel;
     }
+    if (element._xraiBlurGuard) {
+      element.removeEventListener('click', element._xraiBlurGuard, true);
+      delete element._xraiBlurGuard;
+    }
+    if (element._xraiSignalLabel) {
+      element._xraiSignalLabel.remove();
+      delete element._xraiSignalLabel;
+    }
   }
 
-  function addSignalLabel(element, reason) {
+  // Small green badge on kept cards (X: "signal"; YouTube: "♪ music" / "motivation")
+  function addKeepLabel(element, reason) {
     if (!element || !reason || element._xraiSignalLabel) return;
     element.style.position = 'relative';
     var label = document.createElement('div');
@@ -118,6 +154,7 @@ var XraiHider = (function () {
     unblurPending: unblurPending,
     hide: hide,
     show: show,
-    addSignalLabel: addSignalLabel
+    addKeepLabel: addKeepLabel,
+    addSignalLabel: addKeepLabel // back-compat alias
   };
 })();

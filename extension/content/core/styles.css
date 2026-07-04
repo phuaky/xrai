@@ -1,4 +1,4 @@
-/* xrai — Minimal CSS */
+/* rai — Minimal CSS (shared across X + YouTube) */
 
 /* Status pill — bottom-right corner */
 #xrai-pill {
@@ -96,6 +96,12 @@
   accent-color: #4ade80;
 }
 
+#xrai-settings input[type="checkbox"] {
+  accent-color: #4ade80;
+  width: 16px;
+  height: 16px;
+}
+
 #xrai-settings select {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -137,28 +143,37 @@
   margin-top: 10px;
   font-size: 11px;
   color: #888;
+  white-space: pre-line;
 }
 
-/* Reply button on signal tweets */
+/* Reply button on kept tweets (X only) — persistent, visible, easy to click */
 .xrai-reply-btn {
-  display: none;
   position: absolute;
-  right: -8px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  font-size: 14px;
-  opacity: 0.5;
-  transition: opacity 0.15s;
+  font-size: 16px;
+  opacity: 0.85;
+  background: rgba(15, 15, 20, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  backdrop-filter: blur(6px);
+  transition: opacity 0.15s, transform 0.15s, background 0.15s;
   z-index: 10;
+  user-select: none;
 }
-[role="group"]:hover .xrai-reply-btn,
-article:hover .xrai-reply-btn {
-  display: block;
+.xrai-reply-btn:hover {
+  opacity: 1;
+  transform: scale(1.08);
+  background: rgba(30, 30, 40, 0.95);
 }
-.xrai-reply-btn:hover { opacity: 1; }
 
-/* Reply card */
+/* Reply card (X only) */
 .xrai-reply-card {
   position: absolute;
   z-index: 100001;
@@ -226,48 +241,53 @@ article:hover .xrai-reply-btn {
 }
 .xrai-reply-copy:hover { background: rgba(255, 255, 255, 0.2); }
 
-/* Peek button on blurred tweets */
+/* Peek button on blurred cards — large, centered, high contrast */
 .xrai-peek-btn {
   position: absolute;
-  top: 8px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  background: rgba(15, 15, 20, 0.85);
-  color: #ccc;
+  transform: translate(-50%, -50%);
+  min-width: 100px;
+  min-height: 44px;
+  padding: 10px 20px;
+  z-index: 11;
+  background: rgba(15, 15, 20, 0.92);
+  color: #eee;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(8px);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(10px);
   cursor: pointer;
   user-select: none;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, transform 0.15s;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
 }
 .xrai-peek-btn:hover {
-  background: rgba(30, 30, 40, 0.95);
-  color: #fff;
+  background: rgba(40, 40, 55, 0.98);
+  transform: translate(-50%, -50%) scale(1.04);
 }
 
-/* Pending blur — applied immediately on detection, before classification */
-article[data-xrai-pending] {
+/* Pending blur — applied immediately on detection, before classification.
+   Tag-agnostic so it works on X <article> and YouTube <ytd-*-renderer> cards. */
+[data-xrai-pending] {
   position: relative;
 }
-article[data-xrai-pending] > * {
+[data-xrai-pending] > * {
   filter: blur(8px);
   transition: filter 0.2s ease;
 }
 
-/* Blur children of hidden tweets, but not the peek button or blur label */
-article[data-xrai-hidden="blur"] {
+/* Blur children of hidden cards, but not the peek button or blur label */
+[data-xrai-hidden="blur"] {
   position: relative;
 }
-article[data-xrai-hidden="blur"] > *:not(.xrai-peek-btn):not(.xrai-blur-label) {
+[data-xrai-hidden="blur"] > *:not(.xrai-peek-btn):not(.xrai-blur-label) {
   filter: blur(8px);
   transition: filter 0.2s ease;
 }
-article[data-xrai-revealed] > *:not(.xrai-peek-btn):not(.xrai-blur-label) {
+[data-xrai-revealed] > *:not(.xrai-peek-btn):not(.xrai-blur-label) {
   filter: none;
 }
 
@@ -293,7 +313,7 @@ article[data-xrai-revealed] > *:not(.xrai-peek-btn):not(.xrai-blur-label) {
   white-space: nowrap;
 }
 
-/* Signal label — shows classification reason on signal tweets */
+/* Keep label — green badge on kept cards (signal / music / motivation) */
 .xrai-signal-label {
   position: absolute;
   bottom: 8px;
@@ -320,3 +340,89 @@ article[data-xrai-revealed] > *:not(.xrai-peek-btn):not(.xrai-blur-label) {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Pill — Shorts consumption segment (YouTube) */
+.xrai-pill-extra {
+  color: #fbbf24;
+  font-size: 11px;
+}
+
+/* Settings — number inputs + sub-section heading */
+#xrai-settings input[type="number"] {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  width: 56px;
+}
+.xrai-settings-sub {
+  margin: 10px 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fbbf24;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Shorts doom-scroll nudge overlay */
+.rai-nudge-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  background: rgba(10, 10, 14, 0.82);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: xrai-fade-in 0.18s ease;
+}
+.rai-nudge-card {
+  background: rgba(22, 22, 30, 0.98);
+  color: #f3f4f6;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  width: 340px;
+  max-width: 86vw;
+  padding: 28px 24px 22px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+  text-align: center;
+}
+.rai-nudge-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.rai-nudge-body {
+  font-size: 14px;
+  line-height: 1.45;
+  color: #c7c9d1;
+  margin-bottom: 22px;
+}
+.rai-nudge-actions {
+  display: flex;
+  gap: 10px;
+}
+.rai-nudge-actions button {
+  flex: 1;
+  padding: 11px 0;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.12s, background 0.15s;
+}
+.rai-nudge-actions button:hover { transform: translateY(-1px); }
+.rai-nudge-leave {
+  background: #fbbf24;
+  color: #1a1a1a;
+}
+.rai-nudge-leave:hover { background: #f59e0b; }
+.rai-nudge-stay {
+  background: rgba(255, 255, 255, 0.1);
+  color: #c7c9d1;
+}
+.rai-nudge-stay:hover { background: rgba(255, 255, 255, 0.18); }

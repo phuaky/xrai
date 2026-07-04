@@ -1,11 +1,24 @@
-/* xrai — Content Memory (IndexedDB fingerprint store) */
-const XraiMemory = (function () {
+/* rai — Content Memory (IndexedDB fingerprint store + stats/time/log, per-platform) */
+const RaiMemory = (function () {
   'use strict';
 
-  const DB_NAME = 'xrai_memory';
-  const DB_VERSION = 1;
+  // Storage namespace — set via init(platform). 'xrai' for X (legacy-compatible),
+  // 'ytrai' for YouTube. All keys + the IndexedDB name derive from this prefix.
+  var PREFIX = { x: 'xrai', youtube: 'ytrai' };
+  var _prefix = 'xrai';
+
+  var DB_VERSION = 2;
   const STORE_NAME = 'fingerprints';
+  const EVENTS_STORE = 'events';   // durable, append-only classification log (never auto-dropped)
+  const EVENTS_CAP = 200000;       // prune oldest beyond this (~tens of MB)
   let db = null;
+  let _evWrites = 0;
+
+  function dbName() { return _prefix + '_memory'; }
+  function statsKey() { return _prefix + '_stats_totals'; }
+  function timeKey() { return _prefix + '_daily_time'; }
+  function classificationsKey() { return _prefix + '_classifications'; }
+  function correctionsKey() { return _prefix + '_corrections'; }
 
   // djb2 hash
   function djb2(str) {
@@ -16,13 +29,21 @@ const XraiMemory = (function () {
     return hash.toString(36);
   }
 
-  function init() {
+  function init(platform) {
+    if (platform && PREFIX[platform]) _prefix = PREFIX[platform];
     return new Promise(function (resolve, reject) {
       if (db) { resolve(db); return; }
-      var req = indexedDB.open(DB_NAME, DB_VERSION);
+      var req = indexedDB.open(dbName(), DB_VERSION);
       req.onupgradeneeded = function (e) {
-        var store = e.target.result.createObjectStore(STORE_NAME, { keyPath: 'fingerprint' });
-        store.createIndex('last_seen', 'last_seen', { unique: false });
+        var idb = e.target.result;
+        if (!idb.objectStoreNames.contains(STORE_NAME)) {
+          var store = idb.createObjectStore(STORE_NAME, { keyPath: 'fingerprint' });
+          store.createIndex('last_seen', 'last_seen', { unique: false });
+        }
+        if (!idb.objectStoreNames.contains(EVENTS_STORE)) {
+          var ev = idb.createObjectStore(EVENTS_STORE, { keyPath: 'id', autoIncrement: true });
+          ev.createIndex('ts', 'ts', { unique: false });
+        }
       };
       req.onsuccess = function (e) {
         db = e.target.result;
@@ -103,18 +124,103 @@ const XraiMemory = (function () {
     });
   }
 
-  var STATS_KEY = 'xrai_stats_totals';
-  // In-memory stats accumulator — avoids async read-modify-write races
-  var _memStats = null; // loaded from storage on first increment
+  // === Durable classification event log (IndexedDB, append-only) ===
+  // The source of truth for "everything we read". Never auto-dropped on flush —
+  // survives with or without the collector running, exportable on demand.
+
+  function logEvent(record) {
+    return new Promise(function (resolve) {
+      if (!db || !record) { resolve(); return; }
+      try {
+        record.ts = record.ts || Date.now();
+        var tx = db.transaction(EVENTS_STORE, 'readwrite');
+        tx.objectStore(EVENTS_STORE).add(record);
+        tx.oncomplete = function () {
+          resolve();
+          if ((++_evWrites % 1000) === 0) pruneEvents(EVENTS_CAP);
+        };
+        tx.onerror = function () { resolve(); };
+      } catch (e) { resolve(); }
+    });
+  }
+
+  function getEvents() {
+    return new Promise(function (resolve) {
+      if (!db) { resolve([]); return; }
+      try {
+        var tx = db.transaction(EVENTS_STORE, 'readonly');
+        var req = tx.objectStore(EVENTS_STORE).getAll();
+        req.onsuccess = function () { resolve(req.result || []); };
+        req.onerror = function () { resolve([]); };
+      } catch (e) { resolve([]); }
+    });
+  }
+
+  function countEvents() {
+    return new Promise(function (resolve) {
+      if (!db) { resolve(0); return; }
+      try {
+        var tx = db.transaction(EVENTS_STORE, 'readonly');
+        var req = tx.objectStore(EVENTS_STORE).count();
+        req.onsuccess = function () { resolve(req.result || 0); };
+        req.onerror = function () { resolve(0); };
+      } catch (e) { resolve(0); }
+    });
+  }
+
+  function clearEvents() {
+    return new Promise(function (resolve) {
+      if (!db) { resolve(); return; }
+      try {
+        var tx = db.transaction(EVENTS_STORE, 'readwrite');
+        tx.objectStore(EVENTS_STORE).clear();
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { resolve(); };
+      } catch (e) { resolve(); }
+    });
+  }
+
+  // Keep only the most recent `keepN` events (delete oldest by ts).
+  function pruneEvents(keepN) {
+    return new Promise(function (resolve) {
+      if (!db) { resolve(0); return; }
+      countEvents().then(function (total) {
+        var toDelete = total - keepN;
+        if (toDelete <= 0) { resolve(0); return; }
+        try {
+          var tx = db.transaction(EVENTS_STORE, 'readwrite');
+          var idx = tx.objectStore(EVENTS_STORE).index('ts');
+          var cursor = idx.openCursor();
+          var n = 0;
+          cursor.onsuccess = function (e) {
+            var c = e.target.result;
+            if (c && n < toDelete) { c.delete(); n++; c.continue(); }
+            else { resolve(n); }
+          };
+          cursor.onerror = function () { resolve(n); };
+        } catch (e) { resolve(0); }
+      });
+    });
+  }
+
+  // In-memory stats accumulator — avoids async read-modify-write races.
+  // Generic kept/hidden counters: for X, kept=signal hidden=noise; for
+  // YouTube, kept=music/motivational hidden=everything blurred.
+  var _memStats = null;
   var _statsFlushTimer = null;
-  var STATS_FLUSH_INTERVAL = 10000; // flush to storage every 10s
+  var STATS_FLUSH_INTERVAL = 10000;
 
   function _ensureStatsLoaded() {
     return new Promise(function (resolve) {
       if (_memStats) { resolve(); return; }
-      chrome.storage.local.get(STATS_KEY, function (result) {
+      chrome.storage.local.get(statsKey(), function (result) {
         if (!_memStats) {
-          _memStats = result[STATS_KEY] || { total: 0, signal: 0, noise: 0 };
+          _memStats = result[statsKey()] || { total: 0, kept: 0, hidden: 0 };
+          // Back-compat: migrate old {signal,noise} shape into {kept,hidden}
+          if (_memStats.signal !== undefined && _memStats.kept === undefined) {
+            _memStats.kept = _memStats.signal;
+            _memStats.hidden = _memStats.noise || 0;
+          }
         }
         resolve();
       });
@@ -124,7 +230,7 @@ const XraiMemory = (function () {
   function _flushStats() {
     if (!_memStats) return;
     var obj = {};
-    obj[STATS_KEY] = { total: _memStats.total, signal: _memStats.signal, noise: _memStats.noise };
+    obj[statsKey()] = { total: _memStats.total, kept: _memStats.kept, hidden: _memStats.hidden };
     chrome.storage.local.set(obj);
   }
 
@@ -134,29 +240,24 @@ const XraiMemory = (function () {
   }
 
   function getStats() {
-    return new Promise(function (resolve) {
-      if (_memStats) { resolve({ total: _memStats.total, signal: _memStats.signal, noise: _memStats.noise }); return; }
-      chrome.storage.local.get(STATS_KEY, function (result) {
-        var stats = result[STATS_KEY] || { total: 0, signal: 0, noise: 0 };
-        resolve(stats);
-      });
+    return _ensureStatsLoaded().then(function () {
+      return { total: _memStats.total, kept: _memStats.kept, hidden: _memStats.hidden };
     });
   }
 
-  function incrementStats(prediction) {
+  // outcome: 'kept' (shown) or 'hidden' (filtered/blurred)
+  function incrementStats(outcome) {
     return _ensureStatsLoaded().then(function () {
       _memStats.total++;
-      if (prediction === 'signal') _memStats.signal++;
-      else if (prediction === 'noise') _memStats.noise++;
+      if (outcome === 'kept') _memStats.kept++;
+      else if (outcome === 'hidden') _memStats.hidden++;
       _startStatsFlush();
-      return { total: _memStats.total, signal: _memStats.signal, noise: _memStats.noise };
+      return { total: _memStats.total, kept: _memStats.kept, hidden: _memStats.hidden };
     });
   }
 
   // === Daily time tracking ===
-  var DAILY_TIME_KEY = 'xrai_daily_time';
   var _timeInterval = null;
-  // In-memory time accumulator — avoids async read-modify-write races
   var _memTime = null; // { date, seconds }
   var _lastTickTime = 0;
 
@@ -168,15 +269,13 @@ const XraiMemory = (function () {
   function _ensureTimeLoaded() {
     return new Promise(function (resolve) {
       if (_memTime) { resolve(); return; }
-      chrome.storage.local.get(DAILY_TIME_KEY, function (result) {
+      chrome.storage.local.get(timeKey(), function (result) {
         if (!_memTime) {
-          var data = result[DAILY_TIME_KEY] || {};
+          var data = result[timeKey()] || {};
           var today = _todayStr();
-          if (data.date === today) {
-            _memTime = { date: today, seconds: data.seconds || 0 };
-          } else {
-            _memTime = { date: today, seconds: 0 };
-          }
+          _memTime = (data.date === today)
+            ? { date: today, seconds: data.seconds || 0 }
+            : { date: today, seconds: 0 };
         }
         resolve();
       });
@@ -184,11 +283,10 @@ const XraiMemory = (function () {
   }
 
   function startSession() {
-    if (_timeInterval) return; // guard against duplicate calls
+    if (_timeInterval) return;
     _lastTickTime = Date.now();
 
     _ensureTimeLoaded().then(function () {
-      // Save time every 30s while page is visible
       _timeInterval = setInterval(function () {
         if (!document.hidden) {
           var now = Date.now();
@@ -196,18 +294,16 @@ const XraiMemory = (function () {
           _lastTickTime = now;
           _saveTimeIncrement(elapsed);
         } else {
-          _lastTickTime = Date.now(); // reset so hidden time isn't counted on resume
+          _lastTickTime = Date.now();
         }
       }, 30000);
     });
 
-    // Flush partial interval + stats on page unload
     window.addEventListener('beforeunload', function () {
       if (_timeInterval) {
         clearInterval(_timeInterval);
         _timeInterval = null;
       }
-      // Save any accumulated time since last tick
       if (_lastTickTime && !document.hidden) {
         var elapsed = Math.round((Date.now() - _lastTickTime) / 1000);
         if (elapsed > 0) _saveTimeIncrement(elapsed);
@@ -220,41 +316,31 @@ const XraiMemory = (function () {
     if (!_memTime) return;
     var today = _todayStr();
     if (_memTime.date !== today) {
-      // New day — reset
       _memTime = { date: today, seconds: 0 };
     }
     _memTime.seconds += seconds;
     var obj = {};
-    obj[DAILY_TIME_KEY] = { date: _memTime.date, seconds: _memTime.seconds };
+    obj[timeKey()] = { date: _memTime.date, seconds: _memTime.seconds };
     chrome.storage.local.set(obj);
   }
 
   function getDailyTime() {
     if (_memTime) {
       var today = _todayStr();
-      if (_memTime.date === today) {
-        return Promise.resolve(_memTime.seconds);
-      }
-      return Promise.resolve(0);
+      return Promise.resolve(_memTime.date === today ? _memTime.seconds : 0);
     }
     return new Promise(function (resolve) {
-      chrome.storage.local.get(DAILY_TIME_KEY, function (result) {
-        var data = result[DAILY_TIME_KEY] || {};
-        var today = _todayStr();
-        if (data.date !== today) {
-          resolve(0);
-        } else {
-          resolve(data.seconds || 0);
-        }
+      chrome.storage.local.get(timeKey(), function (result) {
+        var data = result[timeKey()] || {};
+        resolve(data.date !== _todayStr() ? 0 : (data.seconds || 0));
       });
     });
   }
 
   function clearAll() {
     return new Promise(function (resolve) {
-      // Clear chrome.storage stats and time tracking
-      chrome.storage.local.remove([STATS_KEY, DAILY_TIME_KEY]);
-      _memStats = { total: 0, signal: 0, noise: 0 };
+      chrome.storage.local.remove([statsKey(), timeKey()]);
+      _memStats = { total: 0, kept: 0, hidden: 0 };
       _memTime = { date: _todayStr(), seconds: 0 };
       if (!db) { resolve(); return; }
       var tx = db.transaction(STORE_NAME, 'readwrite');
@@ -265,83 +351,72 @@ const XraiMemory = (function () {
   }
 
   // === Classification log (for training/improving prompts) ===
-  // Stores every classification decision with full context
-  var CLASSIFICATIONS_KEY = 'xrai_classifications';
   var MAX_CLASSIFICATIONS = 1000;
   var COLLECTOR_URL = 'http://localhost:11435';
-  var FLUSH_EVERY = 100; // auto-send to collector every N entries
+  var FLUSH_EVERY = 100;
 
-  function logClassification(tweetText, mediaType, prediction, confidence, source) {
+  function logClassification(text, mediaType, prediction, confidence, source) {
     return new Promise(function (resolve) {
-      chrome.storage.local.get(CLASSIFICATIONS_KEY, function (result) {
-        var log = result[CLASSIFICATIONS_KEY] || [];
+      chrome.storage.local.get(classificationsKey(), function (result) {
+        var log = result[classificationsKey()] || [];
         log.push({
-          text: (tweetText || '').substring(0, 300),
+          text: (text || '').substring(0, 300),
           mediaType: mediaType || 'text',
           prediction: prediction,
           confidence: confidence || 0,
           source: source || 'unknown',
           timestamp: Date.now()
         });
-        // Auto-flush to local collector every FLUSH_EVERY entries
         if (log.length >= FLUSH_EVERY) {
           flushToCollector(log);
-          log = []; // clear after sending
+          log = [];
         }
         if (log.length > MAX_CLASSIFICATIONS) log = log.slice(-MAX_CLASSIFICATIONS);
         var obj = {};
-        obj[CLASSIFICATIONS_KEY] = log;
+        obj[classificationsKey()] = log;
         chrome.storage.local.set(obj, function () { resolve(); });
       });
     });
   }
 
   function flushToCollector(entries) {
-    // Fire and forget — don't block if collector isn't running
     try {
       fetch(COLLECTOR_URL + '/classifications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(entries)
+        body: JSON.stringify({ platform: _prefix, entries: entries })
       }).catch(function () { /* collector not running, that's fine */ });
     } catch (e) { /* ignore */ }
   }
 
   function getClassifications() {
     return new Promise(function (resolve) {
-      chrome.storage.local.get(CLASSIFICATIONS_KEY, function (result) {
-        resolve(result[CLASSIFICATIONS_KEY] || []);
+      chrome.storage.local.get(classificationsKey(), function (result) {
+        resolve(result[classificationsKey()] || []);
       });
     });
   }
 
   function exportAll() {
-    // Export both classifications and corrections as JSON for improve script
     return Promise.all([getClassifications(), getCorrections()]).then(function (results) {
       return JSON.stringify({ classifications: results[0], corrections: results[1] }, null, 2);
     });
   }
 
-  // === Correction tracking (for meta-learning) ===
-  // Stored in chrome.storage.local so the improve script can read via export
-
-  var CORRECTIONS_KEY = 'xrai_corrections';
-
-  function saveCorrection(tweetText, mediaType, aiPrediction, userCorrection) {
+  function saveCorrection(text, mediaType, aiPrediction, userCorrection) {
     return new Promise(function (resolve) {
-      chrome.storage.local.get(CORRECTIONS_KEY, function (result) {
-        var corrections = result[CORRECTIONS_KEY] || [];
+      chrome.storage.local.get(correctionsKey(), function (result) {
+        var corrections = result[correctionsKey()] || [];
         corrections.push({
-          text: (tweetText || '').substring(0, 300),
+          text: (text || '').substring(0, 300),
           mediaType: mediaType || 'text',
           aiPrediction: aiPrediction,
           userCorrection: userCorrection,
           timestamp: Date.now()
         });
-        // Keep last 500 corrections
         if (corrections.length > 500) corrections = corrections.slice(-500);
         var obj = {};
-        obj[CORRECTIONS_KEY] = corrections;
+        obj[correctionsKey()] = corrections;
         chrome.storage.local.set(obj, function () { resolve(); });
       });
     });
@@ -349,16 +424,16 @@ const XraiMemory = (function () {
 
   function getCorrections() {
     return new Promise(function (resolve) {
-      chrome.storage.local.get(CORRECTIONS_KEY, function (result) {
-        resolve(result[CORRECTIONS_KEY] || []);
+      chrome.storage.local.get(correctionsKey(), function (result) {
+        resolve(result[correctionsKey()] || []);
       });
     });
   }
 
   function getCorrectionCount() {
     return new Promise(function (resolve) {
-      chrome.storage.local.get(CORRECTIONS_KEY, function (result) {
-        resolve((result[CORRECTIONS_KEY] || []).length);
+      chrome.storage.local.get(correctionsKey(), function (result) {
+        resolve((result[correctionsKey()] || []).length);
       });
     });
   }
@@ -366,13 +441,12 @@ const XraiMemory = (function () {
   function clearCorrections() {
     return new Promise(function (resolve) {
       var obj = {};
-      obj[CORRECTIONS_KEY] = [];
+      obj[correctionsKey()] = [];
       chrome.storage.local.set(obj, function () { resolve(); });
     });
   }
 
   function exportCorrections() {
-    // Returns corrections as JSON string for the improve script
     return getCorrections().then(function (corrections) {
       return JSON.stringify(corrections, null, 2);
     });
@@ -396,6 +470,11 @@ const XraiMemory = (function () {
     exportCorrections: exportCorrections,
     incrementStats: incrementStats,
     startSession: startSession,
-    getDailyTime: getDailyTime
+    getDailyTime: getDailyTime,
+    logEvent: logEvent,
+    getEvents: getEvents,
+    countEvents: countEvents,
+    clearEvents: clearEvents,
+    pruneEvents: pruneEvents
   };
 })();

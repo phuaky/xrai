@@ -66,33 +66,42 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Receive classifications
+  // Receive classifications. Body is either a raw array (legacy X) or
+  // { platform, entries } (current). Data is split per platform on disk.
   if (req.method === 'POST' && req.url === '/classifications') {
     let body = '';
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
       try {
-        const entries = JSON.parse(body);
-        if (!Array.isArray(entries)) throw new Error('Expected array');
+        const parsed = JSON.parse(body);
+        let platform = 'x';
+        let entries;
+        if (Array.isArray(parsed)) {
+          entries = parsed;
+        } else {
+          const p = parsed.platform;
+          platform = (p === 'ytrai' || p === 'youtube') ? 'youtube' : 'x';
+          entries = parsed.entries || [];
+        }
+        if (!Array.isArray(entries)) throw new Error('Expected entries array');
 
-        // Append each entry as a JSONL line
-        const lines = entries.map(e => JSON.stringify(e)).join('\n') + '\n';
-        fs.appendFileSync(CLASSIFICATIONS_FILE, lines);
+        const file = path.join(DATA_DIR, `classifications-${platform}.jsonl`);
+        const lines = entries.map(e => JSON.stringify(Object.assign({ platform }, e))).join('\n') + '\n';
+        fs.appendFileSync(file, lines);
 
         totalReceived += entries.length;
         sinceLastImprove += entries.length;
         saveStats();
 
-        const noiseCount = entries.filter(e => e.prediction === 'noise').length;
-        const signalCount = entries.filter(e => e.prediction === 'signal').length;
-        console.log(`[collector] +${entries.length} entries (${signalCount} signal, ${noiseCount} noise) | total: ${totalReceived} | since improve: ${sinceLastImprove}`);
+        const counts = entries.reduce((a, e) => { a[e.prediction] = (a[e.prediction] || 0) + 1; return a; }, {});
+        console.log(`[collector] +${entries.length} ${platform} entries (${JSON.stringify(counts)}) | total: ${totalReceived} | since improve: ${sinceLastImprove}`);
 
-        // Auto-improve trigger
-        if (AUTO_IMPROVE && sinceLastImprove >= IMPROVE_THRESHOLD) {
+        // Auto-improve trigger (improve.js is X-tuned, so only for X data)
+        if (AUTO_IMPROVE && platform === 'x' && sinceLastImprove >= IMPROVE_THRESHOLD) {
           console.log(`[collector] ${IMPROVE_THRESHOLD} new entries since last improve — triggering analysis...`);
           sinceLastImprove = 0;
           saveStats();
-          triggerImprove();
+          triggerImprove(file);
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -114,7 +123,9 @@ const server = http.createServer((req, res) => {
       try {
         const entry = JSON.parse(body);
         fs.appendFileSync(MODEL_LOG_FILE, JSON.stringify(entry) + '\n');
-        console.log(`[collector] model-io: ${entry.prediction} (${entry.confidence}) ${entry.elapsed}ms | "${(entry.input || '').substring(0, 60)}..."`);
+        const r = entry.result || {};
+        const verdict = r.prediction || r.category || '?';
+        console.log(`[collector] model-io (${entry.platform || 'x'}): ${verdict} (${r.confidence}) ${entry.elapsed}ms | "${(entry.input || '').substring(0, 60)}..."`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true }));
       } catch (e) {
@@ -157,10 +168,11 @@ const server = http.createServer((req, res) => {
   res.end('Not found');
 });
 
-function triggerImprove() {
+function triggerImprove(file) {
   const { execSync } = require('child_process');
   try {
-    const output = execSync(`node ${path.join(__dirname, 'improve.js')} ${CLASSIFICATIONS_FILE}`, { encoding: 'utf8', timeout: 30000 });
+    const target = file || CLASSIFICATIONS_FILE;
+    const output = execSync(`node ${path.join(__dirname, 'improve.js')} ${target}`, { encoding: 'utf8', timeout: 30000 });
     console.log(output);
   } catch (e) {
     console.error('[collector] Improve script error:', e.message);

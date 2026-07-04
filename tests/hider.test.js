@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 // Load the IIFE source and eval in a context with a mock document
-const hiderSrc = readFileSync(join(import.meta.dir, '../extension/content/hider.js'), 'utf8');
+const hiderSrc = readFileSync(join(import.meta.dir, '../extension/content/core/hider.js'), 'utf8');
 
 function createMockElement() {
   const el = document.createElement('article');
@@ -16,7 +16,7 @@ function createMockElement() {
 
 function loadHider() {
   // Strip the var assignment so eval returns the IIFE result
-  const stripped = hiderSrc.replace(/var XraiHider\s*=\s*/, '');
+  const stripped = hiderSrc.replace(/var RaiHider\s*=\s*/, '');
   return eval(stripped);
 }
 

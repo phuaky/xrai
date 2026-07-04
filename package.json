@@ -2,9 +2,12 @@
   "name": "xrai",
   "private": true,
   "scripts": {
-    "test": "bun test"
+    "test": "bun test",
+    "eval:x": "node benchmarks/eval-x.js",
+    "eval:x:bless": "node benchmarks/eval-x.js --bless"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.8.9"
+    "@happy-dom/global-registrator": "^20.8.9",
+    "fake-indexeddb": "^6.2.5"
   }
 }

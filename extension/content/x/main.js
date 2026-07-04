@@ -1,7 +1,8 @@
-/* xrai — Main Orchestrator (flat pipeline, every tweet gets a decision) */
+/* xrai — X/Twitter Orchestrator (flat pipeline, every tweet gets a decision) */
 var XraiMain = (function () {
   'use strict';
 
+  var PLATFORM = 'x';
   var config = null;
   var ollamaAvailable = false;
   var offHomeLogged = Object.create(null);
@@ -14,65 +15,58 @@ var XraiMain = (function () {
   function start() {
     console.log('[xrai] Starting...');
 
-    // 1. Init memory (for classification logging) + start time tracking
-    XraiMemory.init().catch(function (e) {
+    RaiMemory.init(PLATFORM).catch(function (e) {
       console.warn('[xrai] Memory init error:', e);
     });
-    XraiMemory.startSession();
+    RaiMemory.startSession();
 
-    // 2. Load config
-    XraiConfig.getConfig().then(function (cfg) {
+    RaiConfig.getConfig(PLATFORM).then(function (cfg) {
       config = cfg;
-      XraiClassifier.configure(cfg);
+      RaiClassifier.configure({ maxModelCallsPerMinute: cfg.maxModelCallsPerMinute, platform: PLATFORM });
 
-      // 3. Check Ollama health via service worker
-      chrome.runtime.sendMessage({ action: 'checkHealth' }, function (response) {
+      chrome.runtime.sendMessage({ action: 'checkHealth', platform: PLATFORM }, function (response) {
         if (chrome.runtime.lastError) {
           console.warn('[xrai] Service worker error:', chrome.runtime.lastError.message);
           ollamaAvailable = false;
-          XraiIndicator.update(null, { connected: false, label: 'offline' });
+          RaiIndicator.update(null, { connected: false, label: 'offline' });
           return;
         }
         ollamaAvailable = response && response.available && response.classify;
         if (response && response.available && response.classify) {
           console.log('[xrai] Ollama connected. Models:', (response.models || []).join(', '));
-          XraiIndicator.update(null, { connected: true, classify: true, reply: true });
+          RaiIndicator.update(null, { connected: true, classify: true });
         } else if (response && response.available) {
           var detail = response.postStatus ? 'HTTP ' + response.postStatus : response.postError || 'unknown';
           console.warn('[xrai] Ollama running but classify POST failed (' + detail + '). Pre-filter only.');
-          XraiIndicator.update(null, { connected: true, classify: false, reply: false });
+          RaiIndicator.update(null, { connected: true, classify: false });
         } else {
           console.log('[xrai] Ollama not available. Pre-filter only mode.');
-          XraiIndicator.update(null, { connected: false, classify: false, reply: false });
+          RaiIndicator.update(null, { connected: false, classify: false });
         }
       });
 
-      // 4. Init UI
-      XraiIndicator.init();
+      RaiIndicator.init(PLATFORM, { name: 'xrai', keptWord: 'shown', hiddenWord: 'hidden', siteWord: 'X' });
 
-      // 5. Start detector
       XraiDetector.onTweet(handleTweet);
       XraiDetector.start();
 
       console.log('[xrai] Running. Filter: ' + cfg.contentFilter + ', Hide: ' + cfg.hideMethod);
     });
 
-    // Periodic health check (every 30s)
     var healthInterval = setInterval(function () {
       if (!chrome.runtime || !chrome.runtime.id) {
         clearInterval(healthInterval);
         return;
       }
       try {
-        chrome.runtime.sendMessage({ action: 'checkHealth' }, function (response) {
+        chrome.runtime.sendMessage({ action: 'checkHealth', platform: PLATFORM }, function (response) {
           if (chrome.runtime.lastError) return;
           var wasAvailable = ollamaAvailable;
           ollamaAvailable = response && response.available && response.classify;
           if (wasAvailable !== ollamaAvailable) {
-            XraiIndicator.update(null, {
+            RaiIndicator.update(null, {
               connected: response && response.available,
-              classify: response && response.classify,
-              reply: response && response.reply
+              classify: response && response.classify
             });
           }
         });
@@ -88,12 +82,9 @@ var XraiMain = (function () {
     if (!tweetText || tweetText._xraiNewTab) return;
     tweetText._xraiNewTab = true;
     tweetText.addEventListener('click', function (e) {
-      // Don't intercept if clicking inside interactive elements
       if (e.target.closest('[data-testid="like"], [data-testid="retweet"], [data-testid="reply"], [data-testid="Tweet-User-Avatar"], [role="group"], video, [data-testid="videoPlayer"], [data-testid="tweetPhoto"]')) return;
-      // Don't open if tweet is pending classification or blurred and not revealed
       if (el.hasAttribute('data-xrai-pending')) return;
       if (el.getAttribute('data-xrai-hidden') === 'blur' && !el.hasAttribute('data-xrai-revealed')) return;
-      // Don't open new tab if already viewing this tweet
       if (window.location.pathname.indexOf('/status/' + data.id) !== -1) return;
       e.preventDefault();
       e.stopPropagation();
@@ -117,6 +108,26 @@ var XraiMain = (function () {
     return parts.join(' ');
   }
 
+  // Durable, per-decision record for the prompt-improvement study.
+  function logTweet(decision, data, text, prediction, confidence, source, result) {
+    RaiMemory.logEvent({
+      platform: 'x',
+      decision: decision,            // 'shown' | 'hidden'
+      prediction: prediction,        // 'signal' | 'noise'
+      confidence: confidence,
+      source: source,                // reply-filter | prefilter:<reason> | media-only | default | model
+      reason: result && result.reason,
+      model: result && result._model,
+      raw: result && result._raw,    // raw model output (model path only)
+      ms: result && result._ms,
+      text: (text || data.text || '').substring(0, 500),
+      mediaType: data.mediaType,
+      author: data.author,
+      tweetId: data.id,
+      url: location.pathname
+    });
+  }
+
   function handleTweet(info) {
     var el = info.element;
     var data = info.data;
@@ -124,7 +135,6 @@ var XraiMain = (function () {
     var mediaTag = buildMediaTag(data);
     var enrichedText = buildEnrichedText(data);
 
-    // Log when tweet text was expanded from truncated state
     if (data.wasExpanded) {
       console.log('[xrai] EXPAND | @' + (data.author || '?') + ' | id:' + data.id + ' | main tweet text was expanded');
     }
@@ -132,8 +142,7 @@ var XraiMain = (function () {
       console.log('[xrai] EXPAND | @' + (data.author || '?') + ' | id:' + data.id + ' | quoted tweet text was expanded');
     }
 
-    // Off-home routes (status detail, profile, explore, etc.): user is reading intentionally,
-    // so skip the entire filtering pipeline. Keep reply button + new-tab handlers available.
+    // Off-home routes: user is reading intentionally, skip filtering.
     if (!isHomeFeed()) {
       if (data.id && !offHomeLogged[data.id]) {
         offHomeLogged[data.id] = true;
@@ -144,59 +153,58 @@ var XraiMain = (function () {
       return;
     }
 
-    // Step 1: Reply filter — blur stays (was applied or apply now)
+    // Step 1: Reply filter
     if (config && config.contentFilter === 'posts-only' && data.isReply) {
       console.log('[xrai] REPLY  | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | reply filtered | ' + (enrichedText || '').substring(0, 80));
-      XraiHider.hide(el, config.hideMethod, 'reply filtered');
-      XraiMemory.incrementStats('noise');
-      XraiIndicator.incrementHidden();
+      RaiHider.hide(el, config.hideMethod, 'reply filtered');
+      RaiMemory.incrementStats('hidden');
+      logTweet('hidden', data, enrichedText, 'noise', 0.9, 'reply-filter');
+      RaiIndicator.incrementHidden();
       attachNewTabHandler(el, data);
       return;
     }
 
-    // Step 2: Pre-filter (regex) — blur stays, apply confirmed hide
+    // Step 2: Pre-filter (regex)
     var pfResult = XraiPrefilter.prefilter(data);
     if (pfResult) {
       console.log('[xrai] PREFLT | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | ' + pfResult.reason + ' | ' + (enrichedText || '').substring(0, 80));
-      XraiHider.hide(el, config ? config.hideMethod : 'remove', 'prefilter: ' + pfResult.reason);
-      XraiClassifier.cachePrefilter(data.id, 'noise', pfResult.confidence, pfResult.reason);
-      XraiMemory.logClassification(data.text, data.mediaType, 'noise', pfResult.confidence, 'prefilter:' + pfResult.reason);
-      XraiMemory.incrementStats('noise');
-      XraiMemory.markSeen(XraiMemory.computeFingerprint(data.text, data.mediaType), 'noise');
-      XraiIndicator.incrementHidden();
+      RaiHider.hide(el, config ? config.hideMethod : 'remove', 'prefilter: ' + pfResult.reason);
+      RaiClassifier.cacheResult(data.id, { prediction: 'noise', confidence: pfResult.confidence, source: 'prefilter:' + pfResult.reason });
+      logTweet('hidden', data, enrichedText, 'noise', pfResult.confidence, 'prefilter:' + pfResult.reason);
+      RaiMemory.incrementStats('hidden');
+      RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'noise');
+      RaiIndicator.incrementHidden();
       attachNewTabHandler(el, data);
       return;
     }
 
-    // Step 2.5: Media-only tweets — has media but no text context at all
+    // Step 2.5: Media-only tweets
     if (data.isMediaOnly) {
-      var mediaOnlyResult = { prediction: 'noise', confidence: 0.55, source: 'media-only' };
       console.log('[xrai] MEDIA  | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | media-only, no text to classify');
-      XraiClassifier.cachePrefilter(data.id, 'noise', 0.55, 'media-only');
-      XraiMemory.logClassification('', data.mediaType, 'noise', 0.55, 'media-only');
-      XraiMemory.incrementStats('noise');
-      XraiMemory.markSeen(XraiMemory.computeFingerprint('', data.mediaType), 'noise');
-      // Low confidence — don't aggressively hide, use blur so user can reveal
-      XraiHider.hide(el, 'blur', 'media-only: no text to classify');
-      XraiIndicator.incrementHidden();
+      RaiClassifier.cacheResult(data.id, { prediction: 'noise', confidence: 0.55, source: 'media-only' });
+      logTweet('hidden', data, '', 'noise', 0.55, 'media-only');
+      RaiMemory.incrementStats('hidden');
+      RaiMemory.markSeen(RaiMemory.computeFingerprint('', data.mediaType), 'noise');
+      RaiHider.hide(el, 'blur', 'media-only: no text to classify');
+      RaiIndicator.incrementHidden();
       attachNewTabHandler(el, data);
       return;
     }
 
-    // Step 3: If Ollama unavailable, show by default (no blur)
+    // Step 3: If Ollama unavailable, show by default
     if (!ollamaAvailable) {
       console.log('[xrai] OFF    | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | showing by default | ' + (enrichedText || '').substring(0, 80));
-      XraiMemory.logClassification(data.text, data.mediaType, 'signal', 0.5, 'default');
-      XraiMemory.incrementStats('signal');
-      XraiMemory.markSeen(XraiMemory.computeFingerprint(data.text, data.mediaType), 'signal');
-      XraiIndicator.incrementShown();
+      logTweet('shown', data, enrichedText, 'signal', 0.5, 'default');
+      RaiMemory.incrementStats('kept');
+      RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'signal');
+      RaiIndicator.incrementKept();
       XraiReply.attachReplyButton(el, data);
       attachNewTabHandler(el, data);
       return;
     }
 
     // Step 4: Check cache synchronously to avoid blur flash on cached signal tweets
-    var cached = XraiClassifier.checkCache(data.id);
+    var cached = RaiClassifier.checkCache(data.id);
     if (cached) {
       if (cached.prediction === 'noise' && cached.confidence >= threshold) {
         var cachedReason = cached.reason
@@ -204,14 +212,14 @@ var XraiMain = (function () {
           : cached.source && cached.source.indexOf('prefilter:') === 0
             ? 'prefilter: ' + cached.source.substring(10)
             : 'AI: noise (' + cached.confidence + ')';
-        XraiHider.hide(el, config ? config.hideMethod : 'remove', cachedReason);
-        XraiIndicator.incrementHidden();
+        RaiHider.hide(el, config ? config.hideMethod : 'remove', cachedReason);
+        RaiIndicator.incrementHidden();
       } else {
         var cachedSignalReason = cached.reason
           ? 'AI: ' + cached.reason
-          : 'AI: signal (' + cached.confidence + ')';
-        XraiHider.addSignalLabel(el, cachedSignalReason);
-        XraiIndicator.incrementShown();
+          : 'AI: signal (' + (cached.confidence || 0.5) + ')';
+        RaiHider.addKeepLabel(el, cachedSignalReason);
+        RaiIndicator.incrementKept();
         XraiReply.attachReplyButton(el, data);
       }
       attachNewTabHandler(el, data);
@@ -219,54 +227,51 @@ var XraiMain = (function () {
     }
 
     // Step 5: Blur immediately while waiting for classification
-    XraiHider.blurPending(el);
+    RaiHider.blurPending(el);
 
     // Step 6: Classify (Ollama queue) — use enriched text for better context
-    XraiClassifier.classify(data.id, enrichedText, data.mediaType, data.author, function (result) {
+    RaiClassifier.classify(data.id, { text: enrichedText, mediaType: data.mediaType, author: data.author }, function (result) {
       if (result.prediction === 'noise' && result.confidence >= threshold) {
         var reasonLabel = result.reason
           ? 'AI: ' + result.reason
           : 'AI: noise (' + result.confidence + ')';
-        XraiHider.unblurPending(el);
-        XraiHider.hide(el, config ? config.hideMethod : 'remove', reasonLabel);
-        XraiMemory.logClassification(data.text, data.mediaType, 'noise', result.confidence, result.source || 'model');
-        XraiMemory.incrementStats('noise');
-        XraiMemory.markSeen(XraiMemory.computeFingerprint(data.text, data.mediaType), 'noise');
-        XraiIndicator.incrementHidden();
+        RaiHider.unblurPending(el);
+        RaiHider.hide(el, config ? config.hideMethod : 'remove', reasonLabel);
+        logTweet('hidden', data, enrichedText, 'noise', result.confidence, result.source || 'model', result);
+        RaiMemory.incrementStats('hidden');
+        RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'noise');
+        RaiIndicator.incrementHidden();
       } else {
-        XraiHider.unblurPending(el);
+        RaiHider.unblurPending(el);
         var signalLabel = result.reason
           ? 'AI: ' + result.reason
-          : 'AI: signal (' + result.confidence + ')';
-        XraiHider.addSignalLabel(el, signalLabel);
-        XraiMemory.logClassification(data.text, data.mediaType, 'signal', result.confidence, result.source || 'model');
-        XraiMemory.incrementStats('signal');
-        XraiMemory.markSeen(XraiMemory.computeFingerprint(data.text, data.mediaType), 'signal');
-        XraiIndicator.incrementShown();
+          : 'AI: signal (' + (result.confidence || 0.5) + ')';
+        RaiHider.addKeepLabel(el, signalLabel);
+        logTweet('shown', data, enrichedText, 'signal', result.confidence || 0.5, result.source || 'model', result);
+        RaiMemory.incrementStats('kept');
+        RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'signal');
+        RaiIndicator.incrementKept();
         XraiReply.attachReplyButton(el, data);
       }
       attachNewTabHandler(el, data);
     });
   }
 
-  // DOM event bridge — allows page JS to request classification data
+  // DOM event bridge — allows page JS to pull the durable classification log
   window.addEventListener('xrai-export-request', function () {
-    Promise.all([XraiMemory.getClassifications(), XraiMemory.getCorrections()])
-      .then(function (results) {
-        var data = { classifications: results[0], corrections: results[1] };
-        var el = document.getElementById('xrai-export-data');
-        if (!el) {
-          el = document.createElement('div');
-          el.id = 'xrai-export-data';
-          el.style.display = 'none';
-          document.body.appendChild(el);
-        }
-        el.textContent = JSON.stringify(data);
-        window.dispatchEvent(new CustomEvent('xrai-export-response'));
-      });
+    RaiMemory.getEvents().then(function (events) {
+      var el = document.getElementById('xrai-export-data');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'xrai-export-data';
+        el.style.display = 'none';
+        document.body.appendChild(el);
+      }
+      el.textContent = JSON.stringify(events);
+      window.dispatchEvent(new CustomEvent('xrai-export-response'));
+    });
   });
 
-  // Auto-start when DOM ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', start);
   } else {
