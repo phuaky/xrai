@@ -59,6 +59,10 @@ Video card appears (home / subscriptions / watch sidebar)
 
 ## Setup
 
+> **Fastest path: [INSTALL.md](INSTALL.md)** — `bash scripts/setup.sh` handles
+> Ollama, the CORS fix, model download, and a live end-to-end test. The manual
+> steps below still work.
+
 ### 1. Install Ollama
 
 Download from [ollama.ai](https://ollama.ai). On Mac, it sits in the menubar and auto-starts on login.
