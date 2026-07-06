@@ -23,8 +23,17 @@ var XraiPrefilter = (function () {
 
   var CLICKBAIT_PHRASES = /\b(you\s*won'?t\s*believe|wait\s*(for|till)\s*(it|the\s*end)|this\s*is\s*so\s*(good|crazy|funny|wild|insane)|my\s*(grandma|mom|dad|kid)\s*(taught|showed|told)|i\s*can'?t\s*(believe|stop)|no\s*way|bro\s*what|absolute\s*madness|i'?m\s*dead|crying|screaming|watch\s*till\s*(the\s*)?end|what\s*happens\s*next\s*will\s*(shock|surprise|blow)|mind\s*blow|most\s*chaotic|100\s*\/\s*10|10\s*\/\s*10|\d+\/10\s*🍿|will\s*shock\s*you|stay\s*till\s*(the\s*)?end|this\s*will\s*(change|blow|shock|break)|you\s*need\s*to\s*see\s*this|i\s*wasn'?t\s*ready|nobody\s*expected|didn'?t\s*see\s*(this|that)\s*coming)\b/i;
 
-  // Entertainment/lifestyle noise — not tech related
-  var ENTERTAINMENT_NOISE = /\b(anime|manga|naruto|madara|one\s*piece|goku|jujutsu|demon\s*slayer|cosplay|marvel|dc\s*comics|avenger|harry\s*potter|hogwarts|snape|game\s*of\s*thrones|nba|nfl|fifa|premier\s*league|messi|ronaldo|lebron|recipe|cooking|baking|workout|gym|fitness|weight\s*loss|diet|skincare|makeup|fashion|outfit|ootd|haul|unbox|prank|challenge|mukbang|asmr|zodiac|horoscope|astrology|celebrity|gossip|drama|tea\b(?!\s*party)|stan|fandom|ship\b(?!\s*ped)|couple\s*goals)\b/i;
+  // Entertainment/lifestyle noise — not tech related.
+  // Global flag: prefilter() COUNTS hits instead of just testing. A single
+  // lifestyle word inside long-form writing is weak evidence — cultural
+  // commentary grazes one all the time ("they sold you a fitness tracker") —
+  // so one hit only condemns short reaction-length tweets; longer text needs
+  // a second distinct term before we hide without asking the AI.
+  var ENTERTAINMENT_NOISE = /\b(anime|manga|naruto|madara|one\s*piece|goku|jujutsu|demon\s*slayer|cosplay|marvel|dc\s*comics|avenger|harry\s*potter|hogwarts|snape|game\s*of\s*thrones|nba|nfl|fifa|premier\s*league|messi|ronaldo|lebron|recipe|cooking|baking|workout|gym|fitness|weight\s*loss|diet|skincare|makeup|fashion|outfit|ootd|haul|unbox|prank|challenge|mukbang|asmr|zodiac|horoscope|astrology|celebrity|gossip|drama|tea\b(?!\s*party)|stan|fandom|ship\b(?!\s*ped)|couple\s*goals)\b/gi;
+
+  // Single entertainment hit only hides at/below this length (classic tweet
+  // limit); anything longer is long-form writing and gets AI judgment.
+  var ENTERTAINMENT_SINGLE_HIT_MAX_LEN = 280;
 
   // === FUNNEL BAIT — checked BEFORE the tech safelist ===
   // The 60-second bait test (2026-07-06): funnels wear tech clothing on purpose.
@@ -90,8 +99,15 @@ var XraiPrefilter = (function () {
       return { prediction: 'noise', confidence: 0.85, reason: 'clickbait-phrase', source: 'prefilter' };
     }
 
-    // Entertainment/lifestyle content — not relevant to tech
-    if (ENTERTAINMENT_NOISE.test(text)) {
+    // Entertainment/lifestyle content — not relevant to tech.
+    // 2+ distinct terms hide at any length; 1 term only hides short tweets.
+    var entMatches = text.match(ENTERTAINMENT_NOISE) || [];
+    var entTerms = {};
+    for (var i = 0; i < entMatches.length; i++) {
+      entTerms[entMatches[i].toLowerCase().replace(/\s+/g, ' ')] = true;
+    }
+    var entCount = Object.keys(entTerms).length;
+    if (entCount >= 2 || (entCount === 1 && text.length <= ENTERTAINMENT_SINGLE_HIT_MAX_LEN)) {
       return { prediction: 'noise', confidence: 0.80, reason: 'entertainment', source: 'prefilter' };
     }
 

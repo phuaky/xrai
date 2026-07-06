@@ -1,18 +1,17 @@
 {
-  "date": "2026-07-06T04:15:10.982Z",
+  "date": "2026-07-06T04:23:20.161Z",
   "model": "dhiltgen/gemma4:e2b-mlx-bf16",
   "threshold": 0.7,
   "promptSha": "c8b70eecf243a9a8",
-  "prefilterSha": "93240b09b7eb31ea",
+  "prefilterSha": "47ac8c6bf9ad3134",
   "goldenVersion": 1,
   "items": 117,
   "criticalRecall": 1,
-  "signalRecall": 0.9464285714285714,
+  "signalRecall": 0.9642857142857143,
   "noiseCatch": 0.9344262295081968,
-  "weightedCost": 10,
+  "weightedCost": 8,
   "criticalLost": [],
   "signalLostIds": [
-    "x-012",
     "x-019",
     "x-023"
   ],
@@ -22,12 +21,10 @@
     "x-079",
     "x-108"
   ],
-  "prefilterFalseHideIds": [
-    "x-012"
-  ],
+  "prefilterFalseHideIds": [],
   "latency": {
-    "p50": 765,
-    "p95": 858
+    "p50": 739,
+    "p95": 851
   },
   "decisions": {
     "x-001": "shown",
@@ -41,7 +38,7 @@
     "x-009": "shown",
     "x-010": "shown",
     "x-011": "shown",
-    "x-012": "hidden",
+    "x-012": "shown",
     "x-013": "shown",
     "x-014": "shown",
     "x-015": "shown",

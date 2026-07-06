@@ -26,10 +26,9 @@ const golden = loadGolden();
 
 // Known prefilter false-hides — signal tweets the prefilter currently kills.
 // Each entry is a BUG to fix, not an acceptance. Fix the regex, then remove
-// the id here.
-//   x-012: "The sun was free... they sold you a fitness tracker" — curated
-//          SIGNAL tweet, killed by ENTERTAINMENT_NOISE matching "fitness".
-const KNOWN_PREFILTER_FALSE_HIDES = ['x-012'];
+// the id here. (x-012 was the last one — fixed 2026-07-06 by requiring a 2nd
+// distinct ENTERTAINMENT_NOISE term before hiding long-form text.)
+const KNOWN_PREFILTER_FALSE_HIDES = [];
 
 describe('prefilter vs golden set', () => {
   it('never prefilters signal (ratchet: see KNOWN_PREFILTER_FALSE_HIDES)', () => {
