@@ -25,6 +25,7 @@
         "content/core/hider.js",
         "content/core/indicator.js",
         "content/x/prefilter.js",
+        "content/x/tips.js",
         "content/x/detector.js",
         "content/x/reply.js",
         "content/x/main.js"

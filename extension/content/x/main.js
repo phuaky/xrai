@@ -128,6 +128,39 @@ var XraiMain = (function () {
     });
   }
 
+  // === Workflow-tip capture — the tips-ledger intake ===
+  // Tip-shaped tweets that survive filtering (or that Kuan opens directly)
+  // get POSTed to the local collector's /tips endpoint, fire-and-forget, and
+  // mirrored to the durable event log. The collector dedupes by tweetId;
+  // scripts/tips.js owns read/evaluated/implemented status.
+  var TIPS_URL = 'http://localhost:11435/tips';
+  var tipSent = Object.create(null);
+
+  function maybeCaptureTip(data, text, context) {
+    if (!data.id || tipSent[data.id]) return;
+    if (typeof XraiTips === 'undefined' || !XraiTips.isTip(text)) return;
+    tipSent[data.id] = true;
+    console.log('[xrai] TIP    | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + context + ' | ' + (text || '').substring(0, 80));
+    RaiMemory.logEvent({
+      platform: 'x', kind: 'tip', context: context,
+      text: (text || '').substring(0, 1000), author: data.author, tweetId: data.id
+    });
+    try {
+      fetch(TIPS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tweetId: data.id,
+          author: data.author,
+          url: 'https://x.com/' + (data.author || 'i') + '/status/' + data.id,
+          text: (text || '').substring(0, 1000),
+          context: context,
+          capturedAt: Date.now()
+        })
+      }).catch(function () { /* collector not running, that's fine */ });
+    } catch (e) { /* ignore */ }
+  }
+
   // === One-tap corrections — the ground-truth loop ===
   // Correction events join the durable log on tweetId (see CLAUDE.md Data
   // Pipeline). They are the ONLY live source of false-hide evidence: hidden
@@ -158,6 +191,8 @@ var XraiMain = (function () {
       RaiHider.show(el);
       RaiHider.addKeepLabel(el, 'corrected: signal');
       XraiReply.attachReplyButton(el, data);
+      // A corrected-to-signal tweet is user-vouched — capture if tip-shaped.
+      maybeCaptureTip(data, text, 'corrected');
     }, 'Worth seeing? Click to reveal it and record the correction');
   }
 
@@ -183,6 +218,8 @@ var XraiMain = (function () {
       }
       XraiReply.attachReplyButton(el, data);
       attachNewTabHandler(el, data);
+      // Reading a tip on its own status page is the strongest interest signal.
+      maybeCaptureTip(data, enrichedText, 'reading');
       return;
     }
 
@@ -235,6 +272,7 @@ var XraiMain = (function () {
       RaiIndicator.incrementKept();
       XraiReply.attachReplyButton(el, data);
       attachNewTabHandler(el, data);
+      maybeCaptureTip(data, enrichedText, 'feed');
       return;
     }
 
@@ -258,6 +296,7 @@ var XraiMain = (function () {
         RaiIndicator.incrementKept();
         XraiReply.attachReplyButton(el, data);
         attachWrongOnKept(el, data, enrichedText, cached.confidence, cached.source || 'cache');
+        maybeCaptureTip(data, enrichedText, 'feed');
       }
       attachNewTabHandler(el, data);
       return;
@@ -291,6 +330,7 @@ var XraiMain = (function () {
         RaiIndicator.incrementKept();
         XraiReply.attachReplyButton(el, data);
         attachWrongOnKept(el, data, enrichedText, result.confidence || 0.5, result.source || 'model');
+        maybeCaptureTip(data, enrichedText, 'feed');
       }
       attachNewTabHandler(el, data);
     });

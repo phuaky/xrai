@@ -20,6 +20,7 @@ const DATA_DIR = path.join(__dirname, '..', 'data');
 const CLASSIFICATIONS_FILE = path.join(DATA_DIR, 'classifications.jsonl');
 const MODEL_LOG_FILE = path.join(DATA_DIR, 'model-io.jsonl');
 const STATS_FILE = path.join(DATA_DIR, 'stats.json');
+const TIPS_FILE = path.join(DATA_DIR, 'tips.jsonl');
 const AUTO_IMPROVE = process.argv.includes('--improve');
 const IMPROVE_THRESHOLD = 200;
 
@@ -29,6 +30,14 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 // Track stats
 let totalReceived = 0;
 let sinceLastImprove = 0;
+
+// Tip dedupe survives restarts: seed from what's already on disk
+const seenTipIds = new Set();
+if (fs.existsSync(TIPS_FILE)) {
+  for (const line of fs.readFileSync(TIPS_FILE, 'utf8').trim().split('\n')) {
+    try { const t = JSON.parse(line); if (t.tweetId) seenTipIds.add(String(t.tweetId)); } catch (e) { /* skip bad line */ }
+  }
+}
 
 // Load existing stats
 if (fs.existsSync(STATS_FILE)) {
@@ -108,6 +117,34 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ received: entries.length, total: totalReceived }));
       } catch (e) {
         console.error('[collector] Parse error:', e.message);
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // Receive a workflow tip (from extension/content/x/tips.js capture).
+  // Append-only to data/tips.jsonl, deduped by tweetId across restarts.
+  // Status lifecycle lives in scripts/tips.js, never here.
+  if (req.method === 'POST' && req.url === '/tips') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const tip = JSON.parse(body);
+        if (!tip.tweetId || !tip.text) throw new Error('tip needs tweetId + text');
+        if (seenTipIds.has(String(tip.tweetId))) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, duplicate: true }));
+          return;
+        }
+        seenTipIds.add(String(tip.tweetId));
+        fs.appendFileSync(TIPS_FILE, JSON.stringify(tip) + '\n');
+        console.log(`[collector] +1 tip (${seenTipIds.size} total) @${tip.author || '?'} [${tip.context || '?'}] "${(tip.text || '').substring(0, 70)}..."`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, total: seenTipIds.size }));
+      } catch (e) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: e.message }));
       }

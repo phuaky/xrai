@@ -19,6 +19,12 @@ function loadPrefilter() {
   return new Function(src + '\nreturn XraiPrefilter;')();
 }
 
+// XraiTips — pure IIFE, no browser deps
+function loadTips() {
+  const src = loadSource('extension/content/x/tips.js');
+  return new Function(src + '\nreturn XraiTips;')();
+}
+
 // X_CLASSIFY_SYSTEM + parseXClassification from the service worker (chrome stubbed)
 function loadWorker() {
   const src = loadSource('extension/background/worker.js');
@@ -88,6 +94,7 @@ function sha(text) {
 
 module.exports = {
   loadPrefilter,
+  loadTips,
   loadWorker,
   loadConfigDefaults,
   loadGolden,

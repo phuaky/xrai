@@ -31,6 +31,7 @@ extension/
     x/                           # X-specific, Xrai* namespace
       detector.js  → XraiDetector     # tweet detection + media + text expansion
       prefilter.js → XraiPrefilter    # regex noise filter + tech safelist
+      tips.js      → XraiTips          # workflow-tip detection (feeds the tips ledger)
       reply.js     → XraiReply         # reply generation (copy-paste only)
       main.js      → XraiMain           # pipeline: hide noise, keep signal
     youtube/                     # YouTube-specific, Ytrai* namespace
@@ -72,7 +73,9 @@ extension/
 | `extension/content/youtube/main.js` | `YtraiMain` — YouTube pipeline (blur all, reveal music) |
 | `extension/content/youtube/detector.js` | `YtraiDetector` — video-card detection (recycle-aware) |
 | `extension/content/youtube/prefilter.js` | `YtraiPrefilter` — regex keep for obvious music/motivational |
-| `scripts/collector.js` | Local HTTP server, per-platform classification logs |
+| `scripts/collector.js` | Local HTTP server, per-platform classification logs + `/tips` intake |
+| `scripts/tips.js` | Tips ledger CLI — digest / mark / stats over `data/tips.jsonl` |
+| `extension/content/x/tips.js` | `XraiTips` — workflow-tip detection (high recall by design) |
 | `benchmarks/eval-x.js` | X full-pipeline eval + regression gate (see "Evals") |
 | `benchmarks/golden-x.json` | Tiered golden set — source of truth for X eval data |
 | `benchmarks/load-extension.js` | Loads real prompt/parser/prefilter/config from extension source |
@@ -90,9 +93,14 @@ for f in extension/lib/*.js extension/content/core/*.js extension/content/x/*.js
 bun install   # first time
 bun test
 
-# Start data collector (optional)
+# Start data collector (optional; also receives tips)
 node scripts/collector.js
 node scripts/collector.js --improve
+
+# Tips ledger — workflow tips captured from the feed
+node scripts/tips.js               # digest: useful-but-unimplemented first, then unread
+node scripts/tips.js mark <id-prefix> read|useful|implemented|rejected|na [note]
+node scripts/tips.js stats
 
 # X eval + regression gate (needs Ollama; ~2-5 min)
 bun run eval:x            # run against blessed baseline, exit 1 on regression
@@ -179,6 +187,27 @@ X records carry `prediction`/`text`/`author`/`tweetId` instead of `category`/`ti
 **Optional collector** (`scripts/collector.js`, port 11435) still receives a best-effort live mirror → `data/classifications-<platform>.jsonl` + `data/model-io.jsonl`, but is no longer required for durability.
 
 > **Ground truth (X, shipped):** a one-tap ✗ button on every kept and blur-hidden tweet calls `RaiMemory.saveCorrection` and writes a `{kind:"correction", was, correctedTo, source, tweetId}` event to the durable log — corrections join decisions on `tweetId`. This is the only live source of false-hide evidence, which is why X `hideMethod` defaults to `blur` (a `remove`-hidden tweet can never be corrected). Mined corrections should graduate into `benchmarks/golden-x.json`. YouTube does not have the affordance yet.
+
+## Tips Ledger (workflow tips: seen → read → evaluated → implemented)
+
+Answers "what useful workflow tips crossed the feed that we still haven't acted on?"
+
+- **Detect** (`extension/content/x/tips.js` → `XraiTips.isTip`): a SHOWN tweet that names a
+  stack tool (Claude Code, MCP, agents, …) AND describes a copyable practice (how-to,
+  setup, first-person method, release). Deliberately high recall — capture only runs on
+  tweets that survived filtering, so the classifier is the precision layer (funnel bait
+  wearing tip clothing gets hidden before it can be captured). Tests pin the recall floor
+  and the plain-noise-never-fires invariant (`tests/tips.test.js`).
+- **Capture** (`main.js maybeCaptureTip`): fires on feed-shown (cache/model/Ollama-off),
+  off-home reading (opening a tip's status page = strongest interest signal, context
+  `reading`), and corrected-to-signal (context `corrected`). Writes a `{kind:"tip"}` event
+  to the durable log + POSTs to the collector `/tips` → `data/tips.jsonl` (append-only,
+  deduped by tweetId across restarts). Collector down = tips only in the durable log.
+- **Track** (`scripts/tips.js`): statuses in `data/tips-status.json` — `new` (implicit) →
+  `read` → `useful` → `implemented | rejected | na`. The digest surfaces unresolved tips,
+  evaluated-`useful` first (known-good and still not acted on), then unread.
+- **Evaluate**: judging "are we already doing this?" is kyu's / the Upgrade skill's job
+  (`tips.js list --json` is the handoff format), not this repo's — the CLI stays deterministic.
 
 ## Configuration Defaults
 
