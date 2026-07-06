@@ -1,7 +1,7 @@
 {
   "version": 1,
   "platform": "x",
-  "note": "Golden eval set. Tiers: critical-signal (must NEVER be hidden), signal (should be shown), tempting-noise (tech-flavored bait the model must catch), noise (should be hidden). Source of truth is THIS file; benchmark.js is legacy.",
+  "note": "Golden eval set. Tiers: critical-signal (must NEVER be hidden), signal (should be shown), tempting-noise (tech-flavored bait the model must catch), noise (should be hidden). Source of truth is THIS file; benchmark.js is legacy. | 2026-07-06: x-110..x-117 added from the six-post bait audit (60s bait test) - clip-farm captions, funnels, fake credentials as tempting-noise; own-work-with-link + OSS-discord as signal guards.",
   "items": [
     {
       "id": "x-001",
@@ -645,6 +645,46 @@
       "tier": "tempting-noise",
       "text": "BREAKING: OpenAI just changed everything again.",
       "media": "video"
+    },
+    {
+      "id": "x-110",
+      "tier": "tempting-noise",
+      "text": "i'm going to teach you how to run Fable 5 on autopilot, using my own library of loops and goals... 25 workflows, each with a prompt and the exact tool it plugs into. the ready-to-run versions of these loops, and the training on turning them into income, live in the real time AI ops community: weeklyaiops.com (part 2 coming soon)"
+    },
+    {
+      "id": "x-111",
+      "tier": "tempting-noise",
+      "text": "Boris Cherny, creator of Claude Code: \"Fable 5 does in a day what used to take your team a month. Most people will keep using it wrong.\" In 12 minutes he explains why Fable 5 needs less prompting than any model before, and why your old detailed prompts now work against you. Watch it, then save the exact config below 👇"
+    },
+    {
+      "id": "x-112",
+      "tier": "tempting-noise",
+      "text": "Anthropic Engineer Andrej Karpathy: \"The biggest mistake in AI right now - people are forcing agents to work instead of mastering the model first. We made that mistake in 2016 at OpenAI - It cost us 5 years.\" what Karpathy actually means: step 1 → stop forcing your agent. watch - bookmark, then read article below ↓"
+    },
+    {
+      "id": "x-113",
+      "tier": "tempting-noise",
+      "text": "Claude Code creator: \"Loops are as big a step as move from source code to agents. 30% of my code is fully written by loops right now.\" in a 40-minute fireside chat, Boris Cherny reveals his actual working setup. Watch the full episode, then read the article on loop engineering below."
+    },
+    {
+      "id": "x-114",
+      "tier": "signal",
+      "text": "\"Loop engineering\" is a hot buzzphrase after mentions of it by Boris Cherny and Peter Steinberger went viral. In this letter, I'd like to share my 3 key loops for building 0-to-1 products: the agentic coding loop (minutes), the developer feedback loop (tens of minutes to hours), and the external feedback loop (hours to weeks). Over the weekend I built a typing app for my daughter and my coding agent worked for an hour, testing in a browser, before getting back to me."
+    },
+    {
+      "id": "x-115",
+      "tier": "critical-signal",
+      "text": "I fact-checked 6 viral AI threads this week: transcribed 58 minutes of video with whisper.cpp, pulled both long-form articles, checked every claim. Scoreboard: 2 real, 2 funnels, 1 fake credential, 1 fabricated quote. Full method and transcripts in the writeup: kuanyu.dev/feed-audit"
+    },
+    {
+      "id": "x-116",
+      "tier": "noise",
+      "text": "This AI system made me $30k last month on autopilot. I packaged every prompt into a free course. Join my community on skool.com/aiops - free for the next 24 hours, spots are limited."
+    },
+    {
+      "id": "x-117",
+      "tier": "critical-signal",
+      "text": "We just open-sourced our agent harness on GitHub - 47 deterministic checks plus an adversarial review pass, MIT licensed. Join our Discord if you want to contribute, PRs welcome. Benchmarks against SWE-bench in the README."
     }
   ]
 }

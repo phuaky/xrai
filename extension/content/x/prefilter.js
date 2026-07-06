@@ -26,12 +26,28 @@ var XraiPrefilter = (function () {
   // Entertainment/lifestyle noise — not tech related
   var ENTERTAINMENT_NOISE = /\b(anime|manga|naruto|madara|one\s*piece|goku|jujutsu|demon\s*slayer|cosplay|marvel|dc\s*comics|avenger|harry\s*potter|hogwarts|snape|game\s*of\s*thrones|nba|nfl|fifa|premier\s*league|messi|ronaldo|lebron|recipe|cooking|baking|workout|gym|fitness|weight\s*loss|diet|skincare|makeup|fashion|outfit|ootd|haul|unbox|prank|challenge|mukbang|asmr|zodiac|horoscope|astrology|celebrity|gossip|drama|tea\b(?!\s*party)|stan|fandom|ship\b(?!\s*ped)|couple\s*goals)\b/i;
 
+  // === FUNNEL BAIT — checked BEFORE the tech safelist ===
+  // The 60-second bait test (2026-07-06): funnels wear tech clothing on purpose.
+  // A tweet full of AI keywords that ends in "join my community" is the funnel,
+  // not the exception — so these hard markers override TECH_SIGNAL.
+  // Hard markers only (near-zero false positives); softer signals (borrowed
+  // authority, promised-specifics, urgency) are judged by the AI's BAIT test.
+  // "join MY telegram/discord" = personal funnel; "join OUR discord" (OSS project
+  // chat) stays with the AI — the possessive is the tell. skool/whop/t.me-invite
+  // links and paid/exclusive communities are funnels regardless of pronoun.
+  var FUNNEL_BAIT = /(t\.me\/(\+|joinchat)|whop\.com|skool\.com|comment\s+["“']?\w{1,15}["”']?\s+(and|&)\s+i(['’]ll)?\s+(dm|send)|i(['’]ll)?\s+dm\s+you\s+the|drop\s+a\s+\S{1,8}\s+(and|&)\s+i(['’]ll)?\s+(dm|send)|join\s+my\s+(free\s+)?(community|cohort|mastermind|telegram(\s+channel)?|discord)\b|join\s+(the|our)\s+(private|paid|exclusive|premium)\s+(community|cohort|mastermind|group)\b|join\s+the\s+best\s+ai\s+community|free\s+for\s+the\s+(next\s+)?(24|48)\s*(hours|hrs)|spots?\s+(are\s+)?(limited|closing)|(link|guide|prompt[s]?|playbook|system)\s+in\s+(my\s+)?bio)/i;
+
   function prefilter(data) {
     var text = (data.text || '').trim();
     var quotedText = (data.quotedText || '').trim();
     var cardText = (data.cardText || '').trim();
     var allText = text || quotedText || cardText;
     var hasMedia = data.hasMedia || data.hasVideo || data.hasImage || data.hasGif;
+
+    // === FUNNEL BAIT — BEFORE the safelist, on all visible text ===
+    if (FUNNEL_BAIT.test(allText)) {
+      return { prediction: 'noise', confidence: 0.9, reason: 'funnel-bait', source: 'prefilter' };
+    }
 
     // === SAFELIST CHECK FIRST ===
     // If any available text contains tech/AI/biz keywords, NEVER prefilter — let AI decide

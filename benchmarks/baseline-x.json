@@ -1,34 +1,33 @@
 {
-  "date": "2026-07-03T10:30:41.451Z",
+  "date": "2026-07-06T04:15:10.982Z",
   "model": "dhiltgen/gemma4:e2b-mlx-bf16",
   "threshold": 0.7,
-  "promptSha": "5b30bb038402e6f2",
-  "prefilterSha": "c3e0d536a8e28dd8",
+  "promptSha": "c8b70eecf243a9a8",
+  "prefilterSha": "93240b09b7eb31ea",
   "goldenVersion": 1,
-  "items": 109,
+  "items": 117,
   "criticalRecall": 1,
-  "signalRecall": 0.9622641509433962,
-  "noiseCatch": 0.8928571428571429,
+  "signalRecall": 0.9464285714285714,
+  "noiseCatch": 0.9344262295081968,
   "weightedCost": 10,
   "criticalLost": [],
   "signalLostIds": [
     "x-012",
-    "x-019"
+    "x-019",
+    "x-023"
   ],
   "noiseLeakedIds": [
     "x-065",
     "x-073",
-    "x-075",
     "x-079",
-    "x-104",
     "x-108"
   ],
   "prefilterFalseHideIds": [
     "x-012"
   ],
   "latency": {
-    "p50": 764,
-    "p95": 860
+    "p50": 765,
+    "p95": 858
   },
   "decisions": {
     "x-001": "shown",
@@ -53,7 +52,7 @@
     "x-020": "shown",
     "x-021": "shown",
     "x-022": "shown",
-    "x-023": "shown",
+    "x-023": "hidden",
     "x-024": "shown",
     "x-025": "shown",
     "x-026": "shown",
@@ -105,7 +104,7 @@
     "x-072": "hidden",
     "x-073": "shown",
     "x-074": "hidden",
-    "x-075": "shown",
+    "x-075": "hidden",
     "x-076": "hidden",
     "x-077": "hidden",
     "x-078": "hidden",
@@ -134,11 +133,19 @@
     "x-101": "shown",
     "x-102": "hidden",
     "x-103": "hidden",
-    "x-104": "shown",
+    "x-104": "hidden",
     "x-105": "hidden",
     "x-106": "hidden",
     "x-107": "hidden",
     "x-108": "shown",
-    "x-109": "hidden"
+    "x-109": "hidden",
+    "x-110": "hidden",
+    "x-111": "hidden",
+    "x-112": "hidden",
+    "x-113": "hidden",
+    "x-114": "shown",
+    "x-115": "shown",
+    "x-116": "hidden",
+    "x-117": "shown"
   }
 }

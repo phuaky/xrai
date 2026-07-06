@@ -112,7 +112,7 @@ describe('decide()', () => {
 // `--bless` a new baseline and update the pin.
 describe('drift pins', () => {
   it('X classify prompt is pinned', () => {
-    expect(sha(worker.X_CLASSIFY_SYSTEM)).toBe('5b30bb038402e6f2');
+    expect(sha(worker.X_CLASSIFY_SYSTEM)).toBe('c8b70eecf243a9a8');
   });
 
   it('X config defaults are pinned', () => {
