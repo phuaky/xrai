@@ -2,7 +2,17 @@
 
 var DEFAULT_URL = 'http://localhost:11434';
 var DEFAULT_MODEL = { x: 'dhiltgen/gemma4:e2b-mlx-bf16', youtube: 'gemma2:2b' };
+var DEFAULT_IMAGE_MODEL = 'qwen3-vl:30b';
 var CONFIG_KEY = { x: 'xrai_config', youtube: 'ytrai_config' };
+
+// MoE model, ~19GB resident when warm — kept alive across a browsing session
+// so back-to-back thumbnail checks don't each eat the ~7s cold-load penalty,
+// but freed automatically once you stop scrolling for a while.
+var IMAGE_KEEP_ALIVE = '10m';
+// Single-image classification prompt needs a few hundred tokens, not
+// Qwen3-VL's 256K default context — that default inflates RAM ~45GB for no
+// benefit and was the whole reason the model looked RAM-expensive in testing.
+var IMAGE_NUM_CTX = 4096;
 
 // === X: signal vs noise ===
 var X_CLASSIFY_SYSTEM = 'You classify tweets as signal or noise. Output ONLY valid JSON.\nScore 4 dimensions (0 or 1 each):\n- NOVELTY: New info (1) or recycled take (0)?\n- SPECIFICITY: Concrete details (1) or vague claims (0)?\n- DENSITY: High insight per word (1) or filler (0)?\n- AUTHENTICITY: Genuine sharing (1) or engagement farming (0)?\n\nBAIT test — any hit forces AUTHENTICITY=0; two or more hits = noise regardless of other scores:\n- promises specifics it never delivers ("the exact prompt/config below", "bookmark this, then read")\n- funnel ending: join a community/telegram/discord/cohort, paid group, "part 2 coming soon", course tease\n- borrowed authority: the tweet IS a dramatic verbatim "quote" from a famous engineer/CEO, with an employer title and usually a video ("Anthropic Engineer X: \\"...\\" watch below"). Merely mentioning or recommending a famous person is NOT bait\n- manufactured urgency about acting on THIS post: buy/join/save before a deadline, "you will be left behind". Discussing risks or news topics is NOT bait\n- repost-farm framing: a breathless caption describing another person’s talk/video as the whole content, "watch the full episode, then read the article below"\n\nNOISE indicators: ALL CAPS text, vague hype ("insane", "wild", "crazy"), video+short text, no concrete details, crypto pumps.\nSIGNAL indicators: specific numbers/tools/results, personal experience with details, technical content. A person sharing their OWN work, data, or writing is signal even when it links out. A personal opinion, recommendation, or warning in the author own voice — even about famous people or alarming topics — is signal when there is no funnel, no video tease, and no verbatim quote-as-content.\n\nScore 3-4 = signal (confidence 0.75-0.95). Score 0-2 = noise (confidence 0.75-0.95). Score 2 with some specifics = noise confidence 0.6.\nOutput: {"prediction":"signal"|"noise","confidence":0.6-0.95,"reason":"1-5 word summary"}';
@@ -11,6 +21,9 @@ var X_REPLY_SYSTEM = 'Generate short reply options for a tweet. Output ONLY vali
 
 // === YouTube: music / motivational / other ===
 var YT_CLASSIFY_SYSTEM = 'You label a YouTube video as MUSIC, MOTIVATIONAL, or OTHER from its title and channel. Output ONLY valid JSON.\n\nMUSIC = songs, official music videos, audio tracks, albums, singles, EPs, live performances, concerts, covers, remixes, DJ sets, mixes, lo-fi / study / sleep / focus beats, instrumentals, classical, soundtracks/OST, full-song playlists. Strong hints: "Official Video", "Official Audio", "Official Music Video", "(Lyrics)", "ft."/"feat.", "remix", "VEVO", a channel ending in "- Topic".\nMOTIVATIONAL = motivational speeches, discipline / mindset / self-improvement talks meant to inspire action, workout motivation, stoicism, goal-setting pep talks.\nOTHER = everything else: vlogs, podcasts (unless purely motivational), gaming, news, politics, reactions, commentary, tutorials/how-to, reviews, unboxings, comedy/skits, sports, movie/TV/trailer clips, documentaries, interviews, explainers, cooking, travel, ASMR, kids content.\n\nRules:\n- Judge ONLY by the title + channel.\n- Background music inside a non-music video is still OTHER.\n- If unsure between MUSIC and OTHER, choose OTHER.\n\nOutput: {"category":"music"|"motivational"|"other","confidence":0.0-1.0}';
+
+// === Image bait check: shared across X photos + YouTube thumbnails ===
+var IMAGE_BAIT_SYSTEM = 'You judge whether an image is being used as clickbait via a sexualized or suggestive image of a person — cleavage, bikini/lingerie, alluring pose, thirst-trap framing — to bait clicks, unrelated to genuine content value.\n\nFully clothed fitness, workout, sports, or motivational imagery is NOT bait even when the person is attractive or fit — judge the intent and framing of the shot, not attractiveness. Movie/TV/game posters, album covers, and news photos are NOT bait. When genuinely unsure, prefer NOT bait (baity=false) — the cost of a wrongly-hidden legitimate thumbnail is worse than a missed one.\n\nOutput ONLY valid JSON: {"baity":true|false,"confidence":0.0-1.0,"reason":"3-6 words"}';
 
 // Get per-platform config from storage
 function getConfig(platform) {
@@ -21,7 +34,8 @@ function getConfig(platform) {
       var cfg = result[key] || {};
       resolve({
         ollamaUrl: cfg.ollamaUrl || DEFAULT_URL,
-        model: cfg.model || def
+        model: cfg.model || def,
+        imageModel: cfg.imageModel || DEFAULT_IMAGE_MODEL
       });
     });
   });
@@ -170,6 +184,87 @@ function classifyYoutube(title, channel, model, ollamaUrl) {
     });
 }
 
+// === Image bait classification ===
+// Fetches image bytes in the service worker (host_permissions cover the CDN
+// domains, so this avoids the tainted-canvas/CORS wall a content script would
+// hit) and sends them to a vision model alongside the surrounding text.
+function fetchImageBase64(url) {
+  return fetch(url, { signal: AbortSignal.timeout(8000) })
+    .then(function (r) {
+      if (!r.ok) throw new Error('image fetch HTTP ' + r.status);
+      return r.arrayBuffer();
+    })
+    .then(function (buf) {
+      var bytes = new Uint8Array(buf);
+      var binary = '';
+      var CHUNK = 0x8000;
+      for (var i = 0; i < bytes.length; i += CHUNK) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+      }
+      return btoa(binary);
+    });
+}
+
+function classifyImage(platform, imageUrl, contextText, model, ollamaUrl) {
+  var start = Date.now();
+  if (!imageUrl) return Promise.resolve({ baity: false, confidence: 0 });
+
+  return fetchImageBase64(imageUrl)
+    .then(function (b64) {
+      var userMsg = 'Context: "' + (contextText || '').substring(0, 200) + '"';
+      return fetch(ollamaUrl + '/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: model,
+          think: false,
+          keep_alive: IMAGE_KEEP_ALIVE,
+          messages: [
+            { role: 'system', content: IMAGE_BAIT_SYSTEM },
+            { role: 'user', content: userMsg, images: [b64] }
+          ],
+          stream: false,
+          options: { temperature: 0.1, num_predict: 60, num_ctx: IMAGE_NUM_CTX }
+        })
+      });
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var raw = (data.message && data.message.content) || '';
+      var parsed = parseImageClassification(raw);
+      var elapsed = Date.now() - start;
+      logModelIO(platform + '-image', contextText || '', raw, parsed, model, elapsed);
+      parsed._model = model;
+      parsed._raw = raw.slice(0, 500);
+      parsed._ms = elapsed;
+      return parsed;
+    })
+    .catch(function (e) {
+      // Fail open — a fetch/model error must never hide legitimate content.
+      console.warn('[rai-worker] Image classify error:', (e && e.message) || e);
+      return { baity: false, confidence: 0 };
+    });
+}
+
+function parseImageClassification(content) {
+  try {
+    var match = content.match(/\{[\s\S]*?\}/);
+    if (match) {
+      var obj = JSON.parse(match[0]);
+      var result = {
+        baity: obj.baity === true,
+        confidence: Math.min(1, Math.max(0, parseFloat(obj.confidence) || 0.5))
+      };
+      if (obj.reason && typeof obj.reason === 'string') {
+        result.reason = obj.reason.substring(0, 50);
+      }
+      return result;
+    }
+  } catch (e) { /* fallback */ }
+  // Unparseable output fails open rather than hiding on a guess.
+  return { baity: false, confidence: 0.5 };
+}
+
 // Generate reply (X only)
 function generateReply(tweetText, authorHandle, style, model, ollamaUrl) {
   var userMsg = 'Tweet by @' + (authorHandle || 'unknown') + ': "' + tweetText + '"';
@@ -291,6 +386,10 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
 
       case 'classify':
         classify(platform, msg, model, url).then(sendResponse);
+        break;
+
+      case 'classifyImage':
+        classifyImage(platform, msg.imageUrl, msg.contextText, cfg.imageModel, url).then(sendResponse);
         break;
 
       case 'reply':

@@ -54,6 +54,14 @@ var YtraiDetector = (function () {
     return readTitleFrom(alt);
   }
 
+  // Thumbnail <img> src — used by the image bait check. YouTube lazy-loads
+  // these, so prefer whichever attribute actually has a real URL at scan time.
+  function extractThumbnail(el) {
+    var img = el.querySelector('ytd-thumbnail img, #thumbnail img, .shortsLockupViewModelHostThumbnailContainer img');
+    if (!img) return '';
+    return img.src || img.getAttribute('data-thumb') || '';
+  }
+
   function extractChannel(el) {
     var cn = el.querySelector('ytd-channel-name, #channel-name, .ytd-channel-name');
     if (!cn) return '';
@@ -84,7 +92,7 @@ var YtraiDetector = (function () {
       if (!title) continue;                     // card not fully rendered yet — retry next mutation
 
       el._ytraiId = id;
-      var data = { id: id, title: title, channel: extractChannel(el) };
+      var data = { id: id, title: title, channel: extractChannel(el), thumbnailUrl: extractThumbnail(el) };
       for (var c = 0; c < callbacks.length; c++) {
         try { callbacks[c]({ element: el, data: data }); } catch (e) { /* silent */ }
       }
@@ -125,6 +133,7 @@ var YtraiDetector = (function () {
     scan: scan,
     _extractVideoId: extractVideoId,
     _extractTitle: extractTitle,
-    _extractChannel: extractChannel
+    _extractChannel: extractChannel,
+    _extractThumbnail: extractThumbnail
   };
 })();

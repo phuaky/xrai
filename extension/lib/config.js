@@ -21,7 +21,12 @@ var RaiConfig = (function () {
       memoryRetentionDays: 30,
       maxModelCallsPerMinute: 100,
       batchSize: 5,
-      batchFlushDelay: 2000
+      batchFlushDelay: 2000,
+      // Image bait check — gates image-bearing signal tweets behind a vision
+      // model before reveal (blur first, same as YouTube). See CLAUDE.md.
+      imageBaitEnabled: true,
+      imageModel: 'qwen3-vl:30b',
+      imageConfidenceThreshold: 0.6
     },
     youtube: {
       model: 'gemma2:2b',
@@ -31,6 +36,12 @@ var RaiConfig = (function () {
       hideMethod: 'blur',            // blur everything that isn't kept
       memoryRetentionDays: 30,
       maxModelCallsPerMinute: 120,
+      // Image bait check — gates music/motivational thumbnails behind a
+      // vision model before reveal, to catch bait thumbnails on titles that
+      // would otherwise pass the text classifier.
+      imageBaitEnabled: true,
+      imageModel: 'qwen3-vl:30b',
+      imageConfidenceThreshold: 0.6,
       // Shorts consumption tracker + gentle doom-scroll nudge
       shortsNudge: true,             // show the snap-out overlay past the limit
       shortsLimitCount: 10,          // nudge after N Shorts in one binge

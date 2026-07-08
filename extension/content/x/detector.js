@@ -187,7 +187,14 @@ var XraiDetector = (function () {
     if (hasVideo) mediaType = 'video';
     else if (hasGif) mediaType = 'gif';
     else if (hasImage) mediaType = 'image';
-    return { hasVideo: hasVideo, hasImage: hasImage, hasGif: hasGif, hasMedia: hasMedia, mediaType: mediaType };
+    // Actual photo URL for the image bait check. Video/GIF frame-grabbing is
+    // out of scope for now — only static photos get checked.
+    var imageUrl = '';
+    if (hasImage) {
+      var img = el.querySelector('[data-testid="tweetPhoto"] img');
+      if (img && img.src) imageUrl = img.src;
+    }
+    return { hasVideo: hasVideo, hasImage: hasImage, hasGif: hasGif, hasMedia: hasMedia, mediaType: mediaType, imageUrl: imageUrl };
   }
 
   function detectReply(el) {
@@ -236,6 +243,7 @@ var XraiDetector = (function () {
         hasGif: media.hasGif,
         hasMedia: media.hasMedia,
         mediaType: media.mediaType,
+        imageUrl: media.imageUrl,
         hasQuote: hasQuote,
         hasCard: hasCard,
         isMediaOnly: isMediaOnly,
@@ -264,6 +272,7 @@ var XraiDetector = (function () {
         hasGif: media.hasGif,
         hasMedia: media.hasMedia,
         mediaType: media.mediaType,
+        imageUrl: media.imageUrl,
         hasQuote: hasQuote,
         hasCard: hasCard,
         isMediaOnly: isMediaOnly,

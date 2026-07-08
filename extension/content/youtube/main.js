@@ -32,6 +32,7 @@ var YtraiMain = (function () {
     RaiConfig.getConfig(PLATFORM).then(function (cfg) {
       config = cfg;
       RaiClassifier.configure({ maxModelCallsPerMinute: cfg.maxModelCallsPerMinute, platform: PLATFORM });
+      RaiImageClassifier.configure({ platform: PLATFORM });
 
       checkHealth();
 
@@ -148,12 +149,57 @@ var YtraiMain = (function () {
     }
 
     if (keep) {
-      keepVideo(el, data, cat, label);
-      if (shouldLog) logDecision(data, 'kept', result, cat);
+      finalizeKeep(el, data, cat, label, result, shouldLog);
     } else {
       blurVideo(el, data, cat);
       if (shouldLog) logDecision(data, 'blurred', result, cat);
     }
+  }
+
+  // === Image bait gate — runs only on videos already headed for "keep" ===
+  // Everything blurred for being "other" category never reaches here, so
+  // this only spends the extra second-plus on candidates that would
+  // otherwise reveal. Card is already blurred (default state), so there's
+  // no flash risk either way — just a longer wait before reveal.
+  function finalizeKeep(el, data, cat, label, result, shouldLog) {
+    function finish(showAsBait, imgResult) {
+      if (showAsBait) {
+        blurVideo(el, data, 'bait-thumbnail');
+        if (shouldLog) logDecision(data, 'blurred', imgResult, 'bait-thumbnail');
+      } else {
+        keepVideo(el, data, cat, label);
+        if (shouldLog) logDecision(data, 'kept', result, cat);
+      }
+      attachGoldenSetButtons(el, data);
+    }
+
+    var imageBaitOn = config && config.imageBaitEnabled !== false;
+    if (!data.thumbnailUrl || !imageBaitOn) { finish(false, null); return; }
+
+    var imgThreshold = (config && config.imageConfidenceThreshold) || 0.6;
+    var cachedImg = RaiImageClassifier.checkCache(data.id);
+    if (cachedImg) { finish(cachedImg.baity && cachedImg.confidence >= imgThreshold, cachedImg); return; }
+
+    RaiImageClassifier.classify(data.id, { imageUrl: data.thumbnailUrl, contextText: data.title }, function (imgResult) {
+      // Generation guard: card may have recycled to a different video while
+      // the image call was in flight.
+      if (el._ytraiId !== data.id) return;
+      finish(imgResult.baity && imgResult.confidence >= imgThreshold, imgResult);
+    });
+  }
+
+  // === Golden-set labeling — the image-bait ground-truth loop ===
+  // Only offered on music/motivational candidates (the only videos that ever
+  // reach finalizeKeep), so it never spams every card in the feed.
+  function attachGoldenSetButtons(el, data) {
+    if (!data.thumbnailUrl) return;
+    RaiHider.addImageLabelButtons(el, function (label) {
+      RaiMemory.logEvent({
+        platform: 'youtube', kind: 'image-label', label: label,
+        imageUrl: data.thumbnailUrl, title: data.title, channel: data.channel, videoId: data.id
+      });
+      console.log('[ytrai] LABEL  | ' + (data.channel || '?') + ' | id:' + data.id + ' | labeled: ' + label);
+    });
   }
 
   function keepVideo(el, data, cat, label) {

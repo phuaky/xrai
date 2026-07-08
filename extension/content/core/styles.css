@@ -283,11 +283,11 @@
 [data-xrai-hidden="blur"] {
   position: relative;
 }
-[data-xrai-hidden="blur"] > *:not(.xrai-peek-btn):not(.xrai-blur-label):not(.xrai-wrong-btn) {
+[data-xrai-hidden="blur"] > *:not(.xrai-peek-btn):not(.xrai-blur-label):not(.xrai-wrong-btn):not(.xrai-label-btns) {
   filter: blur(8px);
   transition: filter 0.2s ease;
 }
-[data-xrai-revealed] > *:not(.xrai-peek-btn):not(.xrai-blur-label):not(.xrai-wrong-btn) {
+[data-xrai-revealed] > *:not(.xrai-peek-btn):not(.xrai-blur-label):not(.xrai-wrong-btn):not(.xrai-label-btns) {
   filter: none;
 }
 
@@ -361,6 +361,41 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Golden-set labeling buttons — top-left, out of the way of the peek/wrong
+   buttons and keep/blur labels which live bottom-left/bottom-right/center. */
+.xrai-label-btns {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 12;
+  display: flex;
+  gap: 4px;
+}
+.xrai-label-btn {
+  padding: 3px 8px;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 11px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.55;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.xrai-label-btn:hover {
+  opacity: 1;
+  transform: scale(1.05);
+}
+.xrai-label-bait {
+  background: rgba(15, 15, 20, 0.85);
+  color: #f87171;
+}
+.xrai-label-safe {
+  background: rgba(15, 15, 20, 0.85);
+  color: #4ade80;
 }
 
 /* Fade-in animation */

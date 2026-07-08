@@ -166,6 +166,8 @@ var RaiIndicator = (function () {
       '<label>Model<select id="xrai-s-model"><option value="">Loading models...</option></select></label>' +
       '<label>' + aggressivenessLabel + '<input type="range" id="xrai-s-threshold" min="0.5" max="0.9" step="0.05" value="' + cfg.confidenceThreshold + '"><span id="xrai-s-threshold-val">' + cfg.confidenceThreshold + '</span></label>' +
       extraControl +
+      '<label>Image bait check<input type="checkbox" id="xrai-s-image-bait"' +
+      (cfg.imageBaitEnabled !== false ? ' checked' : '') + '></label>' +
       '<label>Hide method<select id="xrai-s-hide">' +
       '<option value="remove"' + (cfg.hideMethod === 'remove' ? ' selected' : '') + '>Remove</option>' +
       '<option value="collapse"' + (cfg.hideMethod === 'collapse' ? ' selected' : '') + '>Collapse</option>' +
@@ -206,6 +208,7 @@ var RaiIndicator = (function () {
       var partial = {
         model: popup.querySelector('#xrai-s-model').value,
         confidenceThreshold: parseFloat(slider.value),
+        imageBaitEnabled: popup.querySelector('#xrai-s-image-bait').checked,
         hideMethod: popup.querySelector('#xrai-s-hide').value
       };
       if (_platform === 'x') {

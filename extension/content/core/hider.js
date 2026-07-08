@@ -136,6 +136,10 @@ var RaiHider = (function () {
       element._xraiSignalLabel.remove();
       delete element._xraiSignalLabel;
     }
+    if (element._xraiLabelBtns) {
+      element._xraiLabelBtns.remove();
+      delete element._xraiLabelBtns;
+    }
     removeWrongButton(element);
   }
 
@@ -177,6 +181,37 @@ var RaiHider = (function () {
     element._xraiSignalLabel = label;
   }
 
+  // Golden-set labeling affordance for the image bait classifier — two small
+  // tap targets so real examples accumulate from ordinary scrolling instead
+  // of requiring curated test images. One-shot: labeling removes the buttons.
+  function addImageLabelButtons(element, onLabel) {
+    if (!element || element._xraiLabelBtns) return;
+    element.style.position = 'relative';
+
+    var wrap = document.createElement('div');
+    wrap.className = 'xrai-label-btns';
+
+    function makeBtn(cls, text, title, label) {
+      var btn = document.createElement('button');
+      btn.className = 'xrai-label-btn ' + cls;
+      btn.textContent = text;
+      btn.title = title;
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        onLabel(label);
+        wrap.remove();
+        delete element._xraiLabelBtns;
+      });
+      return btn;
+    }
+
+    wrap.appendChild(makeBtn('xrai-label-bait', '🔞 bait', 'Label this image as bait for the golden-set', 'bait'));
+    wrap.appendChild(makeBtn('xrai-label-safe', '✅ safe', 'Label this image as safe for the golden-set', 'safe'));
+    element.appendChild(wrap);
+    element._xraiLabelBtns = wrap;
+  }
+
   return {
     blurPending: blurPending,
     unblurPending: unblurPending,
@@ -185,6 +220,7 @@ var RaiHider = (function () {
     addKeepLabel: addKeepLabel,
     addSignalLabel: addKeepLabel, // back-compat alias
     addWrongButton: addWrongButton,
-    removeWrongButton: removeWrongButton
+    removeWrongButton: removeWrongButton,
+    addImageLabelButtons: addImageLabelButtons
   };
 })();

@@ -23,6 +23,7 @@ var XraiMain = (function () {
     RaiConfig.getConfig(PLATFORM).then(function (cfg) {
       config = cfg;
       RaiClassifier.configure({ maxModelCallsPerMinute: cfg.maxModelCallsPerMinute, platform: PLATFORM });
+      RaiImageClassifier.configure({ platform: PLATFORM });
 
       chrome.runtime.sendMessage({ action: 'checkHealth', platform: PLATFORM }, function (response) {
         if (chrome.runtime.lastError) {
@@ -196,6 +197,66 @@ var XraiMain = (function () {
     }, 'Worth seeing? Click to reveal it and record the correction');
   }
 
+  // === Golden-set labeling — the image-bait ground-truth loop ===
+  // Only offered on tweets that actually carry a checkable photo, so it never
+  // spams text-only or video tweets.
+  function attachGoldenSetButtons(el, data, text) {
+    if (!data.hasImage || !data.imageUrl) return;
+    RaiHider.addImageLabelButtons(el, function (label) {
+      RaiMemory.logEvent({
+        platform: 'x', kind: 'image-label', label: label,
+        imageUrl: data.imageUrl, text: (text || '').substring(0, 300),
+        author: data.author, tweetId: data.id
+      });
+      console.log('[xrai] LABEL  | @' + (data.author || '?') + ' | id:' + data.id + ' | labeled: ' + label);
+    });
+  }
+
+  // === Image bait gate — runs only on tweets already headed for "shown" ===
+  // Noise tweets skip this entirely (already hidden, no point spending the
+  // extra second-plus on a vision call). Text-only signal tweets skip it too
+  // (finish(false) fires immediately, same as before this feature existed).
+  // Image tweets blur-then-reveal, matching the YouTube pattern: never let a
+  // bait thumbnail flash on screen while the model is still thinking.
+  function finalizeSignal(el, data, enrichedText, confidence, source, result) {
+    function finish(hideAsBait, imgResult) {
+      if (hideAsBait) {
+        RaiHider.unblurPending(el);
+        var reasonLabel = imgResult && imgResult.reason ? 'AI: bait image (' + imgResult.reason + ')' : 'AI: bait image';
+        RaiHider.hide(el, config ? config.hideMethod : 'blur', reasonLabel);
+        logTweet('hidden', data, enrichedText, 'bait-image', imgResult ? imgResult.confidence : 0.6, 'image-model', imgResult);
+        RaiMemory.incrementStats('hidden');
+        RaiIndicator.incrementHidden();
+        attachWrongOnHidden(el, data, enrichedText, imgResult ? imgResult.confidence : 0.6, 'image-model');
+      } else {
+        RaiHider.unblurPending(el);
+        var signalLabel = (result && result.reason) ? 'AI: ' + result.reason : 'AI: signal (' + (confidence || 0.5) + ')';
+        RaiHider.addKeepLabel(el, signalLabel);
+        logTweet('shown', data, enrichedText, 'signal', confidence || 0.5, source, result);
+        RaiMemory.incrementStats('kept');
+        RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'signal');
+        RaiIndicator.incrementKept();
+        XraiReply.attachReplyButton(el, data);
+        attachWrongOnKept(el, data, enrichedText, confidence || 0.5, source);
+        maybeCaptureTip(data, enrichedText, 'feed');
+      }
+      attachNewTabHandler(el, data);
+      attachGoldenSetButtons(el, data, enrichedText);
+    }
+
+    var imageBaitOn = config && config.imageBaitEnabled !== false;
+    if (!data.hasImage || !data.imageUrl || !imageBaitOn) { finish(false, null); return; }
+
+    var imgThreshold = (config && config.imageConfidenceThreshold) || 0.6;
+    var cachedImg = RaiImageClassifier.checkCache(data.id);
+    if (cachedImg) { finish(cachedImg.baity && cachedImg.confidence >= imgThreshold, cachedImg); return; }
+
+    RaiHider.blurPending(el, 0);
+    RaiImageClassifier.classify(data.id, { imageUrl: data.imageUrl, contextText: enrichedText }, function (imgResult) {
+      finish(imgResult.baity && imgResult.confidence >= imgThreshold, imgResult);
+    });
+  }
+
   function handleTweet(info) {
     var el = info.element;
     var data = info.data;
@@ -288,17 +349,13 @@ var XraiMain = (function () {
         RaiHider.hide(el, config ? config.hideMethod : 'remove', cachedReason);
         RaiIndicator.incrementHidden();
         attachWrongOnHidden(el, data, enrichedText, cached.confidence, cached.source || 'cache');
-      } else {
-        var cachedSignalReason = cached.reason
-          ? 'AI: ' + cached.reason
-          : 'AI: signal (' + (cached.confidence || 0.5) + ')';
-        RaiHider.addKeepLabel(el, cachedSignalReason);
-        RaiIndicator.incrementKept();
-        XraiReply.attachReplyButton(el, data);
-        attachWrongOnKept(el, data, enrichedText, cached.confidence, cached.source || 'cache');
-        maybeCaptureTip(data, enrichedText, 'feed');
+        attachNewTabHandler(el, data);
+        return;
       }
-      attachNewTabHandler(el, data);
+      // Cached signal — still needs the image-bait gate if this tweet has a
+      // photo (RaiImageClassifier has its own cache, so a re-encountered
+      // tweet with an already-checked image reveals instantly, no flash).
+      finalizeSignal(el, data, enrichedText, cached.confidence, cached.source || 'cache', cached);
       return;
     }
 
@@ -318,21 +375,13 @@ var XraiMain = (function () {
         RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'noise');
         RaiIndicator.incrementHidden();
         attachWrongOnHidden(el, data, enrichedText, result.confidence, result.source || 'model');
+        attachNewTabHandler(el, data);
       } else {
-        RaiHider.unblurPending(el);
-        var signalLabel = result.reason
-          ? 'AI: ' + result.reason
-          : 'AI: signal (' + (result.confidence || 0.5) + ')';
-        RaiHider.addKeepLabel(el, signalLabel);
-        logTweet('shown', data, enrichedText, 'signal', result.confidence || 0.5, result.source || 'model', result);
-        RaiMemory.incrementStats('kept');
-        RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'signal');
-        RaiIndicator.incrementKept();
-        XraiReply.attachReplyButton(el, data);
-        attachWrongOnKept(el, data, enrichedText, result.confidence || 0.5, result.source || 'model');
-        maybeCaptureTip(data, enrichedText, 'feed');
+        // Signal — element is already blurred from Step 5. finalizeSignal
+        // owns the image-bait gate and, either way, the final unblur/reveal
+        // (or bait-hide) plus attachNewTabHandler.
+        finalizeSignal(el, data, enrichedText, result.confidence || 0.5, result.source || 'model', result);
       }
-      attachNewTabHandler(el, data);
     });
   }
 
