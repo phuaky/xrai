@@ -4,7 +4,9 @@
   "scripts": {
     "test": "bun test",
     "eval:x": "node benchmarks/eval-x.js",
-    "eval:x:bless": "node benchmarks/eval-x.js --bless"
+    "eval:x:bless": "node benchmarks/eval-x.js --bless",
+    "eval:youtube": "node benchmarks/eval-youtube.js",
+    "eval:youtube:bless": "node benchmarks/eval-youtube.js --bless"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.8.9",

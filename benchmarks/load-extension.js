@@ -25,7 +25,13 @@ function loadTips() {
   return new Function(src + '\nreturn XraiTips;')();
 }
 
-// X_CLASSIFY_SYSTEM + parseXClassification from the service worker (chrome stubbed)
+// YtraiPrefilter — pure IIFE, no browser deps
+function loadYoutubePrefilter() {
+  const src = loadSource('extension/content/youtube/prefilter.js');
+  return new Function(src + '\nreturn YtraiPrefilter;')();
+}
+
+// Prompts + parsers from the service worker (chrome stubbed)
 function loadWorker() {
   const src = loadSource('extension/background/worker.js');
   const chromeStub = {
@@ -34,7 +40,9 @@ function loadWorker() {
   };
   return new Function(
     'chrome',
-    src + '\nreturn { X_CLASSIFY_SYSTEM: X_CLASSIFY_SYSTEM, parseXClassification: parseXClassification };'
+    src +
+      '\nreturn { X_CLASSIFY_SYSTEM: X_CLASSIFY_SYSTEM, parseXClassification: parseXClassification, ' +
+      'YT_CLASSIFY_SYSTEM: YT_CLASSIFY_SYSTEM, parseYoutubeClassification: parseYoutubeClassification };'
   )(chromeStub);
 }
 
@@ -46,6 +54,10 @@ function loadConfigDefaults() {
 
 function loadGolden() {
   return JSON.parse(loadSource('benchmarks/golden-x.json'));
+}
+
+function loadGoldenYoutube() {
+  return JSON.parse(loadSource('benchmarks/golden-youtube.json'));
 }
 
 // Golden item → the `data` shape XraiPrefilter.prefilter() receives in production
@@ -88,19 +100,61 @@ function isSignalTier(tier) {
   return tier === 'signal' || tier === 'critical-signal';
 }
 
+// Golden YouTube item → the `data` shape YtraiPrefilter.prefilter() receives in production
+function toYoutubePrefilterData(item) {
+  return { title: item.title, channel: item.channel };
+}
+
+// Golden YouTube item → the exact user message classifyYoutube() sends to Ollama
+function toYoutubeUserMessage(item) {
+  let msg = 'Title: "' + (item.title || '') + '"';
+  if (item.channel) msg += '\nChannel: "' + item.channel + '"';
+  return msg;
+}
+
+// Mirror of applyDecision() in extension/content/youtube/main.js. Note the same
+// asymmetry as X's decide(): a prefilter keep bypasses confidenceThreshold
+// entirely; only the model path respects it.
+function decideYoutube(prefilterResult, modelResult, keepMotivational, threshold) {
+  const result = prefilterResult
+    ? { category: prefilterResult.category, confidence: prefilterResult.confidence, source: 'prefilter:' + prefilterResult.reason }
+    : { category: modelResult.category, confidence: modelResult.confidence, source: 'model' };
+  const isPrefilter = result.source.indexOf('prefilter') === 0;
+
+  let keep = false;
+  if (result.category === 'music') keep = true;
+  else if (result.category === 'motivational' && keepMotivational) keep = true;
+
+  if (keep && !isPrefilter && result.confidence !== undefined && result.confidence < threshold) {
+    keep = false;
+  }
+
+  return { decision: keep ? 'kept' : 'blurred', stage: isPrefilter ? 'prefilter' : 'model', category: result.category, confidence: result.confidence };
+}
+
+function isKeepTier(tier) {
+  return tier === 'music' || tier === 'motivational';
+}
+
 function sha(text) {
   return crypto.createHash('sha256').update(text).digest('hex').slice(0, 16);
 }
 
 module.exports = {
   loadPrefilter,
+  loadYoutubePrefilter,
   loadTips,
   loadWorker,
   loadConfigDefaults,
   loadGolden,
+  loadGoldenYoutube,
   toPrefilterData,
   toUserMessage,
+  toYoutubePrefilterData,
+  toYoutubeUserMessage,
   decide,
+  decideYoutube,
   isSignalTier,
+  isKeepTier,
   sha,
 };

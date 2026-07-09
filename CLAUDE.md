@@ -64,8 +64,9 @@ extension/
 | `extension/background/worker.js` | Service worker — platform-routed Ollama proxy + both prompts |
 | `extension/lib/config.js` | `RaiConfig` — per-platform config |
 | `extension/lib/memory.js` | `RaiMemory` — per-platform stats/time/log + IndexedDB |
-| `extension/content/core/classifier.js` | `RaiClassifier` — concurrent queue + cache |
-| `extension/content/core/hider.js` | `RaiHider` — blur/remove/collapse + peek button |
+| `extension/content/core/classifier.js` | `RaiClassifier` — concurrent queue + cache (text) |
+| `extension/content/core/image-classifier.js` | `RaiImageClassifier` — small queue + cache for the image bait check |
+| `extension/content/core/hider.js` | `RaiHider` — blur/remove/collapse + peek/wrong/label buttons |
 | `extension/content/core/indicator.js` | `RaiIndicator` — pill + per-platform settings |
 | `extension/content/x/main.js` | `XraiMain` — X pipeline (hide noise) |
 | `extension/content/x/detector.js` | `XraiDetector` — tweet detection |
@@ -78,7 +79,9 @@ extension/
 | `extension/content/x/tips.js` | `XraiTips` — workflow-tip detection (high recall by design) |
 | `benchmarks/eval-x.js` | X full-pipeline eval + regression gate (see "Evals") |
 | `benchmarks/golden-x.json` | Tiered golden set — source of truth for X eval data |
-| `benchmarks/load-extension.js` | Loads real prompt/parser/prefilter/config from extension source |
+| `benchmarks/eval-youtube.js` | YouTube full-pipeline eval + regression gate (see "Evals") |
+| `benchmarks/golden-youtube.json` | Tiered golden set — source of truth for YouTube eval data |
+| `benchmarks/load-extension.js` | Loads real prompt/parser/prefilter/config from extension source (both platforms) |
 | `tests/regression.test.js` | Fast no-Ollama pins: prefilter invariants, parser fail-open, prompt/config hashes |
 | `benchmarks/benchmark.js` | LEGACY — model-only benchmark; drifted from production (wrong models/prompt/format). Use eval-x.js |
 | `SPEC.md` | Full architecture specification (X — predates YouTube) |
@@ -106,6 +109,11 @@ node scripts/tips.js stats
 bun run eval:x            # run against blessed baseline, exit 1 on regression
 bun run eval:x:bless      # re-bless baseline after an INTENTIONAL prompt/prefilter/model change
 node benchmarks/eval-x.js --limit 10   # quick smoke run
+
+# YouTube eval + regression gate (needs Ollama; ~1 min)
+bun run eval:youtube            # run against blessed baseline, exit 1 on regression
+bun run eval:youtube:bless      # re-bless baseline after an INTENTIONAL prompt/prefilter/model change
+node benchmarks/eval-youtube.js --limit 10   # quick smoke run
 
 # Check Ollama status / models
 curl -s http://localhost:11434/api/tags | python3 -m json.tool
@@ -150,6 +158,24 @@ Rules:
 - `benchmarks/benchmark.js` is legacy: it tests non-production models with a stale
   prompt copy in a non-production input format and never runs the prefilter. Don't
   extend it; extend `golden-x.json` + `eval-x.js` instead.
+
+## Evals — what "better" means for the YouTube filter
+
+Inverted asymmetry from X: YouTube blurs by default and reveals only music/motivational,
+so a wrongly-blurred music/motivational video is the INVISIBLE cost (you never know you
+missed a good song), and a wrongly-revealed "other" video is the FELT cost (a distracting
+video shows). Same principle as X — guard the side no one can feel — opposite direction.
+
+Metrics, in priority order (computed by `benchmarks/eval-youtube.js` over `golden-youtube.json`):
+1. **Keep recall** (guarded metric — invisible in daily use). Gate: max 3pt drop vs baseline.
+2. **False-keep rate** (felt metric). Gate: max 5pt rise vs baseline. `tempting-other` tier =
+   titles/channels that superficially resemble music/motivational bait, reported separately.
+3. Weighted cost = 2×keep-lost + 1×false-keep. Latency p50/p95 (warn only).
+
+Rules: same as X's, mirrored — any change to `YT_CLASSIFY_SYSTEM`, `youtube/prefilter.js`,
+the default model, or `confidenceThreshold` → run `bun run eval:youtube`; if intentional
+and acceptable, `bun run eval:youtube:bless`. Prefilter false-keeps are the worst failure
+class here too: deterministic, silent, and bypass the confidence threshold.
 
 ## Development
 
