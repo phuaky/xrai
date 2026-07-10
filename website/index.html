@@ -5,197 +5,350 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>rai — your feed, without the noise. Local AI, measured.</title>
   <meta name="description" content="A Chrome extension that filters X and YouTube with a local AI model. 100% on-device, no cloud, no account — and its accuracy is measured, gated, and public.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0A0A0B;
-      --bg-raised: #121216;
-      --bg-card: #16161C;
-      --border: rgba(255, 255, 255, 0.08);
-      --border-strong: rgba(255, 255, 255, 0.14);
-      --text: #E7E7EA;
-      --text-dim: #9B9BA4;
-      --text-faint: #62626B;
-      --accent: #4ADE80;
-      --accent-dim: rgba(74, 222, 128, 0.15);
-      --red: #F87171;
-      --red-dim: rgba(248, 113, 113, 0.14);
-      --amber: #FBBF24;
-      --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      --ink: #0B0B0F;
+      --paper: #FFFFFF;
+      --panel: #EDEDF0;
+      --blue: #2C4BFF;
+      --blue-soft: rgba(44, 75, 255, 0.08);
+      --gray: #56565E;
+      --faint: #8B8B93;
+      --line: rgba(11, 11, 15, 0.14);
+      --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      --sans: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
       font-size: 16px;
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
     }
-    a { color: var(--text); text-decoration: none; transition: color 0.15s; }
-    a:hover { color: var(--accent); }
-    .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px; }
+    a { color: var(--ink); text-decoration: none; transition: color 0.15s; }
+    a:hover { color: var(--blue); }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 28px; }
+
+    /* Mono micro-labels */
+    .tag {
+      display: inline-flex; align-items: center; gap: 10px;
+      font-family: var(--mono); font-size: 12.5px; font-weight: 500;
+      letter-spacing: 0.14em; text-transform: uppercase; color: var(--blue);
+      margin-bottom: 22px;
+    }
+    .tag::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--blue); }
+
+    /* Halftone dot fields */
+    .dotfield {
+      position: absolute; pointer-events: none;
+      background-image: radial-gradient(circle, var(--blue) 1.4px, transparent 1.4px);
+      background-size: 12px 12px;
+      -webkit-mask-image: radial-gradient(ellipse 55% 50% at 60% 45%, #000 5%, transparent 72%);
+      mask-image: radial-gradient(ellipse 55% 50% at 60% 45%, #000 5%, transparent 72%);
+      opacity: 0.6;
+    }
+
+    /* Corner plus marks */
+    .pm {
+      position: absolute; font-family: var(--mono); font-style: normal;
+      font-size: 17px; color: rgba(11, 11, 15, 0.3); line-height: 1;
+      pointer-events: none; user-select: none;
+    }
+    .pm-tl { top: 18px; left: 18px; }
+    .pm-tr { top: 18px; right: 18px; }
+    .pm-bl { bottom: 18px; left: 18px; }
+    .pm-br { bottom: 18px; right: 18px; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 24px; border-radius: 4px;
+      font-size: 15.5px; font-weight: 600; line-height: 1.2;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .btn .arr { transition: transform 0.18s; font-weight: 500; }
+    .btn:hover .arr { transform: translateX(4px); }
+    .btn-primary { background: var(--ink); color: #fff !important; }
+    .btn-primary:hover { background: #23232B; }
+    .btn-ghost { border: 1px solid var(--ink); background: transparent; color: var(--ink) !important; }
+    .btn-ghost:hover { border-color: var(--blue); color: var(--blue) !important; }
 
     /* Nav */
     nav {
       position: sticky; top: 0; z-index: 50;
-      background: rgba(10, 10, 11, 0.85);
+      background: rgba(255, 255, 255, 0.88);
       backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid var(--line);
     }
-    .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 60px; }
-    .logo { font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
-    .logo .dot { color: var(--accent); }
-    .nav-links { display: flex; gap: 28px; align-items: center; font-size: 14px; color: var(--text-dim); }
-    .nav-links a { color: var(--text-dim); }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 76px; }
+    .logo { font-weight: 800; font-size: 24px; letter-spacing: -0.03em; }
+    .logo .dot { color: var(--blue); }
+    .nav-links { display: flex; gap: 30px; align-items: center; font-size: 14px; }
+    .nav-links > a { color: var(--gray); font-weight: 500; }
+    .nav-links > a:hover { color: var(--blue); }
     .btn-nav {
-      padding: 7px 16px; border: 1px solid var(--border-strong); border-radius: 8px;
-      color: var(--text) !important; font-weight: 500;
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--ink); color: #fff !important;
+      padding: 11px 20px; border-radius: 4px; font-weight: 600; font-size: 14px;
     }
-    .btn-nav:hover { border-color: var(--accent); color: var(--accent) !important; }
+    .btn-nav:hover { background: #23232B; }
 
     /* Hero */
-    .hero { padding: 92px 0 64px; }
-    .hero-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 56px; align-items: center; }
-    .pill-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: var(--bg-raised); border: 1px solid var(--border);
-      border-radius: 20px; padding: 5px 14px; font-size: 12.5px; color: var(--text-dim);
-      margin-bottom: 24px;
+    .hero { position: relative; padding: 96px 0 88px; overflow: hidden; }
+    .hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 64px; align-items: center; }
+    .lift { display: flex; align-items: center; gap: 14px; margin-bottom: 26px; color: var(--gray); }
+    .lift .cross { position: relative; width: 26px; height: 26px; flex-shrink: 0; }
+    .lift .cross::before, .lift .cross::after { content: ''; position: absolute; background: var(--ink); }
+    .lift .cross::before { left: 50%; top: 0; bottom: 0; width: 1.5px; transform: translateX(-50%); }
+    .lift .cross::after { top: 50%; left: 0; right: 0; height: 1.5px; transform: translateY(-50%); }
+    .lift span:nth-child(2) { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+    .lift .rule { flex: 1; height: 1px; background: var(--line); }
+    h1 {
+      font-size: clamp(46px, 6.2vw, 84px);
+      line-height: 0.98; letter-spacing: -0.04em; font-weight: 800;
+      margin-bottom: 26px;
     }
-    .pill-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-    h1 { font-size: 46px; line-height: 1.12; letter-spacing: -0.03em; font-weight: 750; margin-bottom: 18px; }
-    h1 .green { color: var(--accent); }
-    .hero-sub { font-size: 18px; color: var(--text-dim); margin-bottom: 30px; max-width: 480px; }
-    .hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; }
-    .btn {
-      display: inline-block; padding: 12px 22px; border-radius: 10px;
-      font-size: 15px; font-weight: 600; transition: transform 0.12s, background 0.15s, border-color 0.15s;
-    }
-    .btn:hover { transform: translateY(-1px); }
-    .btn-primary { background: var(--accent); color: #05130A !important; }
-    .btn-primary:hover { background: #34d16b; }
-    .btn-ghost { border: 1px solid var(--border-strong); color: var(--text) !important; }
-    .btn-ghost:hover { border-color: var(--accent); }
-    .hero-note { margin-top: 16px; font-size: 13px; color: var(--text-faint); }
+    h1 .noiseword { filter: blur(2.5px); }
+    .hero-sub { font-size: 18px; color: var(--gray); margin-bottom: 34px; max-width: 470px; }
+    .hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; }
+    .hero-note { margin-top: 20px; font-family: var(--mono); font-size: 12.5px; color: var(--faint); }
+    .hero-art { position: relative; }
+    .hero-art .dotfield { top: -70px; right: -90px; width: 460px; height: 340px; z-index: 0; }
 
     /* Demo feed */
     .feed {
-      background: var(--bg-raised); border: 1px solid var(--border); border-radius: 16px;
-      padding: 14px; display: flex; flex-direction: column; gap: 10px;
-      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+      position: relative; z-index: 1;
+      background: var(--paper); border: 1px solid var(--ink); border-radius: 2px;
+      padding: 16px; display: flex; flex-direction: column; gap: 10px;
+      box-shadow: 10px 10px 0 var(--blue-soft), 10px 10px 0 1px rgba(44, 75, 255, 0.25);
     }
-    .feed-head { display: flex; justify-content: space-between; align-items: center; padding: 2px 6px 8px; font-size: 12px; color: var(--text-faint); border-bottom: 1px solid var(--border); }
-    .feed-pill { display: inline-flex; gap: 6px; align-items: center; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 3px 10px; font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+    .feed-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 2px 4px 12px; font-family: var(--mono); font-size: 12px; color: var(--faint);
+      border-bottom: 1px solid var(--line);
+    }
+    .feed-pill {
+      display: inline-flex; gap: 8px; align-items: center;
+      border: 1px solid var(--line); border-radius: 2px; padding: 4px 10px;
+      font-family: var(--mono); font-size: 11px; color: var(--gray);
+    }
+    .feed-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--blue); }
     .card {
-      position: relative; background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: 12px; padding: 14px 14px 26px; font-size: 13.5px;
+      position: relative; border: 1px solid var(--line); border-radius: 2px;
+      padding: 14px 14px 32px; font-size: 13.5px;
     }
-    .card .who { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
-    .card .who span { color: var(--text-faint); font-weight: 400; }
-    .card p { color: var(--text-dim); }
+    .card .who { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+    .card .who span { color: var(--faint); font-weight: 400; }
+    .card p { color: var(--gray); }
     .card.blurred p, .card.blurred .who { filter: blur(5px); user-select: none; }
-    .tag {
-      position: absolute; bottom: 8px; left: 10px; font-size: 10.5px; font-family: var(--mono);
-      padding: 2px 9px; border-radius: 10px;
+    .ctag {
+      position: absolute; bottom: 9px; left: 11px;
+      font-size: 10.5px; font-family: var(--mono); letter-spacing: 0.02em;
+      padding: 2px 9px; border-radius: 2px;
     }
-    .tag-keep { color: var(--accent); background: var(--accent-dim); }
-    .tag-hide { color: var(--text-dim); background: rgba(255,255,255,0.06); }
+    .ctag-keep { color: var(--blue); background: var(--blue-soft); }
+    .ctag-hide { color: var(--gray); background: rgba(11, 11, 15, 0.06); }
     .xbtn {
-      position: absolute; bottom: 6px; right: 8px; width: 22px; height: 22px;
+      position: absolute; bottom: 8px; right: 9px; width: 22px; height: 22px;
       display: flex; align-items: center; justify-content: center;
-      border-radius: 50%; border: 1px solid var(--red-dim); color: var(--red);
-      background: rgba(15,15,20,0.85); font-size: 11px; opacity: 0.7;
+      border-radius: 2px; border: 1px solid var(--line); color: var(--faint);
+      background: var(--paper); font-size: 11px;
     }
     .peek {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-      background: rgba(15,15,20,0.92); border: 1px solid var(--border-strong);
-      border-radius: 16px; padding: 6px 16px; font-size: 12.5px; color: var(--text);
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: var(--paper); border: 1px solid var(--ink); border-radius: 2px;
+      padding: 6px 16px; font-family: var(--mono); font-size: 11.5px; color: var(--ink);
     }
-    .feed-caption { text-align: center; font-size: 12px; color: var(--text-faint); padding-top: 4px; }
-    .feed-caption b { color: var(--red); font-weight: 600; }
+    .feed-caption { text-align: center; font-family: var(--mono); font-size: 11.5px; color: var(--faint); padding-top: 6px; }
+    .feed-caption b { color: var(--ink); font-weight: 600; }
 
     /* Sections */
-    section { padding: 72px 0; border-top: 1px solid var(--border); }
-    .section-tag {
-      display: inline-block; font-family: var(--mono); font-size: 12px; color: var(--accent);
-      background: var(--accent-dim); padding: 3px 12px; border-radius: 12px; margin-bottom: 14px;
+    section { position: relative; padding: 96px 0; border-top: 1px solid var(--line); }
+    h2 {
+      font-size: clamp(34px, 4.4vw, 56px);
+      letter-spacing: -0.035em; line-height: 1.02; font-weight: 800;
+      margin-bottom: 18px; max-width: 780px;
     }
-    h2 { font-size: 32px; letter-spacing: -0.02em; line-height: 1.2; margin-bottom: 12px; }
-    .section-sub { color: var(--text-dim); max-width: 640px; margin-bottom: 40px; }
+    .section-sub { color: var(--gray); max-width: 620px; margin-bottom: 48px; font-size: 17px; }
 
-    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .box {
-      background: var(--bg-raised); border: 1px solid var(--border); border-radius: 14px; padding: 22px;
+    /* Pipeline strip (full-bleed numbered cells) */
+    .strip-section { padding-bottom: 0; }
+    .strip {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink);
     }
-    .box h3 { font-size: 16px; margin-bottom: 8px; }
-    .box p { font-size: 14px; color: var(--text-dim); }
-    .box .k { font-family: var(--mono); font-size: 12px; color: var(--accent); display: block; margin-bottom: 10px; }
+    .cell { padding: 26px 28px 30px; border-left: 1px solid var(--ink); }
+    .cell:first-child { border-left: none; }
+    .cell-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 18px; }
+    .cell-head .n { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--blue); }
+    .cell-head .arr { font-size: 18px; color: var(--ink); }
+    .cell h4 { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 8px; }
+    .cell p { font-size: 13.5px; color: var(--gray); line-height: 1.55; }
 
-    /* Pipeline */
-    .pipe { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; }
-    .pipe-step { flex: 1; min-width: 150px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 12px; padding: 16px; position: relative; }
-    .pipe-step + .pipe-step { margin-left: 26px; }
-    .pipe-step + .pipe-step::before {
-      content: '→'; position: absolute; left: -21px; top: 50%; transform: translateY(-50%);
-      color: var(--text-faint); font-size: 15px;
+    /* Stats */
+    .stats {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      border: 1px solid var(--ink); margin-bottom: 36px;
     }
-    .pipe-step .n { font-family: var(--mono); font-size: 11px; color: var(--accent); }
-    .pipe-step h4 { font-size: 14px; margin: 4px 0 4px; }
-    .pipe-step p { font-size: 12.5px; color: var(--text-dim); line-height: 1.45; }
-
-    /* Measured */
-    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
-    .stat { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 14px; padding: 24px; text-align: center; }
-    .stat .num { font-size: 40px; font-weight: 750; letter-spacing: -0.02em; color: var(--accent); font-variant-numeric: tabular-nums; }
-    .stat .lbl { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
-    .stat .sub { font-size: 11.5px; color: var(--text-faint); font-family: var(--mono); margin-top: 8px; }
+    .stat { padding: 34px 32px 30px; border-left: 1px solid var(--ink); }
+    .stat:first-child { border-left: none; }
+    .stat .num {
+      font-size: clamp(48px, 5vw, 68px); font-weight: 800; letter-spacing: -0.04em;
+      line-height: 1; font-variant-numeric: tabular-nums; margin-bottom: 14px;
+    }
+    .stat .lbl { font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--blue); margin-bottom: 8px; }
+    .stat .sub { font-size: 13px; color: var(--gray); line-height: 1.5; }
     .callout {
-      background: var(--bg-raised); border: 1px solid var(--border); border-left: 3px solid var(--accent);
-      border-radius: 10px; padding: 18px 22px; font-size: 14.5px; color: var(--text-dim); max-width: 760px;
+      border: 1px solid var(--ink); border-radius: 2px;
+      padding: 26px 30px; font-size: 15px; color: var(--gray); max-width: 860px;
+      background: var(--paper);
     }
-    .callout b { color: var(--text); }
+    .callout .k { display: block; font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue); margin-bottom: 10px; }
+    .callout b { color: var(--ink); }
 
-    /* Code */
-    pre {
-      background: #0D0D10; border: 1px solid var(--border); border-radius: 12px;
-      padding: 18px 20px; font-family: var(--mono); font-size: 13.5px; line-height: 1.7;
-      overflow-x: auto; color: var(--text-dim);
+    /* Bordered boxes */
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--ink); }
+    .box { padding: 30px 28px 34px; border-left: 1px solid var(--ink); }
+    .box:first-child { border-left: none; }
+    .box .k { display: block; font-family: var(--mono); font-size: 11.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue); margin-bottom: 16px; }
+    .box h3 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 10px; }
+    .box p { font-size: 14px; color: var(--gray); }
+
+    /* Cloud / pricing */
+    .cloud-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: start; }
+    .cloud-steps { margin-top: 40px; display: flex; flex-direction: column; }
+    .cstep {
+      display: flex; gap: 20px; align-items: baseline;
+      padding: 18px 4px; border-top: 1px solid var(--line);
     }
-    pre .c { color: var(--text-faint); }
-    pre .g { color: var(--accent); }
-    .steps { counter-reset: step; display: flex; flex-direction: column; gap: 14px; max-width: 720px; }
-    .step { display: flex; gap: 16px; align-items: flex-start; }
-    .step::before {
-      counter-increment: step; content: counter(step);
-      flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
-      background: var(--accent-dim); color: var(--accent);
+    .cstep:last-child { border-bottom: 1px solid var(--line); }
+    .cstep .n { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--blue); flex-shrink: 0; }
+    .cstep h4 { font-size: 15.5px; font-weight: 700; margin-bottom: 2px; }
+    .cstep p { font-size: 13.5px; color: var(--gray); }
+    .price-wrap { position: relative; }
+    .price-wrap .dotfield { bottom: -60px; right: -70px; width: 380px; height: 260px; }
+    .price-card {
+      position: relative; z-index: 1;
+      border: 1px solid var(--ink); border-radius: 2px; background: var(--paper);
+      box-shadow: 10px 10px 0 var(--blue-soft), 10px 10px 0 1px rgba(44, 75, 255, 0.25);
+    }
+    .price-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 18px 28px; border-bottom: 1px solid var(--ink);
+      font-family: var(--mono); font-size: 12.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+    }
+    .price-head .live { color: var(--blue); }
+    .price-body { padding: 30px 28px 32px; }
+    .price-num { font-size: clamp(64px, 6vw, 88px); font-weight: 800; letter-spacing: -0.05em; line-height: 1; }
+    .price-line { color: var(--gray); font-size: 15px; margin: 12px 0 26px; padding-bottom: 26px; border-bottom: 1px solid var(--line); }
+    .price-feat { list-style: none; display: flex; flex-direction: column; gap: 16px; margin-bottom: 30px; }
+    .price-feat li { display: flex; gap: 14px; align-items: baseline; font-size: 15px; font-weight: 600; }
+    .price-feat li::before { content: '✓'; font-family: var(--mono); color: var(--blue); font-weight: 600; }
+    .price-feat li span { display: block; font-size: 13px; font-weight: 400; color: var(--gray); }
+    .price-ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+    .price-note { margin-top: 18px; font-size: 12.5px; color: var(--faint); }
+    .price-note a { text-decoration: underline; text-underline-offset: 3px; }
+
+    /* Install steps */
+    .steps { display: flex; flex-direction: column; max-width: 780px; }
+    .step { display: flex; gap: 24px; align-items: flex-start; padding: 26px 0; border-top: 1px solid var(--line); }
+    .step:last-child { border-bottom: 1px solid var(--line); }
+    .step .n {
+      flex-shrink: 0; width: 34px; height: 34px; margin-top: 2px;
       display: flex; align-items: center; justify-content: center;
-      font-family: var(--mono); font-size: 13px; font-weight: 600; margin-top: 2px;
+      border: 1px solid var(--ink); border-radius: 2px;
+      font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--blue);
     }
-    .step h4 { font-size: 15px; margin-bottom: 2px; }
-    .step p { font-size: 14px; color: var(--text-dim); }
-    .step pre { margin-top: 8px; }
+    .step h4 { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+    .step p { font-size: 14.5px; color: var(--gray); }
+    .step code { font-family: var(--mono); font-size: 13px; background: rgba(11, 11, 15, 0.05); padding: 1px 6px; border-radius: 2px; }
+    pre {
+      background: var(--ink); border-radius: 2px;
+      padding: 20px 22px; font-family: var(--mono); font-size: 13px; line-height: 1.7;
+      overflow-x: auto; color: #C9C9D2; margin-top: 14px;
+    }
+    pre .c { color: #6E6E78; }
+    pre .g { color: #8FA3FF; }
 
-    /* ToS list */
-    .tos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 28px; max-width: 720px; }
-    .tos li { list-style: none; font-size: 14px; color: var(--text-dim); padding-left: 24px; position: relative; }
-    .tos li::before { content: '✓'; position: absolute; left: 0; color: var(--accent); }
+    /* FAQ */
+    .faq { border: 1px solid var(--ink); max-width: 920px; }
+    .faq details { border-top: 1px solid var(--ink); }
+    .faq details:first-child { border-top: none; }
+    .faq summary {
+      display: grid; grid-template-columns: 70px 1fr 36px; align-items: center; gap: 12px;
+      padding: 24px 26px; cursor: pointer; list-style: none;
+    }
+    .faq summary::-webkit-details-marker { display: none; }
+    .faq .qn { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--blue); }
+    .faq .q { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+    .faq .toggle {
+      width: 32px; height: 32px; border: 1px solid var(--ink); border-radius: 2px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--mono); font-size: 16px; line-height: 1;
+    }
+    .faq .toggle::before { content: '+'; }
+    .faq details[open] .toggle::before { content: '−'; }
+    .faq .a { padding: 2px 26px 30px 108px; color: var(--gray); font-size: 15px; max-width: 820px; }
+    .faq .a ul { list-style: none; margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .faq .a li { padding-left: 24px; position: relative; font-size: 14px; }
+    .faq .a li::before { content: '✓'; position: absolute; left: 0; font-family: var(--mono); color: var(--blue); }
 
-    footer { border-top: 1px solid var(--border); padding: 36px 0 48px; font-size: 13.5px; color: var(--text-faint); }
-    .footer-inner { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-    .footer-links { display: flex; gap: 22px; }
-    .footer-links a { color: var(--text-dim); }
+    /* Footer */
+    footer { background: var(--panel); border-top: 1px solid var(--line); position: relative; overflow: hidden; }
+    footer .dotfield { bottom: -80px; left: -80px; width: 380px; height: 260px; opacity: 0.4; }
+    .foot-inner { position: relative; padding: 72px 0 0; }
+    .foot-logo { font-weight: 800; font-size: clamp(40px, 4.5vw, 60px); letter-spacing: -0.04em; margin-bottom: 56px; }
+    .foot-logo .dot { color: var(--blue); }
+    .foot-cols { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1.2fr; padding-bottom: 64px; }
+    .foot-col { padding: 0 32px; border-left: 1px solid rgba(11, 11, 15, 0.18); }
+    .foot-col:first-child { padding-left: 0; border-left: none; }
+    .foot-col .h { font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--blue); margin-bottom: 22px; }
+    .foot-col p { font-size: 15.5px; color: var(--ink); max-width: 240px; }
+    .foot-col ul { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+    .foot-col li a { font-size: 15px; color: var(--ink); display: inline-flex; align-items: center; gap: 8px; }
+    .foot-col li a .arr { color: var(--faint); }
+    .foot-col .mrow { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; padding: 8px 0; border-bottom: 1px solid rgba(11, 11, 15, 0.12); }
+    .foot-col .mrow:last-child { border-bottom: none; }
+    .foot-col .mrow b { font-family: var(--mono); font-weight: 600; }
+    .foot-col .btn { margin-top: 22px; }
+    .foot-base {
+      display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+      padding: 26px 0 30px; border-top: 1px solid rgba(11, 11, 15, 0.18);
+      font-size: 13.5px; color: var(--gray);
+    }
+    .foot-base .fnote { display: inline-flex; align-items: center; gap: 9px; font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue); }
+    .foot-base .fnote::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
 
-    @media (max-width: 800px) {
-      h1 { font-size: 34px; }
-      h2 { font-size: 26px; }
-      .hero { padding: 56px 0 40px; }
-      .hero-grid, .grid-3, .grid-2, .stats, .tos { grid-template-columns: 1fr; }
-      .pipe { flex-direction: column; }
-      .pipe-step + .pipe-step { margin-left: 0; margin-top: 24px; }
-      .pipe-step + .pipe-step::before { content: '↓'; left: 50%; top: -22px; transform: translateX(-50%); }
+    @media (max-width: 960px) {
+      .hero { padding: 64px 0 56px; }
+      .hero-grid, .cloud-grid { grid-template-columns: 1fr; gap: 48px; }
+      .strip { grid-template-columns: 1fr 1fr; }
+      .cell:nth-child(3) { border-left: none; }
+      .cell:nth-child(n+3) { border-top: 1px solid var(--ink); }
+      .foot-cols { grid-template-columns: 1fr 1fr; gap: 40px 0; }
+      .foot-col:nth-child(3) { border-left: none; padding-left: 0; }
+    }
+    @media (max-width: 640px) {
+      section { padding: 64px 0; }
+      .strip { grid-template-columns: 1fr; }
+      .cell { border-left: none; }
+      .cell:nth-child(n+2) { border-top: 1px solid var(--ink); }
+      .stats, .grid-3 { grid-template-columns: 1fr; }
+      .stat, .box { border-left: none; }
+      .stat:nth-child(n+2), .box:nth-child(n+2) { border-top: 1px solid var(--ink); }
+      .nav-links > a:not(.btn-nav) { display: none; }
+      .faq summary { grid-template-columns: 44px 1fr 36px; padding: 20px 18px; }
+      .faq .a { padding: 2px 18px 26px 18px; }
+      .foot-cols { grid-template-columns: 1fr; }
+      .foot-col { padding: 0; border-left: none; }
+      .pm { display: none; }
     }
   </style>
 </head>
@@ -208,127 +361,138 @@
       <a href="#measured">Measured</a>
       <a href="#youtube">YouTube</a>
       <a href="#pricing">Cloud mode</a>
-      <a href="#install">Install</a>
-      <a class="btn-nav" href="https://github.com/phuaky/xrai">GitHub</a>
+      <a href="https://github.com/phuaky/xrai">GitHub</a>
+      <a class="btn-nav" href="#install">Install <span class="arr">→</span></a>
     </div>
   </div>
 </nav>
 
 <header class="hero">
+  <i class="pm pm-tl">+</i><i class="pm pm-tr">+</i><i class="pm pm-bl">+</i><i class="pm pm-br">+</i>
   <div class="wrap hero-grid">
     <div>
-      <div class="pill-badge"><span class="pill-dot"></span> 100% local · no cloud · no account</div>
-      <h1>Your feed, <span class="green">without the noise.</span></h1>
+      <div class="tag">100% local · no cloud · no account</div>
+      <div class="lift"><span class="cross"></span><span>for your attention</span><span class="rule"></span></div>
+      <h1>Your feed, without the <span class="noiseword">noise</span>.</h1>
       <p class="hero-sub">A Chrome extension that filters X and YouTube with a small AI model running on your own machine. Noise gets blurred. Signal gets through. Nothing leaves your laptop.</p>
       <div class="hero-ctas">
-        <a class="btn btn-primary" href="#install">Install in 5 minutes</a>
-        <a class="btn btn-ghost" href="https://github.com/phuaky/xrai">View source</a>
+        <a class="btn btn-primary" href="#install">Install in 5 minutes <span class="arr">→</span></a>
+        <a class="btn btn-ghost" href="https://github.com/phuaky/xrai">View source <span class="arr">→</span></a>
       </div>
       <p class="hero-note">Requires a Mac with Chrome and ~2 GB disk for the model. Everything is open source.</p>
     </div>
 
-    <div class="feed" aria-label="Demo of a filtered feed">
-      <div class="feed-head">
-        <span>x.com/home</span>
-        <span class="feed-pill"><span class="pill-dot"></span> 14 shown · 41 hidden</span>
+    <div class="hero-art">
+      <div class="dotfield"></div>
+      <div class="feed" aria-label="Demo of a filtered feed">
+        <div class="feed-head">
+          <span>x.com/home</span>
+          <span class="feed-pill">14 shown · 41 hidden</span>
+        </div>
+        <div class="card">
+          <div class="who">@arvidkahl <span>· 2h</span></div>
+          <p>When someone signs up to your SaaS, grab their email domain, get a summary from Firecrawl, have an LLM generate the best starting configuration…</p>
+          <span class="ctag ctag-keep">✓ AI: specific tool and tactic</span>
+          <span class="xbtn">✗</span>
+        </div>
+        <div class="card blurred">
+          <div class="who">@viralclips <span>· 3h</span></div>
+          <p>You won't believe what happened next 🤯 wait for the end</p>
+          <span class="ctag ctag-hide">prefilter: clickbait-phrase</span>
+          <span class="peek">👁 SHOW</span>
+          <span class="xbtn">✗</span>
+        </div>
+        <div class="card">
+          <div class="who">@levelsio <span>· 5h</span></div>
+          <p>I mass launched 70+ startups since 2013. Here's my stack: a $5/month VPS, PHP, jQuery, SQLite. No frameworks. No team. $2.7M ARR.</p>
+          <span class="ctag ctag-keep">✓ AI: concrete numbers, real stack</span>
+          <span class="xbtn">✗</span>
+        </div>
+        <div class="feed-caption">The <b>✗</b> on every card tells the filter it was wrong — and it learns from that.</div>
       </div>
-      <div class="card">
-        <div class="who">@arvidkahl <span>· 2h</span></div>
-        <p>When someone signs up to your SaaS, grab their email domain, get a summary from Firecrawl, have an LLM generate the best starting configuration…</p>
-        <span class="tag tag-keep">✓ AI: specific tool and tactic</span>
-        <span class="xbtn">✗</span>
-      </div>
-      <div class="card blurred">
-        <div class="who">@viralclips <span>· 3h</span></div>
-        <p>You won't believe what happened next 🤯 wait for the end</p>
-        <span class="tag tag-hide">prefilter: clickbait-phrase</span>
-        <span class="peek">👁 Show</span>
-        <span class="xbtn">✗</span>
-      </div>
-      <div class="card">
-        <div class="who">@levelsio <span>· 5h</span></div>
-        <p>I mass launched 70+ startups since 2013. Here's my stack: a $5/month VPS, PHP, jQuery, SQLite. No frameworks. No team. $2.7M ARR.</p>
-        <span class="tag tag-keep">✓ AI: concrete numbers, real stack</span>
-        <span class="xbtn">✗</span>
-      </div>
-      <div class="feed-caption">The <b>✗</b> on every card tells the filter it was wrong — and it learns from that.</div>
     </div>
   </div>
 </header>
 
-<section>
+<section class="strip-section">
   <div class="wrap">
-    <span class="section-tag">How it works</span>
-    <h2>Three gates. All on your machine.</h2>
-    <p class="section-sub">Every tweet on your home feed gets a decision in under a second. Nothing is sent anywhere — the model runs in <a href="https://ollama.com">Ollama</a> on localhost.</p>
-    <div class="pipe">
-      <div class="pipe-step">
-        <span class="n">01 · regex prefilter</span>
-        <h4>Obvious junk dies instantly</h4>
-        <p>Engagement bait, crypto pumps, NSFW, clickbait phrasing — caught by patterns before the model is even asked. A tech/business safelist protects real content from false positives.</p>
-      </div>
-      <div class="pipe-step">
-        <span class="n">02 · local model</span>
-        <h4>A 4B model scores the rest</h4>
-        <p>Novelty, specificity, density, authenticity — scored by Gemma running locally (~780ms median). Concrete numbers and real experience read as signal; vague hype reads as noise.</p>
-      </div>
-      <div class="pipe-step">
-        <span class="n">03 · your threshold</span>
-        <h4>You control the strictness</h4>
-        <p>Only confident noise calls get blurred. Everything is reversible: peek under any blur, and if the call was wrong, one tap on ✗ fixes it and records the mistake.</p>
-      </div>
+    <div class="tag">How it works</div>
+    <h2>Four gates. All on your machine.</h2>
+    <p class="section-sub">Every tweet on your home feed gets a decision in under a second. Nothing is sent anywhere — the model runs in <a href="https://ollama.com" style="text-decoration:underline;text-underline-offset:3px">Ollama</a> on localhost.</p>
+  </div>
+  <div class="strip">
+    <div class="cell">
+      <div class="cell-head"><span class="n">01 PREFILTER</span><span class="arr">→</span></div>
+      <h4>Obvious junk dies instantly</h4>
+      <p>Engagement bait, crypto pumps, NSFW, clickbait phrasing — caught by regex before the model is even asked. A tech/business safelist protects real content from false positives.</p>
+    </div>
+    <div class="cell">
+      <div class="cell-head"><span class="n">02 LOCAL MODEL</span><span class="arr">→</span></div>
+      <h4>A 4B model scores the rest</h4>
+      <p>Novelty, specificity, density, authenticity — scored by Gemma running locally (~780ms median). Concrete numbers and real experience read as signal; vague hype reads as noise.</p>
+    </div>
+    <div class="cell">
+      <div class="cell-head"><span class="n">03 THRESHOLD</span><span class="arr">→</span></div>
+      <h4>You control the strictness</h4>
+      <p>Only confident noise calls get blurred. Everything is reversible — peek under any blur with one click, and tune the confidence threshold to taste.</p>
+    </div>
+    <div class="cell">
+      <div class="cell-head"><span class="n">04 CORRECTION</span><span class="arr">→</span></div>
+      <h4>Wrong calls become test cases</h4>
+      <p>One tap on ✗ fixes a bad decision and records the mistake. Real corrections graduate into the eval set that gates every future version.</p>
     </div>
   </div>
 </section>
 
 <section id="measured">
   <div class="wrap">
-    <span class="section-tag">Measured, not vibes</span>
-    <h2>Filter accuracy is a number here, not a feeling.</h2>
+    <div class="tag">Measured, not vibes</div>
+    <h2>Filter accuracy is a number here. Not a feeling.</h2>
     <p class="section-sub">Every version of the filter runs against a 109-tweet golden set before it ships — real tweets, tiered by what missing them would cost. A regression gate blocks any change that loses signal.</p>
 
     <div class="stats">
       <div class="stat">
         <div class="num">100%</div>
-        <div class="lbl">critical-signal recall</div>
-        <div class="sub">job leads, paid pilots, key releases — zero lost</div>
+        <div class="lbl">Critical-signal recall</div>
+        <div class="sub">Job leads, paid pilots, key releases — zero lost.</div>
       </div>
       <div class="stat">
         <div class="num">96.2%</div>
-        <div class="lbl">signal recall</div>
-        <div class="sub">the metric you could never feel by scrolling</div>
+        <div class="lbl">Signal recall</div>
+        <div class="sub">The metric you could never feel by scrolling.</div>
       </div>
       <div class="stat">
         <div class="num">89.3%</div>
-        <div class="lbl">noise caught</div>
-        <div class="sub">including tech-flavored engagement bait</div>
+        <div class="lbl">Noise caught</div>
+        <div class="sub">Including tech-flavored engagement bait.</div>
       </div>
     </div>
 
     <div class="callout">
-      <b>Why measure at all?</b> A feed filter has two failure modes with very different visibility. Noise that leaks through is annoying — but you <i>see</i> it, so you fix it. Signal that gets hidden is <b>invisible</b> — you never know what you lost, so every hand-tuned "improvement" quietly drifts toward over-hiding. The eval suite guards the side no human can feel, and the ✗ button turns your real corrections into test cases.
+      <span class="k">Why measure at all?</span>
+      A feed filter has two failure modes with very different visibility. Noise that leaks through is annoying — but you <i>see</i> it, so you fix it. Signal that gets hidden is <b>invisible</b> — you never know what you lost, so every hand-tuned "improvement" quietly drifts toward over-hiding. The eval suite guards the side no human can feel, and the ✗ button turns your real corrections into test cases.
     </div>
   </div>
 </section>
 
 <section id="youtube">
   <div class="wrap">
-    <span class="section-tag">Also: YouTube</span>
+    <div class="tag">Also: YouTube</div>
     <h2>Open YouTube for music. Leave with music.</h2>
     <p class="section-sub">The same extension runs an inverted filter on YouTube: everything is blurred by default, and only music (and optionally motivational videos) is revealed. For when you came to press play, not to lose an evening.</p>
     <div class="grid-3">
       <div class="box">
-        <span class="k">blur-by-default</span>
+        <span class="k">Blur-by-default</span>
         <h3>The homepage can't grab you</h3>
         <p>Every thumbnail is blurred until the local model confirms it's music. The trending video you didn't come for stays a gray rectangle.</p>
       </div>
       <div class="box">
-        <span class="k">title + channel only</span>
+        <span class="k">Title + channel only</span>
         <h3>Fast enough to be invisible</h3>
         <p>Classification uses just the title and channel with a 2B model, so the grid resolves in a blink. Search and channel pages are never touched.</p>
       </div>
       <div class="box">
-        <span class="k">shorts nudge</span>
+        <span class="k">Shorts nudge</span>
         <h3>Doom-scroll circuit breaker</h3>
         <p>A counter tracks Shorts binges. Past your limit — 10 Shorts or 5 minutes — a gentle full-screen nudge asks if this is really where the evening goes.</p>
       </div>
@@ -337,39 +501,60 @@
 </section>
 
 <section id="pricing">
-  <div class="wrap">
-    <span class="section-tag">No Ollama? No problem.</span>
-    <h2>Cloud mode — same filter, nothing to install. Free.</h2>
-    <p class="section-sub">Local mode above is free forever and never leaves your machine. Cloud mode is for everyone who doesn't want to install a local AI model: rai runs the classification for you. While rai is in beta, Cloud mode is free — no card, no subscription, no account, no email. One click in the extension mints a key preloaded with ~50,000 classifications, months of normal scrolling on both X and YouTube.</p>
-    <div class="grid-3">
-      <div class="box">
-        <span class="k">1</span>
-        <h3>Install the extension</h3>
-        <p>From the Chrome Web Store or GitHub — see below.</p>
-      </div>
-      <div class="box">
-        <span class="k">2</span>
-        <h3>Switch Mode to Cloud</h3>
-        <p>⚙ settings → Mode → Cloud (free beta, no setup).</p>
-      </div>
-      <div class="box">
-        <span class="k">3</span>
-        <h3>Get a free key</h3>
-        <p>One click, no forms. The key <i>is</i> your account — save it and scroll.</p>
+  <i class="pm pm-tl">+</i><i class="pm pm-tr">+</i><i class="pm pm-bl">+</i><i class="pm pm-br">+</i>
+  <div class="wrap cloud-grid">
+    <div>
+      <div class="tag">No Ollama? No problem.</div>
+      <h2>Cloud mode. Nothing to install.</h2>
+      <p class="section-sub" style="margin-bottom:0">Local mode is free forever and never leaves your machine. Cloud mode is for everyone who doesn't want to run a local AI model: rai runs the classification for you. While rai is in beta, it's free — no card, no subscription, no account, no email.</p>
+      <div class="cloud-steps">
+        <div class="cstep">
+          <span class="n">01</span>
+          <div><h4>Install the extension</h4><p>From the Chrome Web Store or GitHub — see below.</p></div>
+        </div>
+        <div class="cstep">
+          <span class="n">02</span>
+          <div><h4>Switch Mode to Cloud</h4><p>⚙ settings → Mode → Cloud. No setup, no forms.</p></div>
+        </div>
+        <div class="cstep">
+          <span class="n">03</span>
+          <div><h4>Get a free key</h4><p>One click. The key <i>is</i> your account — save it and scroll.</p></div>
+        </div>
       </div>
     </div>
-    <p class="hero-note" style="margin-top:20px">Cloud mode sends tweet text and video titles (never images, never your identity) to rai's server for classification. See the <a href="/privacy.html">privacy policy</a> for exactly what's sent and to whom.</p>
+
+    <div class="price-wrap">
+      <div class="dotfield"></div>
+      <div class="price-card">
+        <div class="price-head"><span>rai cloud</span><span class="live">Free beta</span></div>
+        <div class="price-body">
+          <div class="price-num">$0</div>
+          <p class="price-line">Same filter. Same rules. Zero setup.</p>
+          <ul class="price-feat">
+            <li>~50,000 classifications preloaded<span>months of normal scrolling on both platforms</span></li>
+            <li>One click, one key<span>no card, no account, no email</span></li>
+            <li>X and YouTube, both covered<span>text and titles only — never images, never your identity</span></li>
+          </ul>
+          <div class="price-ctas">
+            <a class="btn btn-primary" href="#install">Get the extension <span class="arr">→</span></a>
+            <a class="btn btn-ghost" href="/privacy.html">Privacy policy</a>
+          </div>
+          <p class="price-note">Cloud mode sends tweet text and video titles to rai's server for classification. The <a href="/privacy.html">privacy policy</a> lists exactly what's sent and to whom.</p>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
 <section id="install">
   <div class="wrap">
-    <span class="section-tag">Install</span>
+    <div class="tag">Install</div>
     <h2>Five minutes, one script.</h2>
     <p class="section-sub">The setup script installs the local AI runtime, downloads the right model for your machine, fixes permissions, and proves the whole pipeline with a live classification before you ever open Chrome.</p>
     <div class="steps">
       <div class="step">
-        <div>
+        <span class="n">01</span>
+        <div style="flex:1;min-width:0">
           <h4>Get the code and run setup</h4>
           <pre>git clone https://github.com/phuaky/xrai.git &amp;&amp; cd xrai
 bash scripts/setup.sh
@@ -378,12 +563,14 @@ bash scripts/setup.sh
         </div>
       </div>
       <div class="step">
+        <span class="n">02</span>
         <div>
           <h4>Load the extension</h4>
           <p>Open <code>chrome://extensions</code> → enable Developer mode → <b>Load unpacked</b> → select the <code>extension/</code> folder.</p>
         </div>
       </div>
       <div class="step">
+        <span class="n">03</span>
         <div>
           <h4>Open x.com</h4>
           <p>The rai pill appears bottom-right with live shown/hidden counts. 👁 peeks under any blur, ✗ corrects mistakes, ⚙ tunes everything.</p>
@@ -395,27 +582,71 @@ bash scripts/setup.sh
 
 <section>
   <div class="wrap">
-    <span class="section-tag">Privacy &amp; rules</span>
-    <h2>Reads your screen. Touches nothing else.</h2>
-    <p class="section-sub">rai behaves like an ad blocker, not a bot.</p>
-    <ul class="tos">
-      <li>Model runs 100% locally — no data ever leaves your machine</li>
-      <li>Never calls X or YouTube APIs — reads already-rendered DOM only</li>
-      <li>Never posts, likes, follows, or clicks anything for you</li>
-      <li>Hiding is CSS-only — blur and display, fully reversible</li>
-      <li>Reply suggestions are copy-paste only, never auto-sent</li>
-      <li>No account, no telemetry, no analytics on this site either</li>
-    </ul>
+    <div class="tag">Privacy &amp; rules</div>
+    <h2>Fast does not mean sneaky.</h2>
+    <p class="section-sub">Four plain answers before you install. rai behaves like an ad blocker, not a bot.</p>
+    <div class="faq">
+      <details open>
+        <summary><span class="qn">01</span><span class="q">Does anything leave my machine?</span><span class="toggle"></span></summary>
+        <div class="a">In local mode, no. The model runs in Ollama on localhost, and there's no account, no telemetry, and no analytics — on this site either. Cloud mode sends tweet text and video titles (never images, never your identity) to rai's server; the <a href="/privacy.html" style="text-decoration:underline;text-underline-offset:3px">privacy policy</a> lists every byte.</div>
+      </details>
+      <details>
+        <summary><span class="qn">02</span><span class="q">Is this allowed by X and YouTube?</span><span class="toggle"></span></summary>
+        <div class="a">rai reads what's already on your screen and hides some of it with CSS — the same mechanics as an ad blocker.
+          <ul>
+            <li>Never calls X or YouTube APIs — reads already-rendered DOM only</li>
+            <li>Never posts, likes, follows, or clicks anything for you</li>
+            <li>Hiding is CSS-only — blur and display, fully reversible</li>
+            <li>Reply suggestions are copy-paste only, never auto-sent</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary><span class="qn">03</span><span class="q">What do I need to run it?</span><span class="toggle"></span></summary>
+        <div class="a">Local mode: a Mac with Chrome and ~2 GB of disk for the model — the setup script handles the rest. Cloud mode: just Chrome. Everything is open source on <a href="https://github.com/phuaky/xrai" style="text-decoration:underline;text-underline-offset:3px">GitHub</a>.</div>
+      </details>
+      <details>
+        <summary><span class="qn">04</span><span class="q">What if it hides something important?</span><span class="toggle"></span></summary>
+        <div class="a">Every hidden post is one click from visible — blur, not delete. And the failure you can't see is exactly what the eval suite guards: 100% recall on critical signal, gated on every release, with your ✗ corrections feeding the test set.</div>
+      </details>
+    </div>
   </div>
 </section>
 
 <footer>
-  <div class="wrap footer-inner">
-    <div>rai — built in public by <a href="https://kuanyu.dev">Kuan</a>, Singapore.</div>
-    <div class="footer-links">
-      <a href="https://github.com/phuaky/xrai">GitHub</a>
-      <a href="https://x.com/phuakuanyu">@phuakuanyu</a>
-      <a href="https://kuanyu.dev">kuanyu.dev</a>
+  <div class="dotfield"></div>
+  <div class="wrap foot-inner">
+    <div class="foot-logo">rai<span class="dot">.</span></div>
+    <div class="foot-cols">
+      <div class="foot-col">
+        <div class="h">rai</div>
+        <p>Local-first feed filter for X and YouTube. Built in public by <a href="https://kuanyu.dev" style="text-decoration:underline;text-underline-offset:3px">Kuan</a>, Singapore.</p>
+      </div>
+      <div class="foot-col">
+        <div class="h">Measured</div>
+        <div class="mrow"><span>Critical recall</span><b>100%</b></div>
+        <div class="mrow"><span>Signal recall</span><b>96.2%</b></div>
+        <div class="mrow"><span>Noise caught</span><b>89.3%</b></div>
+      </div>
+      <div class="foot-col">
+        <div class="h">Links</div>
+        <ul>
+          <li><a href="https://github.com/phuaky/xrai">GitHub <span class="arr">→</span></a></li>
+          <li><a href="https://x.com/phuakuanyu">@phuakuanyu <span class="arr">→</span></a></li>
+          <li><a href="https://kuanyu.dev">kuanyu.dev <span class="arr">→</span></a></li>
+          <li><a href="/privacy.html">Privacy <span class="arr">→</span></a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <div class="h">Ready to start?</div>
+        <p>Five minutes, one script. Everything is open source.</p>
+        <a class="btn btn-primary" href="#install">Install rai <span class="arr">→</span></a>
+      </div>
+    </div>
+    <div class="foot-base">
+      <span>© 2026 rai</span>
+      <span>Your feed, without the noise.</span>
+      <span class="fnote">Noise floor: measured</span>
     </div>
   </div>
 </footer>
