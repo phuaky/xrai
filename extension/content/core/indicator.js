@@ -14,12 +14,20 @@ var RaiIndicator = (function () {
   var popupOpen = false;
 
   var _platform = 'x';
+  var _mode = 'local';
   var L = { name: 'rai', keptWord: 'kept', hiddenWord: 'hidden', siteWord: 'this site' };
 
   function init(platform, labels) {
     if (platform) _platform = platform;
     if (labels) L = Object.assign({}, L, labels);
     if (pill) return;
+
+    if (typeof RaiConfig !== 'undefined' && RaiConfig.getConfig) {
+      RaiConfig.getConfig(_platform).then(function (cfg) {
+        _mode = cfg.mode === 'cloud' ? 'cloud' : 'local';
+        render();
+      });
+    }
 
     pill = document.createElement('div');
     pill.id = 'xrai-pill';
@@ -78,9 +86,15 @@ var RaiIndicator = (function () {
       ' classify: ' + (status.classify ? '✓' : '✗');
 
     var statusText = '';
-    if (!status.connected) statusText = 'ollama offline';
-    else if (!status.classify) statusText = 'ollama up · classify ✗ (CORS?)';
-    else statusText = 'local';
+    if (_mode === 'cloud') {
+      if (!status.connected) statusText = 'cloud offline';
+      else if (!status.classify) statusText = 'cloud up · classify ✗';
+      else statusText = 'cloud';
+    } else {
+      if (!status.connected) statusText = 'ollama offline';
+      else if (!status.classify) statusText = 'ollama up · classify ✗ (CORS?)';
+      else statusText = 'local';
+    }
     statusEl.textContent = statusText;
   }
 
@@ -160,9 +174,26 @@ var RaiIndicator = (function () {
     }
 
     var aggressivenessLabel = _platform === 'youtube' ? 'Strictness' : 'Aggressiveness';
+    var cloudMode = cfg.mode === 'cloud';
+
+    var cloudControl =
+      '<label>Mode<select id="xrai-s-mode">' +
+      '<option value="local"' + (!cloudMode ? ' selected' : '') + '>Local (free, needs Ollama)</option>' +
+      '<option value="cloud"' + (cloudMode ? ' selected' : '') + '>Cloud (free beta, no setup)</option>' +
+      '</select></label>' +
+      '<div id="xrai-s-cloud-fields" style="display:' + (cloudMode ? 'block' : 'none') + '">' +
+      '<label>API key<input type="password" id="xrai-s-cloud-key" placeholder="rai_live_..." value="' + (cfg.cloudApiKey || '') + '"></label>' +
+      '<div class="xrai-settings-actions"><button type="button" id="xrai-s-free-key"' +
+      (cfg.cloudApiKey ? ' style="display:none"' : '') + '>Get a free key</button></div>' +
+      '<div class="xrai-settings-sub" id="xrai-s-cloud-balance">' +
+      (cloudMode ? 'Checking balance…' : '') +
+      '</div>' +
+      '<div class="xrai-settings-sub"><a href="https://snratio.xyz/privacy.html" target="_blank" rel="noopener">What cloud mode sends</a></div>' +
+      '</div>';
 
     popup.innerHTML =
       '<div class="xrai-settings-title">' + L.name + ' settings</div>' +
+      cloudControl +
       '<label>Model<select id="xrai-s-model"><option value="">Loading models...</option></select></label>' +
       '<label>' + aggressivenessLabel + '<input type="range" id="xrai-s-threshold" min="0.5" max="0.9" step="0.05" value="' + cfg.confidenceThreshold + '"><span id="xrai-s-threshold-val">' + cfg.confidenceThreshold + '</span></label>' +
       extraControl +
@@ -204,12 +235,55 @@ var RaiIndicator = (function () {
       sliderVal.textContent = slider.value;
     });
 
+    var modeSelect = popup.querySelector('#xrai-s-mode');
+    var cloudFields = popup.querySelector('#xrai-s-cloud-fields');
+    modeSelect.addEventListener('change', function () {
+      cloudFields.style.display = modeSelect.value === 'cloud' ? 'block' : 'none';
+    });
+
+    if (cloudMode && cfg.cloudApiKey) {
+      chrome.runtime.sendMessage({ action: 'checkBalance', platform: _platform }, function (response) {
+        var el = popup && popup.querySelector('#xrai-s-cloud-balance');
+        if (!el) return;
+        if (!response || response.error) {
+          el.textContent = 'Balance unavailable — check your API key';
+        } else {
+          // Balance is fractional cents at 0.01¢/classification, so ×100 = calls left
+          el.textContent = '~' + Math.max(0, Math.round(response.balance_cents * 100)).toLocaleString() + ' free classifications left';
+        }
+      });
+    }
+
+    var freeKeyBtn = popup.querySelector('#xrai-s-free-key');
+    freeKeyBtn.addEventListener('click', function () {
+      freeKeyBtn.textContent = 'Creating key…';
+      freeKeyBtn.disabled = true;
+      chrome.runtime.sendMessage({ action: 'getFreeKey', platform: _platform }, function (response) {
+        if (!popup) return;
+        var balanceEl = popup.querySelector('#xrai-s-cloud-balance');
+        if (!response || !response.api_key) {
+          freeKeyBtn.textContent = 'Get a free key';
+          freeKeyBtn.disabled = false;
+          if (balanceEl) balanceEl.textContent = (response && response.error) || 'Key request failed — try again';
+          return;
+        }
+        popup.querySelector('#xrai-s-cloud-key').value = response.api_key;
+        freeKeyBtn.style.display = 'none';
+        if (balanceEl) {
+          balanceEl.textContent = 'Key created — ~' + Math.round(response.balance_cents * 100).toLocaleString() +
+            ' free classifications. Hit Save.';
+        }
+      });
+    });
+
     popup.querySelector('#xrai-s-save').addEventListener('click', function () {
       var partial = {
         model: popup.querySelector('#xrai-s-model').value,
         confidenceThreshold: parseFloat(slider.value),
         imageBaitEnabled: popup.querySelector('#xrai-s-image-bait').checked,
-        hideMethod: popup.querySelector('#xrai-s-hide').value
+        hideMethod: popup.querySelector('#xrai-s-hide').value,
+        mode: modeSelect.value,
+        cloudApiKey: popup.querySelector('#xrai-s-cloud-key').value.trim()
       };
       if (_platform === 'x') {
         partial.contentFilter = popup.querySelector('#xrai-s-filter').value;
@@ -220,6 +294,7 @@ var RaiIndicator = (function () {
         partial.shortsLimitMinutes = parseInt(popup.querySelector('#xrai-s-shorts-min').value, 10) || 5;
       }
       RaiConfig.saveConfig(_platform, partial).then(function () {
+        _mode = partial.mode === 'cloud' ? 'cloud' : 'local';
         closePopup();
       });
     });

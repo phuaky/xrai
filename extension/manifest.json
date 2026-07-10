@@ -12,7 +12,8 @@
     "https://i.ytimg.com/*",
     "https://pbs.twimg.com/*",
     "http://localhost:11434/*",
-    "http://localhost:11435/*"
+    "http://localhost:11435/*",
+    "https://api.snratio.xyz/*"
   ],
   "background": {
     "service_worker": "background/worker.js"
@@ -27,6 +28,7 @@
         "content/core/image-classifier.js",
         "content/core/hider.js",
         "content/core/indicator.js",
+        "content/core/dwell.js",
         "content/x/prefilter.js",
         "content/x/tips.js",
         "content/x/detector.js",
@@ -48,11 +50,16 @@
         "content/youtube/prefilter.js",
         "content/youtube/detector.js",
         "content/youtube/shorts.js",
+        "content/youtube/watch.js",
         "content/youtube/main.js"
       ],
       "css": ["content/core/styles.css"],
       "run_at": "document_idle"
     }
   ],
-  "icons": {}
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }

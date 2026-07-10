@@ -5,6 +5,18 @@ var DEFAULT_MODEL = { x: 'dhiltgen/gemma4:e2b-mlx-bf16', youtube: 'gemma2:2b' };
 var DEFAULT_IMAGE_MODEL = 'qwen3-vl:30b';
 var CONFIG_KEY = { x: 'xrai_config', youtube: 'ytrai_config' };
 
+// Cloud mode — hosted, Ollama-API-compatible endpoint (see rai-cloud/).
+// Text classification only; the vision bait-check stays local-only for now.
+var CLOUD_URL = 'https://api.snratio.xyz';
+
+// Ollama ignores an unrecognized Authorization header, so this can be sent
+// unconditionally rather than branched per call site.
+function authHeaders(apiKey) {
+  var headers = { 'Content-Type': 'application/json' };
+  if (apiKey) headers.Authorization = 'Bearer ' + apiKey;
+  return headers;
+}
+
 // MoE model, ~19GB resident when warm — kept alive across a browsing session
 // so back-to-back thumbnail checks don't each eat the ~7s cold-load penalty,
 // but freed automatically once you stop scrolling for a while.
@@ -32,21 +44,30 @@ function getConfig(platform) {
   return new Promise(function (resolve) {
     chrome.storage.local.get(key, function (result) {
       var cfg = result[key] || {};
+      var cloud = cfg.mode === 'cloud';
+      // ollamaUrl always points at local Ollama — the image bait-check stays
+      // local-only in Cloud mode v1 (no hosted vision endpoint yet), so it
+      // needs the real local URL even when text classification goes to the
+      // cloud. classifyUrl is the one text/reply/health calls should use.
       resolve({
         ollamaUrl: cfg.ollamaUrl || DEFAULT_URL,
+        classifyUrl: cloud ? CLOUD_URL : (cfg.ollamaUrl || DEFAULT_URL),
         model: cfg.model || def,
-        imageModel: cfg.imageModel || DEFAULT_IMAGE_MODEL
+        imageModel: cfg.imageModel || DEFAULT_IMAGE_MODEL,
+        cloud: cloud,
+        apiKey: cloud ? (cfg.cloudApiKey || '') : ''
       });
     });
   });
 }
 
 // Health check — tests an actual POST (catches CORS/403), not just GET
-function checkHealth(ollamaUrl, model) {
+function checkHealth(ollamaUrl, model, apiKey) {
   var result = { available: false, models: [], classify: false, reply: false };
 
   return fetch(ollamaUrl + '/api/tags', {
     method: 'GET',
+    headers: authHeaders(apiKey),
     signal: AbortSignal.timeout(3000)
   })
     .then(function (r) { return r.json(); })
@@ -55,7 +76,7 @@ function checkHealth(ollamaUrl, model) {
       result.available = true;
       return fetch(ollamaUrl + '/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(apiKey),
         signal: AbortSignal.timeout(15000),
         body: JSON.stringify({
           model: model,
@@ -105,14 +126,14 @@ function logModelIO(platform, input, rawOutput, parsed, model, elapsed) {
 
 // --- Classification dispatch ---
 
-function classify(platform, msg, model, ollamaUrl) {
+function classify(platform, msg, model, ollamaUrl, apiKey) {
   if (platform === 'youtube') {
-    return classifyYoutube(msg.text, msg.channel, model, ollamaUrl);
+    return classifyYoutube(msg.text, msg.channel, model, ollamaUrl, apiKey);
   }
-  return classifyX(msg.text, msg.mediaType, model, ollamaUrl);
+  return classifyX(msg.text, msg.mediaType, model, ollamaUrl, apiKey);
 }
 
-function classifyX(text, mediaType, model, ollamaUrl) {
+function classifyX(text, mediaType, model, ollamaUrl, apiKey) {
   var userMsg = 'Tweet: "' + (text || '') + '"';
   if (mediaType && mediaType !== 'text') {
     userMsg += ' [has ' + mediaType + ']';
@@ -120,7 +141,7 @@ function classifyX(text, mediaType, model, ollamaUrl) {
   var start = Date.now();
   return fetch(ollamaUrl + '/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(apiKey),
     body: JSON.stringify({
       model: model,
       messages: [
@@ -149,13 +170,13 @@ function classifyX(text, mediaType, model, ollamaUrl) {
     });
 }
 
-function classifyYoutube(title, channel, model, ollamaUrl) {
+function classifyYoutube(title, channel, model, ollamaUrl, apiKey) {
   var userMsg = 'Title: "' + (title || '') + '"';
   if (channel) userMsg += '\nChannel: "' + channel + '"';
   var start = Date.now();
   return fetch(ollamaUrl + '/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(apiKey),
     body: JSON.stringify({
       model: model,
       messages: [
@@ -266,13 +287,13 @@ function parseImageClassification(content) {
 }
 
 // Generate reply (X only)
-function generateReply(tweetText, authorHandle, style, model, ollamaUrl) {
+function generateReply(tweetText, authorHandle, style, model, ollamaUrl, apiKey) {
   var userMsg = 'Tweet by @' + (authorHandle || 'unknown') + ': "' + tweetText + '"';
   userMsg += '\nPreferred style: ' + (style || 'curious');
 
   return fetch(ollamaUrl + '/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(apiKey),
     body: JSON.stringify({
       model: model,
       messages: [
@@ -293,8 +314,8 @@ function generateReply(tweetText, authorHandle, style, model, ollamaUrl) {
     });
 }
 
-function listModels(ollamaUrl) {
-  return fetch(ollamaUrl + '/api/tags', { signal: AbortSignal.timeout(3000) })
+function listModels(ollamaUrl, apiKey) {
+  return fetch(ollamaUrl + '/api/tags', { headers: authHeaders(apiKey), signal: AbortSignal.timeout(3000) })
     .then(function (r) { return r.json(); })
     .then(function (data) {
       return (data.models || []).map(function (m) { return m.name; });
@@ -376,32 +397,50 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   var platform = msg.platform || 'x';
 
   getConfig(platform).then(function (cfg) {
-    var url = cfg.ollamaUrl;
+    // classifyUrl/apiKey route to the cloud endpoint in Cloud mode; the image
+    // bait-check always uses ollamaUrl (local-only, see getConfig above).
+    var url = cfg.classifyUrl;
     var model = cfg.model;
+    var apiKey = cfg.apiKey;
 
     switch (msg.action) {
       case 'checkHealth':
-        checkHealth(url, model).then(sendResponse);
+        checkHealth(url, model, apiKey).then(sendResponse);
         break;
 
       case 'classify':
-        classify(platform, msg, model, url).then(sendResponse);
+        classify(platform, msg, model, url, apiKey).then(sendResponse);
         break;
 
       case 'classifyImage':
-        classifyImage(platform, msg.imageUrl, msg.contextText, cfg.imageModel, url).then(sendResponse);
+        classifyImage(platform, msg.imageUrl, msg.contextText, cfg.imageModel, cfg.ollamaUrl).then(sendResponse);
         break;
 
       case 'reply':
-        generateReply(msg.tweetText, msg.authorHandle, msg.style, model, url).then(function (replies) {
+        generateReply(msg.tweetText, msg.authorHandle, msg.style, model, url, apiKey).then(function (replies) {
           sendResponse({ replies: replies });
         });
         break;
 
       case 'listModels':
-        listModels(url).then(function (models) {
+        listModels(url, apiKey).then(function (models) {
           sendResponse({ models: models });
         });
+        break;
+
+      case 'checkBalance':
+        if (!cfg.cloud || !apiKey) { sendResponse({ error: 'not in cloud mode' }); break; }
+        fetch(CLOUD_URL + '/api/balance', { headers: authHeaders(apiKey), signal: AbortSignal.timeout(5000) })
+          .then(function (r) { return r.json(); })
+          .then(sendResponse)
+          .catch(function () { sendResponse({ error: 'balance check failed' }); });
+        break;
+
+      case 'getFreeKey':
+        fetch(CLOUD_URL + '/api/free-key', { method: 'POST', signal: AbortSignal.timeout(8000) })
+          .then(function (r) { return r.json(); })
+          .then(sendResponse)
+          .catch(function () { sendResponse({ error: 'could not reach the cloud endpoint' }); });
         break;
 
       case 'exportData':

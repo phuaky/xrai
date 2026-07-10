@@ -26,7 +26,12 @@ var RaiConfig = (function () {
       // model before reveal (blur first, same as YouTube). See CLAUDE.md.
       imageBaitEnabled: true,
       imageModel: 'qwen3-vl:30b',
-      imageConfidenceThreshold: 0.6
+      imageConfidenceThreshold: 0.6,
+      // Cloud mode — routes classification through the hosted endpoint
+      // instead of local Ollama, for users who skip local setup. Free
+      // while in beta, opt-in, off by default. See background/worker.js.
+      mode: 'local',
+      cloudApiKey: ''
     },
     youtube: {
       model: 'gemma2:2b',
@@ -45,7 +50,11 @@ var RaiConfig = (function () {
       // Shorts consumption tracker + gentle doom-scroll nudge
       shortsNudge: true,             // show the snap-out overlay past the limit
       shortsLimitCount: 10,          // nudge after N Shorts in one binge
-      shortsLimitMinutes: 5          // ...or M minutes of continuous Shorts
+      shortsLimitMinutes: 5,         // ...or M minutes of continuous Shorts
+      // Cloud mode — see the x block above for details. X and YouTube share
+      // one cloudApiKey (one account, one balance, both platforms).
+      mode: 'local',
+      cloudApiKey: ''
     }
   };
 

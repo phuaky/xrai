@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy — rai</title>
+  <meta name="description" content="rai privacy policy: what data the extension touches, where it goes, and what it never does.">
+  <style>
+    :root {
+      --bg: #0A0A0B;
+      --bg-raised: #121216;
+      --bg-card: #16161C;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --text: #E7E7EA;
+      --text-dim: #9B9BA4;
+      --text-faint: #62626B;
+      --accent: #4ADE80;
+      --accent-dim: rgba(74, 222, 128, 0.15);
+      --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 64px 24px 96px; }
+    .back { display: inline-block; margin-bottom: 32px; font-size: 14px; color: var(--text-dim); }
+    h1 { font-size: 32px; letter-spacing: -0.02em; margin-bottom: 8px; }
+    .updated { font-size: 13px; color: var(--text-faint); margin-bottom: 40px; font-family: var(--mono); }
+    h2 { font-size: 18px; margin: 36px 0 12px; color: var(--text); }
+    p, li { color: var(--text-dim); font-size: 15px; }
+    ul { padding-left: 20px; margin: 8px 0; }
+    li { margin: 6px 0; }
+    .card {
+      background: var(--bg-raised); border: 1px solid var(--border); border-radius: 12px;
+      padding: 20px 22px; margin: 24px 0;
+    }
+    .card p:first-child { margin-top: 0; }
+    code { font-family: var(--mono); font-size: 13px; background: var(--bg-card); padding: 1px 6px; border-radius: 4px; }
+    footer { margin-top: 56px; font-size: 13px; color: var(--text-faint); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/">&larr; rai</a>
+    <h1>Privacy Policy</h1>
+    <div class="updated">Last updated: July 2026</div>
+
+    <div class="card">
+      <p><strong>Default (Local mode):</strong> everything runs on your machine. rai never sends your feed, your tweets, or your video titles anywhere. There is no account, no login, and no tracking.</p>
+    </div>
+
+    <h2>What rai reads</h2>
+    <p>rai is a Chrome extension that reads the X (Twitter) and YouTube pages you already have open in your browser — tweet text, media type, video titles, and channel names. It never calls the X or YouTube APIs, never scrapes anything beyond what's already rendered on your screen, and never posts, likes, follows, or interacts with either site on your behalf.</p>
+
+    <h2>Local mode (default)</h2>
+    <p>In Local mode, everything above is sent only to <code>localhost:11434</code> — a small AI model (via <a href="https://ollama.com" target="_blank" rel="noopener">Ollama</a>) running on your own computer. Nothing leaves your machine. Classification results and your correction history are stored in your browser's IndexedDB, under your control, exportable at any time via the extension's settings panel.</p>
+
+    <h2>Cloud mode (optional, free while in beta)</h2>
+    <p>Cloud mode is an opt-in alternative for people who don't want to install a local AI model. When enabled, the text described above (tweet text / video title + channel — never images, never your account identity) is sent to rai's hosted classification endpoint, which forwards it to a third-party inference provider (Groq) to generate a classification, and the result is returned to your browser. This content is not stored beyond what's needed to serve the request and is not used to train models.</p>
+    <p>Cloud mode is identified only by a randomly generated API key — no email, no account, no login, no payment. The only things stored server-side are the key itself, its remaining usage balance, and the network address that created it (to limit abuse of the free tier).</p>
+
+    <h2>What rai never does</h2>
+    <ul>
+      <li>Never sells or shares data with third parties for advertising</li>
+      <li>Never tracks you across sites</li>
+      <li>Never requires an account to use Local mode</li>
+      <li>Never posts, likes, follows, or takes any action on X or YouTube on your behalf</li>
+    </ul>
+
+    <h2>Data you control</h2>
+    <p>All classification history and settings live in your browser's local storage. Uninstalling the extension removes it. Local mode's export button gives you the full log as a <code>.jsonl</code> file at any time.</p>
+
+    <h2>Contact</h2>
+    <p>Questions: <a href="mailto:phuaky2017@gmail.com">phuaky2017@gmail.com</a></p>
+
+    <footer>rai is open source: <a href="https://github.com/phuaky/xrai" target="_blank" rel="noopener">github.com/phuaky/xrai</a></footer>
+  </div>
+</body>
+</html>

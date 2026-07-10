@@ -1,0 +1,19 @@
+name = "rai-cloud"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+
+# Zone route — matches CLOUD_URL in extension/background/worker.js.
+# api.snratio.xyz already has proxied DNS records (left over from the dead v2
+# API), so a route on the zone intercepts them; a custom_domain attach would
+# conflict with those records instead.
+routes = [
+  { pattern = "api.snratio.xyz/*", zone_name = "snratio.xyz" }
+]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rai-cloud"
+database_id = "a2acc46e-7e7b-49c5-a10a-8d3f6a342335"
+
+# Secrets (never in this file — set via `wrangler secret put <NAME>`):
+#   GROQ_API_KEY — Groq API key for classification calls
