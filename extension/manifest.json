@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "rai — local AI feed filter",
   "version": "2.0.0",
-  "description": "Local AI feed filter. On X: signal stays, noise disappears. On YouTube: only music + motivational videos show, everything else blurs.",
+  "description": "Local AI feed filter. On X: signal stays, noise disappears. On YouTube: only music + motivational videos show, the rest blurs.",
   "permissions": ["storage", "unlimitedStorage"],
   "host_permissions": [
     "https://x.com/*",
