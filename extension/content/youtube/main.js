@@ -44,6 +44,9 @@ var YtraiMain = (function () {
       // Shorts consumption tracker + gentle doom-scroll nudge
       if (typeof YtraiShorts !== 'undefined') YtraiShorts.init(cfg);
 
+      // Attention ledger — watch-time per video on /watch (see watch.js)
+      if (typeof YtraiWatch !== 'undefined') YtraiWatch.init();
+
       console.log('[ytrai] Running. Keep music' + (cfg.keepMotivational ? ' + motivational' : '') + '. Hide: ' + cfg.hideMethod);
     });
 

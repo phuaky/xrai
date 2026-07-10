@@ -51,6 +51,9 @@ var XraiMain = (function () {
       XraiDetector.onTweet(handleTweet);
       XraiDetector.start();
 
+      // Attention ledger — per-card dwell tracking (see core/dwell.js)
+      if (typeof RaiDwell !== 'undefined') RaiDwell.init(PLATFORM);
+
       console.log('[xrai] Running. Filter: ' + cfg.contentFilter + ', Hide: ' + cfg.hideMethod);
     });
 
@@ -110,7 +113,17 @@ var XraiMain = (function () {
   }
 
   // Durable, per-decision record for the prompt-improvement study.
-  function logTweet(decision, data, text, prediction, confidence, source, result) {
+  // Also the single attach point for dwell tracking: every logged decision
+  // starts a visibility observation, so read events carry decision context
+  // and join the decision event on tweetId.
+  function logTweet(el, decision, data, text, prediction, confidence, source, result) {
+    if (typeof RaiDwell !== 'undefined' && el) {
+      RaiDwell.observe(el, {
+        id: data.id, author: data.author,
+        snippet: text || data.text || '',
+        decision: decision, source: source
+      });
+    }
     RaiMemory.logEvent({
       platform: 'x',
       decision: decision,            // 'shown' | 'hidden'
@@ -224,7 +237,7 @@ var XraiMain = (function () {
         RaiHider.unblurPending(el);
         var reasonLabel = imgResult && imgResult.reason ? 'AI: bait image (' + imgResult.reason + ')' : 'AI: bait image';
         RaiHider.hide(el, config ? config.hideMethod : 'blur', reasonLabel);
-        logTweet('hidden', data, enrichedText, 'bait-image', imgResult ? imgResult.confidence : 0.6, 'image-model', imgResult);
+        logTweet(el, 'hidden', data, enrichedText, 'bait-image', imgResult ? imgResult.confidence : 0.6, 'image-model', imgResult);
         RaiMemory.incrementStats('hidden');
         RaiIndicator.incrementHidden();
         attachWrongOnHidden(el, data, enrichedText, imgResult ? imgResult.confidence : 0.6, 'image-model');
@@ -232,7 +245,7 @@ var XraiMain = (function () {
         RaiHider.unblurPending(el);
         var signalLabel = (result && result.reason) ? 'AI: ' + result.reason : 'AI: signal (' + (confidence || 0.5) + ')';
         RaiHider.addKeepLabel(el, signalLabel);
-        logTweet('shown', data, enrichedText, 'signal', confidence || 0.5, source, result);
+        logTweet(el, 'shown', data, enrichedText, 'signal', confidence || 0.5, source, result);
         RaiMemory.incrementStats('kept');
         RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'signal');
         RaiIndicator.incrementKept();
@@ -279,6 +292,14 @@ var XraiMain = (function () {
       }
       XraiReply.attachReplyButton(el, data);
       attachNewTabHandler(el, data);
+      // Off-home skips logTweet, so attach dwell explicitly — status-page
+      // reading is the strongest attention signal and must not be dropped.
+      if (typeof RaiDwell !== 'undefined') {
+        RaiDwell.observe(el, {
+          id: data.id, author: data.author, snippet: enrichedText,
+          decision: 'reading', source: 'off-home'
+        });
+      }
       // Reading a tip on its own status page is the strongest interest signal.
       maybeCaptureTip(data, enrichedText, 'reading');
       return;
@@ -289,7 +310,7 @@ var XraiMain = (function () {
       console.log('[xrai] REPLY  | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | reply filtered | ' + (enrichedText || '').substring(0, 80));
       RaiHider.hide(el, config.hideMethod, 'reply filtered');
       RaiMemory.incrementStats('hidden');
-      logTweet('hidden', data, enrichedText, 'noise', 0.9, 'reply-filter');
+      logTweet(el, 'hidden', data, enrichedText, 'noise', 0.9, 'reply-filter');
       RaiIndicator.incrementHidden();
       attachNewTabHandler(el, data);
       return;
@@ -301,7 +322,7 @@ var XraiMain = (function () {
       console.log('[xrai] PREFLT | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | ' + pfResult.reason + ' | ' + (enrichedText || '').substring(0, 80));
       RaiHider.hide(el, config ? config.hideMethod : 'remove', 'prefilter: ' + pfResult.reason);
       RaiClassifier.cacheResult(data.id, { prediction: 'noise', confidence: pfResult.confidence, source: 'prefilter:' + pfResult.reason });
-      logTweet('hidden', data, enrichedText, 'noise', pfResult.confidence, 'prefilter:' + pfResult.reason);
+      logTweet(el, 'hidden', data, enrichedText, 'noise', pfResult.confidence, 'prefilter:' + pfResult.reason);
       RaiMemory.incrementStats('hidden');
       RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'noise');
       RaiIndicator.incrementHidden();
@@ -314,7 +335,7 @@ var XraiMain = (function () {
     if (data.isMediaOnly) {
       console.log('[xrai] MEDIA  | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | media-only, no text to classify');
       RaiClassifier.cacheResult(data.id, { prediction: 'noise', confidence: 0.55, source: 'media-only' });
-      logTweet('hidden', data, '', 'noise', 0.55, 'media-only');
+      logTweet(el, 'hidden', data, '', 'noise', 0.55, 'media-only');
       RaiMemory.incrementStats('hidden');
       RaiMemory.markSeen(RaiMemory.computeFingerprint('', data.mediaType), 'noise');
       RaiHider.hide(el, 'blur', 'media-only: no text to classify');
@@ -327,7 +348,7 @@ var XraiMain = (function () {
     // Step 3: If Ollama unavailable, show by default
     if (!ollamaAvailable) {
       console.log('[xrai] OFF    | @' + (data.author || '?') + ' | id:' + data.id + ' | ' + mediaTag + ' | showing by default | ' + (enrichedText || '').substring(0, 80));
-      logTweet('shown', data, enrichedText, 'signal', 0.5, 'default');
+      logTweet(el, 'shown', data, enrichedText, 'signal', 0.5, 'default');
       RaiMemory.incrementStats('kept');
       RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'signal');
       RaiIndicator.incrementKept();
@@ -340,6 +361,8 @@ var XraiMain = (function () {
     // Step 4: Check cache synchronously to avoid blur flash on cached signal tweets
     var cached = RaiClassifier.checkCache(data.id);
     if (cached) {
+      // Cache replays are not re-logged, and deliberately not dwell-observed
+      // either (a re-seen blurred tweet is low-value attention data).
       if (cached.prediction === 'noise' && cached.confidence >= threshold) {
         var cachedReason = cached.reason
           ? 'AI: ' + cached.reason
@@ -370,7 +393,7 @@ var XraiMain = (function () {
           : 'AI: noise (' + result.confidence + ')';
         RaiHider.unblurPending(el);
         RaiHider.hide(el, config ? config.hideMethod : 'remove', reasonLabel);
-        logTweet('hidden', data, enrichedText, 'noise', result.confidence, result.source || 'model', result);
+        logTweet(el, 'hidden', data, enrichedText, 'noise', result.confidence, result.source || 'model', result);
         RaiMemory.incrementStats('hidden');
         RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'noise');
         RaiIndicator.incrementHidden();

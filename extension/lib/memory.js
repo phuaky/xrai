@@ -389,6 +389,32 @@ const RaiMemory = (function () {
     } catch (e) { /* ignore */ }
   }
 
+  // === Attention-ledger mirror — best-effort disk copy of read/watch events ===
+  // IndexedDB (logEvent) stays the source of truth; this buffers records and
+  // POSTs them to the collector's /events endpoint so digest.js can read them
+  // from data/events-<platform>.jsonl. Collector down = events only in IDB
+  // (same contract as tips; reconnect backfill is a known v2 gap).
+  var _mirrorBuf = [];
+  var MIRROR_FLUSH_AT = 20;
+
+  function mirrorEvent(record) {
+    _mirrorBuf.push(record);
+    if (_mirrorBuf.length >= MIRROR_FLUSH_AT) flushMirror();
+  }
+
+  function flushMirror() {
+    if (!_mirrorBuf.length) return;
+    var entries = _mirrorBuf;
+    _mirrorBuf = [];
+    try {
+      fetch(COLLECTOR_URL + '/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform: _prefix, entries: entries })
+      }).catch(function () { /* collector not running, that's fine */ });
+    } catch (e) { /* ignore */ }
+  }
+
   function getClassifications() {
     return new Promise(function (resolve) {
       chrome.storage.local.get(classificationsKey(), function (result) {
@@ -472,6 +498,8 @@ const RaiMemory = (function () {
     startSession: startSession,
     getDailyTime: getDailyTime,
     logEvent: logEvent,
+    mirrorEvent: mirrorEvent,
+    flushMirror: flushMirror,
     getEvents: getEvents,
     countEvents: countEvents,
     clearEvents: clearEvents,

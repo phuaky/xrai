@@ -39,6 +39,9 @@ if (fs.existsSync(TIPS_FILE)) {
   }
 }
 
+// Attention-event exact-duplicate guard (re-POST retries only; per-process)
+const seenEventKeys = new Set();
+
 // Load existing stats
 if (fs.existsSync(STATS_FILE)) {
   try {
@@ -144,6 +147,43 @@ const server = http.createServer((req, res) => {
         console.log(`[collector] +1 tip (${seenTipIds.size} total) @${tip.author || '?'} [${tip.context || '?'}] "${(tip.text || '').substring(0, 70)}..."`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, total: seenTipIds.size }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // Receive attention-ledger events ({kind:'read'} dwell / {kind:'watch'})
+  // from RaiMemory.flushMirror. Pure append to data/events-<platform>.jsonl —
+  // NO upsert here; all collapsing (same-day dwell sums, watch-partial MAX)
+  // happens read-time in scripts/digest.js. The in-memory Set only drops
+  // exact re-POSTs; partials legitimately repeat a videoId with new ts/seconds.
+  if (req.method === 'POST' && req.url === '/events') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body);
+        const p = parsed.platform;
+        const platform = (p === 'ytrai' || p === 'youtube') ? 'youtube' : 'x';
+        const entries = parsed.entries || [];
+        if (!Array.isArray(entries)) throw new Error('Expected entries array');
+
+        const lines = [];
+        for (const e of entries) {
+          const key = `${e.kind}|${e.tweetId || e.videoId || ''}|${e.ts || ''}|${e.dwellMs ?? e.seconds ?? ''}`;
+          if (seenEventKeys.has(key)) continue;
+          seenEventKeys.add(key);
+          lines.push(JSON.stringify(Object.assign({ platform }, e)));
+        }
+        if (lines.length) {
+          fs.appendFileSync(path.join(DATA_DIR, `events-${platform}.jsonl`), lines.join('\n') + '\n');
+        }
+        console.log(`[collector] +${lines.length} ${platform} attention events (${entries.length - lines.length} dup)`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ received: lines.length }));
       } catch (e) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: e.message }));

@@ -27,6 +27,7 @@ extension/
       classifier.js → RaiClassifier   # concurrent queue (max 5) + result cache, platform pass-through
       hider.js      → RaiHider        # blur / remove / collapse + peek button
       indicator.js  → RaiIndicator    # status pill + per-platform settings
+      dwell.js      → RaiDwell        # attention ledger: per-card dwell tracking (X only for now)
       styles.css                      # tag-agnostic selectors ([data-xrai-*])
     x/                           # X-specific, Xrai* namespace
       detector.js  → XraiDetector     # tweet detection + media + text expansion
@@ -38,6 +39,7 @@ extension/
       detector.js  → YtraiDetector     # video-card detection (recycle-aware)
       prefilter.js → YtraiPrefilter    # regex KEEP for obvious music/motivational
       shorts.js    → YtraiShorts       # Shorts consumption tracker + doom-scroll nudge
+      watch.js     → YtraiWatch        # attention ledger: watch-time per video on /watch
       main.js      → YtraiMain           # inverted pipeline: blur all, reveal music/motivational
 ```
 
@@ -56,6 +58,7 @@ extension/
 **Data Collector** (optional, port 11435):
 - `node scripts/collector.js` — receives classification data, splits per platform into `data/classifications-x.jsonl` / `data/classifications-youtube.jsonl`.
 - Extension auto-flushes every 100 entries. `--improve` auto-runs analysis every 200 X entries (improve.js is X-tuned).
+- Also receives attention-ledger events (`POST /events` → `data/events-<platform>.jsonl`) and tips (`POST /tips`).
 
 ## Key Files
 
@@ -74,8 +77,11 @@ extension/
 | `extension/content/youtube/main.js` | `YtraiMain` — YouTube pipeline (blur all, reveal music) |
 | `extension/content/youtube/detector.js` | `YtraiDetector` — video-card detection (recycle-aware) |
 | `extension/content/youtube/prefilter.js` | `YtraiPrefilter` — regex keep for obvious music/motivational |
-| `scripts/collector.js` | Local HTTP server, per-platform classification logs + `/tips` intake |
+| `scripts/collector.js` | Local HTTP server, per-platform classification logs + `/tips` + `/events` intake |
 | `scripts/tips.js` | Tips ledger CLI — digest / mark / stats over `data/tips.jsonl` |
+| `extension/content/core/dwell.js` | `RaiDwell` — attention ledger: per-card dwell tracking |
+| `extension/content/youtube/watch.js` | `YtraiWatch` — attention ledger: /watch time per video |
+| `scripts/digest.js` | Daily attention digest CLI — deterministic assembly + `--analyze` via codex |
 | `extension/content/x/tips.js` | `XraiTips` — workflow-tip detection (high recall by design) |
 | `benchmarks/eval-x.js` | X full-pipeline eval + regression gate (see "Evals") |
 | `benchmarks/golden-x.json` | Tiered golden set — source of truth for X eval data |
@@ -104,6 +110,11 @@ node scripts/collector.js --improve
 node scripts/tips.js               # digest: useful-but-unimplemented first, then unread
 node scripts/tips.js mark <id-prefix> read|useful|implemented|rejected|na [note]
 node scripts/tips.js stats
+
+# Attention ledger — daily digest of what was actually read/watched
+node scripts/digest.js                    # today's record → data/daily/YYYY-MM-DD.md
+node scripts/digest.js 2026-07-09 --analyze   # + goal-mapping via codex (gpt-5.5)
+node scripts/digest.js --json             # machine-readable (for kyu)
 
 # X eval + regression gate (needs Ollama; ~2-5 min)
 bun run eval:x            # run against blessed baseline, exit 1 on regression
@@ -234,6 +245,36 @@ Answers "what useful workflow tips crossed the feed that we still haven't acted 
   evaluated-`useful` first (known-good and still not acted on), then unread.
 - **Evaluate**: judging "are we already doing this?" is kyu's / the Upgrade skill's job
   (`tips.js list --json` is the handoff format), not this repo's — the CLI stays deterministic.
+
+## Attention Ledger (what was actually READ, not just what the feed showed)
+
+Intent: close the loop between attention spent and goals served. rai decides what you
+*see*; the ledger measures what you actually *read* and feeds it back as a saved daily
+record with goal mapping against `~/.claude/PAI/USER/TELOS/GOALS.md`.
+
+- **X dwell** (`core/dwell.js` → `RaiDwell`): one IntersectionObserver (≥50% visible) +
+  2s tick. Every logged decision in `x/main.js logTweet` starts an observation (so read
+  events carry `decision`/`source` and join decision events on `tweetId`); the off-home
+  branch observes explicitly with `decision:'reading'` (status-page reading = strongest
+  attention signal). Finalizes on viewport exit / node detach (sweep) / href change
+  (polled — X has no SPA nav event) / beforeunload, all through one idempotent
+  `finalize`. Logs `{kind:'read', dwellMs, ...}` only at ≥1s dwell. Known undercount:
+  re-reads within a page load are lost (detector's `processed` set never re-emits).
+- **YouTube watch time** (`youtube/watch.js` → `YtraiWatch`): `/watch` only. Accrues 2s
+  ticks when tab visible AND playing AND `currentTime` advanced AND no ad
+  (`#movie_player.ad-showing`). Background-tab audio deliberately does NOT count.
+  Writes cumulative `{kind:'watch', seconds, partial:true}` every 30s (crash safety) +
+  a final record; downstream collapses via MAX(seconds) per (videoId, date).
+- **Egress**: events go to the durable IndexedDB log (source of truth) AND
+  best-effort to the collector via `RaiMemory.mirrorEvent` → `POST /events` →
+  `data/events-<platform>.jsonl` (pure append; collapsing is digest-time).
+- **Digest** (`scripts/digest.js`): deterministic CLI (tips.js philosophy) —
+  totals, per-item lists, exact repeats across days → `data/daily/YYYY-MM-DD.md`.
+  `--analyze` shells `codex exec -s read-only` for goal mapping / themes / semantic
+  repeats / worth-deeper-processing / gaps. Run it in the morning session.
+- Deliberately deferred: embeddings + in-feed "seen before" badges, YouTube feed dwell
+  (feed is blurred by default), collector-reconnect backfill, cron scheduling.
+- No prompt/prefilter/model/threshold changes → eval gates unaffected.
 
 ## Configuration Defaults
 

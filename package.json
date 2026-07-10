@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "test": "bun test",
+    "digest": "node scripts/digest.js",
     "eval:x": "node benchmarks/eval-x.js",
     "eval:x:bless": "node benchmarks/eval-x.js --bless",
     "eval:youtube": "node benchmarks/eval-youtube.js",
