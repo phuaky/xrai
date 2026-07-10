@@ -5,55 +5,84 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Privacy — rai</title>
   <meta name="description" content="rai privacy policy: what data the extension touches, where it goes, and what it never does.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0A0A0B;
-      --bg-raised: #121216;
-      --bg-card: #16161C;
-      --border: rgba(255, 255, 255, 0.08);
-      --border-strong: rgba(255, 255, 255, 0.14);
-      --text: #E7E7EA;
-      --text-dim: #9B9BA4;
-      --text-faint: #62626B;
-      --accent: #4ADE80;
-      --accent-dim: rgba(74, 222, 128, 0.15);
-      --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      --ink: #0B0B0F;
+      --paper: #FFFFFF;
+      --blue: #2C4BFF;
+      --blue-soft: rgba(44, 75, 255, 0.08);
+      --gray: #56565E;
+      --faint: #8B8B93;
+      --line: rgba(11, 11, 15, 0.14);
+      --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      --sans: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
       font-size: 16px;
       line-height: 1.65;
       -webkit-font-smoothing: antialiased;
     }
-    a { color: var(--accent); }
-    .wrap { max-width: 720px; margin: 0 auto; padding: 64px 24px 96px; }
-    .back { display: inline-block; margin-bottom: 32px; font-size: 14px; color: var(--text-dim); }
-    h1 { font-size: 32px; letter-spacing: -0.02em; margin-bottom: 8px; }
-    .updated { font-size: 13px; color: var(--text-faint); margin-bottom: 40px; font-family: var(--mono); }
-    h2 { font-size: 18px; margin: 36px 0 12px; color: var(--text); }
-    p, li { color: var(--text-dim); font-size: 15px; }
-    ul { padding-left: 20px; margin: 8px 0; }
-    li { margin: 6px 0; }
-    .card {
-      background: var(--bg-raised); border: 1px solid var(--border); border-radius: 12px;
-      padding: 20px 22px; margin: 24px 0;
+    a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+    a:hover { color: var(--blue); }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 56px 28px 96px; }
+    .back {
+      display: flex; width: fit-content; align-items: center; gap: 8px; margin-bottom: 48px;
+      font-family: var(--mono); font-size: 13px; color: var(--gray); text-decoration: none;
     }
-    .card p:first-child { margin-top: 0; }
-    code { font-family: var(--mono); font-size: 13px; background: var(--bg-card); padding: 1px 6px; border-radius: 4px; }
-    footer { margin-top: 56px; font-size: 13px; color: var(--text-faint); }
+    .back:hover { color: var(--blue); }
+    .tag {
+      display: inline-flex; align-items: center; gap: 10px;
+      font-family: var(--mono); font-size: 12.5px; font-weight: 500;
+      letter-spacing: 0.14em; text-transform: uppercase; color: var(--blue);
+      margin-bottom: 18px;
+    }
+    .tag::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--blue); }
+    h1 { font-size: clamp(38px, 5vw, 56px); letter-spacing: -0.035em; line-height: 1.02; font-weight: 800; margin-bottom: 14px; }
+    .updated { font-size: 13px; color: var(--faint); margin-bottom: 44px; font-family: var(--mono); }
+    h2 {
+      font-size: 20px; font-weight: 700; letter-spacing: -0.01em;
+      margin: 44px 0 12px; padding-top: 28px; border-top: 1px solid var(--line);
+    }
+    p, li { color: var(--gray); font-size: 15.5px; }
+    ul { list-style: none; margin: 10px 0; }
+    li { margin: 8px 0; padding-left: 26px; position: relative; }
+    li::before { content: '✓'; position: absolute; left: 0; font-family: var(--mono); color: var(--blue); }
+    .card {
+      border: 1px solid var(--ink); border-radius: 2px;
+      padding: 22px 26px; margin: 0 0 8px;
+      box-shadow: 8px 8px 0 var(--blue-soft), 8px 8px 0 1px rgba(44, 75, 255, 0.25);
+    }
+    .card .k { display: block; font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue); margin-bottom: 8px; }
+    .card p { color: var(--gray); }
+    .card b { color: var(--ink); }
+    code { font-family: var(--mono); font-size: 13px; background: rgba(11, 11, 15, 0.05); padding: 1px 6px; border-radius: 2px; }
+    footer {
+      margin-top: 64px; padding-top: 26px; border-top: 1px solid var(--line);
+      display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+      font-size: 13.5px; color: var(--gray);
+    }
+    .fnote { display: inline-flex; align-items: center; gap: 9px; font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue); }
+    .fnote::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <a class="back" href="/">&larr; rai</a>
+    <a class="back" href="/">← rai</a>
+    <div class="tag">Privacy</div>
     <h1>Privacy Policy</h1>
     <div class="updated">Last updated: July 2026</div>
 
     <div class="card">
-      <p><strong>Default (Local mode):</strong> everything runs on your machine. rai never sends your feed, your tweets, or your video titles anywhere. There is no account, no login, and no tracking.</p>
+      <span class="k">The default</span>
+      <p><b>Local mode: everything runs on your machine.</b> rai never sends your feed, your tweets, or your video titles anywhere. There is no account, no login, and no tracking.</p>
     </div>
 
     <h2>What rai reads</h2>
@@ -80,7 +109,10 @@
     <h2>Contact</h2>
     <p>Questions: <a href="mailto:phuaky2017@gmail.com">phuaky2017@gmail.com</a></p>
 
-    <footer>rai is open source: <a href="https://github.com/phuaky/xrai" target="_blank" rel="noopener">github.com/phuaky/xrai</a></footer>
+    <footer>
+      <span>rai is open source: <a href="https://github.com/phuaky/xrai" target="_blank" rel="noopener">github.com/phuaky/xrai</a></span>
+      <span class="fnote">Noise floor: measured</span>
+    </footer>
   </div>
 </body>
 </html>
