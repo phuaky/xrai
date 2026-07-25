@@ -1,690 +1,1971 @@
 {
-  "version": 1,
-  "platform": "x",
-  "note": "Golden eval set. Tiers: critical-signal (must NEVER be hidden), signal (should be shown), tempting-noise (tech-flavored bait the model must catch), noise (should be hidden). Source of truth is THIS file; benchmark.js is legacy. | 2026-07-06: x-110..x-117 added from the six-post bait audit (60s bait test) - clip-farm captions, funnels, fake credentials as tempting-noise; own-work-with-link + OSS-discord as signal guards.",
+  "version": 2,
+  "note": "v2 (2026-07-13): rebuilt from 3 days of live traffic (5,309 decisions, 1,058 codex-judged, criticals hand-audited). v1 was synthetic. Provenance: judge=gpt-5.6-sol, tiers audited by fable, hard cases labeled by Kuan.",
   "items": [
     {
-      "id": "x-001",
+      "id": "live-2074077891747316194",
+      "text": "gpt 5.5 is finding and fixing bugs that fable left behind",
       "tier": "signal",
-      "text": "Just shipped a feature that reduced latency by 40% using connection pooling in Postgres. The key was pgBouncer with transaction-level pooling."
+      "author": "yacineMTB"
     },
     {
-      "id": "x-002",
-      "tier": "signal",
-      "text": "We hit 10k users today. Biggest lesson: the feature we almost cut (dark mode) drives 60% of retention."
-    },
-    {
-      "id": "x-003",
-      "tier": "signal",
-      "text": "New paper from DeepMind shows that chain-of-thought prompting works because it reduces the effective complexity of the task, not because it mimics human reasoning."
-    },
-    {
-      "id": "x-004",
-      "tier": "signal",
-      "text": "After 3 years of running Kubernetes in production: just use a managed service. The operational overhead of self-hosting is never worth it below 50 engineers."
-    },
-    {
-      "id": "x-005",
-      "tier": "signal",
-      "text": "TIL you can use CSS container queries instead of media queries for component-level responsive design. Game changer for design systems."
-    },
-    {
-      "id": "x-006",
-      "tier": "signal",
-      "text": "Cloudflare just announced R2 egress is now completely free. This changes the economics of serving static assets significantly."
-    },
-    {
-      "id": "x-007",
-      "tier": "signal",
-      "text": "We moved from microservices back to a monolith. Deployment time went from 45min to 3min. Sometimes boring tech wins."
-    },
-    {
-      "id": "x-008",
-      "tier": "signal",
-      "text": "Released v2.0 of our open source CLI tool. Added streaming output, plugin system, and cut binary size by 70%."
-    },
-    {
-      "id": "x-009",
-      "tier": "signal",
-      "text": "The real bottleneck in most AI apps isn't the model, it's the data pipeline. We spent 3 months on data quality and accuracy jumped from 72% to 94%."
-    },
-    {
-      "id": "x-010",
-      "tier": "signal",
-      "text": "SQLite can handle 100k+ concurrent readers. Most apps don't need Postgres. We switched and our infrastructure cost dropped to $0."
-    },
-    {
-      "id": "x-011",
-      "tier": "signal",
-      "text": "Just because someone trusts you quickly doesn't mean you need to trust them quickly. It's a more advanced manipulation move, typically from people who need something from you.",
-      "author": "@AlexHormozi"
-    },
-    {
-      "id": "x-012",
-      "tier": "signal",
-      "text": "The sun was free. They sold you SPF 50 and a vitamin D deficiency. Sleep was free. They sold you an app, a pill, and a wearable that tells you your sleep was bad. Walking was free. They sold you a treadmill, a fitness tracker, and a £180 pair of trainers. Fasting was free. They sold you meal replacement shakes and the anxiety that skipping breakfast would wreck your metabolism. The 20th century removed access to everything the body needs to function. The 21st century is selling it back, one subscription at a time.",
-      "author": "@SamaHoole"
-    },
-    {
-      "id": "x-013",
-      "tier": "signal",
-      "text": "I actively vibe/code apps to 5000+ customers at my SaaS companies (one at 40 millish ARR). I built and now maintain 3-4 apps/core parts of our business with it. I am a turbo claude code user. I'm not saying it's not useful. I saying that despite being incredibly useful, its also stupid as hell. Even with extreme guardrails/watching its a competent junior dev who does whatever it wants and you have to watch like a hawk. At somepoint making code fast is NOT an advantage and if your using claude/codex to push and review its own code...your actually an insane person.",
-      "author": "@ZssBecker"
-    },
-    {
-      "id": "x-014",
-      "tier": "signal",
-      "text": "The next version of OpenClaw is also an MCP, you can use it instead of Anthropic's message channel MCP to connect to a much wider range of message providers.",
-      "author": "@steipete"
-    },
-    {
-      "id": "x-015",
-      "tier": "signal",
-      "text": "Thesis: the problem with AI working in every domain = all the edge cases. Antithesis: domains with lots of edge cases = difficult & time consuming to practically impossible for error-prone people. Synthesis: such domains = where AI agents will do best. (Such as SAAS migration…)",
-      "author": "@pmarca"
-    },
-    {
-      "id": "x-016",
-      "tier": "signal",
-      "text": "the more I've been digging into the new Figma MCP, the more excited I am about it. something new I'm trying is starting with a very ugly sketch in Figma, and then having Claude Code flesh it out in Figma so I can tweak and edit before sending the final back to Claude Code",
-      "author": "@trq212"
-    },
-    {
-      "id": "x-017",
-      "tier": "signal",
-      "text": "1.5M views with 800 comments. shocked UGC face with a snapchat caption -> app demo. remember, simple formats scale well",
-      "author": "@jaxxdwyer"
-    },
-    {
-      "id": "x-018",
-      "tier": "signal",
-      "text": "Claire Vo's first day with OpenClaw it deleted her family calendar. Now she runs 9 agents across 3 Mac Minis, and said \"I haven't felt like this since I was a teenager learning to code.\" Her sales agent Sam does a daily CRM sweep, identifies decision-makers from new signups.",
-      "author": "@lennysan"
-    },
-    {
-      "id": "x-019",
-      "tier": "signal",
-      "text": "The only 4 jobs that will remain at tech companies.",
-      "media": "image",
-      "author": "@chintanzalani"
-    },
-    {
-      "id": "x-020",
-      "tier": "signal",
-      "text": "No electricity, no battery, Swiss movement tropical fan from 1910. The full wind lasts about 30 minutes. It still works.",
-      "media": "video",
-      "author": "@BrianRoemmele"
-    },
-    {
-      "id": "x-021",
-      "tier": "signal",
-      "text": "prediction re the end of spreadsheets. AI code gen means that anything that is currently modeled as a spreadsheet is better modeled in code. You get all the advantages of software - libraries, open source, AI, all the complexity and expressiveness.",
-      "author": "@andrewchen"
-    },
-    {
-      "id": "x-022",
-      "tier": "signal",
-      "text": "people are buying rigs worth thousands of dollars while your five year old GPUs can run 9B parameter open source LLMs",
-      "media": "image",
-      "author": "@aviral10x"
-    },
-    {
-      "id": "x-023",
-      "tier": "signal",
-      "text": "I'm not the only one doing this. - karpathy best thought leader, best person to learn from imo. Nanochat is the best way to get into training LLMs its the simplest and most digestible source for building your first AI model",
-      "media": "image",
-      "author": "@0xSero"
-    },
-    {
-      "id": "x-024",
-      "tier": "signal",
-      "text": "When someone signs up to your SaaS, grab their email domain, get a summary from Firecrawl, have an LLM generate you the best starting keywords/configuration/demo project",
-      "author": "@arvidkahl"
-    },
-    {
-      "id": "x-025",
-      "tier": "signal",
-      "text": "I mass launched 70+ startups since 2013. Here's my stack: a $5/month VPS, PHP, jQuery, SQLite. No frameworks. No dependencies. No team. $2.7M ARR.",
-      "author": "@levelsio"
-    },
-    {
-      "id": "x-026",
-      "tier": "signal",
-      "text": "Every page on all of my sites has a screenshot for og:image social media cards. Remote OK has 1.7 million user profiles, millions of job filter combo pages.",
-      "author": "@levelsio"
-    },
-    {
-      "id": "x-027",
-      "tier": "signal",
-      "text": "Structured outputs are the most underrated feature in LLM APIs. Stop parsing markdown. Just define a schema.",
-      "author": "@jxnlco"
-    },
-    {
-      "id": "x-028",
-      "tier": "signal",
-      "text": "LangGraph just hit 1M downloads. The shift from chains to graphs is real. Agents need cycles, not pipelines.",
-      "author": "@hwchase17"
-    },
-    {
-      "id": "x-029",
-      "tier": "signal",
-      "text": "Tailwind CSS v4 alpha is out. New engine, 10x faster builds, and native CSS cascade layers.",
-      "author": "@adamwathan"
-    },
-    {
-      "id": "x-030",
-      "tier": "signal",
-      "text": "Gumroad hit $200M in creator payouts. Our team is 3 people. SaaS doesn't need to be complicated.",
-      "author": "@shl"
-    },
-    {
-      "id": "x-031",
-      "tier": "signal",
-      "text": "DeepSeek-R1 is here! Performance on par with OpenAI-o1. Fully open-source model.",
-      "author": "@deepseek_ai"
-    },
-    {
-      "id": "x-032",
-      "tier": "signal",
-      "text": "Firecrawl v2 can now extract structured data from any website. No more parsing HTML. Just define your schema and go.",
-      "author": "@nickscamara_"
-    },
-    {
-      "id": "x-033",
-      "tier": "signal",
-      "text": "80% of auditing is codebase understanding. How can you make someone faster at understanding code?",
-      "author": "@0xjimmyk"
-    },
-    {
-      "id": "x-034",
-      "tier": "signal",
-      "text": "Used deep research to extract common keywords, product mentions, and painpoints from subreddits",
-      "author": "@mayowaoshin"
-    },
-    {
-      "id": "x-035",
-      "tier": "signal",
-      "text": "Crazy story how we built Cursor Directory in 3 hours and gathered over 1.1M views.",
-      "media": "image",
-      "author": "@pontusab"
-    },
-    {
-      "id": "x-036",
-      "tier": "signal",
-      "text": "the only things you need to know: your account has a base score and it runs before your tweet is evaluated: verified accounts: +100 automatic unverified accounts: max +55 then multiplied by your follower ratio",
-      "author": "@retardmode"
-    },
-    {
-      "id": "x-037",
-      "tier": "signal",
-      "text": "If only someone told me this before my 1st startup: 1. Validate. I wasted at least 5 years building things nobody wanted.",
-      "author": "@johnrushx"
-    },
-    {
-      "id": "x-038",
-      "tier": "signal",
-      "text": "I spent 6 months building an AI writing tool nobody wanted. Then I pivoted to a simple grammar checker and got 50k users in 2 weeks.",
-      "author": "@JamesBorrell"
-    },
-    {
-      "id": "x-039",
-      "tier": "noise",
-      "text": "this is so good 😂",
-      "media": "video"
-    },
-    {
-      "id": "x-040",
-      "tier": "noise",
-      "text": "Jamaican girl almost gets Ray cancelled but Kai saves him",
-      "media": "video"
-    },
-    {
-      "id": "x-041",
-      "tier": "noise",
-      "text": "My Italian grandma taught me this.",
-      "media": "video"
-    },
-    {
-      "id": "x-042",
-      "tier": "noise",
-      "text": "The coke ruined it",
-      "media": "video"
-    },
-    {
-      "id": "x-043",
-      "tier": "noise",
-      "text": "You won't believe what happened next 🤯"
-    },
-    {
-      "id": "x-044",
-      "tier": "noise",
-      "text": "Follow me for daily motivation 💪 Like if you agree! RT to spread the word!"
-    },
-    {
-      "id": "x-045",
-      "tier": "noise",
-      "text": "Unpopular opinion: hard work beats talent every time. Who agrees?"
-    },
-    {
-      "id": "x-046",
-      "tier": "noise",
-      "text": "I made $10k in my first month with this one simple trick. DM me to learn how!"
-    },
-    {
-      "id": "x-047",
-      "tier": "noise",
-      "text": "She's so beautiful 😍🔥",
+      "id": "live-2074766666618057107",
+      "text": "POV: Anthropic graciously granting the digital peasants 5 more days of SOTA intelligence",
+      "tier": "tempting-noise",
+      "author": "DataChaz",
       "media": "image"
     },
     {
-      "id": "x-048",
-      "tier": "noise",
-      "text": "How football is made",
+      "id": "live-2071487131302994371",
+      "text": "Can we get a Singapore version please?\n\nChecking for APIs has always been such an annoying process \n\nWho’s building this",
+      "tier": "signal",
+      "author": "DRTnky",
       "media": "video"
     },
     {
-      "id": "x-049",
-      "tier": "noise",
-      "text": "The best way to end something is to starve it... 💯",
-      "media": "video",
-      "author": "@ModernxDad"
-    },
-    {
-      "id": "x-050",
-      "tier": "noise",
-      "text": "She literally explained why you must keep going.",
-      "media": "video",
-      "author": "@parveen__tyagi"
-    },
-    {
-      "id": "x-051",
-      "tier": "noise",
-      "text": "I need one of these.",
-      "media": "image",
-      "author": "@DefiantLs"
-    },
-    {
-      "id": "x-052",
-      "tier": "noise",
-      "text": "Before you ask AI another dumb coding question… watch this.",
-      "media": "video",
-      "author": "@IamKyros69"
-    },
-    {
-      "id": "x-053",
-      "tier": "noise",
-      "text": "Woman logic:",
-      "media": "image",
-      "author": "@ZherkaOfficial"
-    },
-    {
-      "id": "x-054",
-      "tier": "noise",
-      "text": "If Lionel Messi had perfect side profile",
-      "media": "image",
-      "author": "@interesting_aIl"
-    },
-    {
-      "id": "x-055",
-      "tier": "noise",
-      "text": "True",
-      "author": "@elonmusk"
-    },
-    {
-      "id": "x-056",
-      "tier": "noise",
-      "text": "The fraudsters always come up with the most sympathetic excuses and do so very loudly, because that is what swindlers do",
-      "author": "@elonmusk"
-    },
-    {
-      "id": "x-057",
-      "tier": "noise",
-      "text": "To succeed you just need to do so many reps is unreasonable that you fail.",
-      "author": "@AlexHormozi"
-    },
-    {
-      "id": "x-058",
-      "tier": "noise",
-      "text": "I have a theory that life meets you at your level of audacity",
-      "author": "@ashebytes"
-    },
-    {
-      "id": "x-059",
-      "tier": "noise",
-      "text": "Palantir CEO, Alex Karp says only 2 types of people will survive the AI era..",
-      "media": "video",
-      "author": "@damianplayer"
-    },
-    {
-      "id": "x-060",
-      "tier": "noise",
-      "text": "i often think about this..",
-      "media": "image",
-      "author": "@oprydai"
-    },
-    {
-      "id": "x-061",
-      "tier": "noise",
-      "text": "One great thing about SF is that you can see criminals just roaming the street!",
-      "author": "@mil0theminer"
-    },
-    {
-      "id": "x-062",
-      "tier": "noise",
-      "text": "A moving man will meet his luck",
-      "author": "@Adikastakes"
-    },
-    {
-      "id": "x-063",
-      "tier": "noise",
-      "text": "Ever wondered how Olympics can become more sustainable, efficient and intelligent?",
-      "author": "@AlibabaGroup"
-    },
-    {
-      "id": "x-064",
-      "tier": "noise",
-      "text": "Test if you can read at 900 words per minute with this technique",
-      "media": "video",
-      "author": "@InternetH0F"
-    },
-    {
-      "id": "x-065",
-      "tier": "noise",
-      "text": "iPhone 13 battery cell replacement",
-      "media": "video",
-      "author": "@_Brainboxx"
-    },
-    {
-      "id": "x-066",
-      "tier": "noise",
-      "text": "Gym etiquette final boss",
-      "media": "video",
-      "author": "@unhingedfeed"
-    },
-    {
-      "id": "x-067",
-      "tier": "noise",
-      "text": "your favorite founders' favorite founder",
-      "media": "video",
-      "author": "@jacobandreou"
-    },
-    {
-      "id": "x-068",
-      "tier": "noise",
-      "text": "This new anime season is looking cool. Would you watch this?",
-      "media": "video",
-      "author": "@Leaflit"
-    },
-    {
-      "id": "x-069",
-      "tier": "noise",
-      "text": "Ever heard of the Michelangelo effect?",
-      "media": "video",
-      "author": "@manly_mentor"
-    },
-    {
-      "id": "x-070",
-      "tier": "noise",
-      "text": "goodnight",
-      "author": "@Abhinavstwt"
-    },
-    {
-      "id": "x-071",
-      "tier": "noise",
-      "text": "The danger that's killing your long term health: Muscle loss. Here's what happens: Memory loss, Trouble walking, Chronic disease. But luckily there is a simple answer. Here is your ultimate guide.",
-      "media": "image",
-      "author": "@theoliveranwar"
-    },
-    {
-      "id": "x-072",
-      "tier": "tempting-noise",
-      "text": "Start building your moat now it's not too late",
-      "media": "image",
-      "author": "@boringmarketer"
-    },
-    {
-      "id": "x-073",
-      "tier": "noise",
-      "text": "The fastest way to change your life isn't: Starting a business, Investing in crypto. It's fixing your sleep.",
-      "author": "@edendotso"
-    },
-    {
-      "id": "x-074",
-      "tier": "noise",
-      "text": "How to do marketing (If you are Solopreneurs who sucks at marketing)",
-      "media": "image",
-      "author": "@DanKulkov"
-    },
-    {
-      "id": "x-075",
-      "tier": "noise",
-      "text": "Back pain? This is the one book you need. I know someone who only read the description and got better.",
-      "media": "image",
-      "author": "@julianweisser"
-    },
-    {
-      "id": "x-076",
-      "tier": "tempting-noise",
-      "text": "Your pitch deck is losing you money.",
-      "media": "image",
-      "author": "@KevinHenrikson"
-    },
-    {
-      "id": "x-077",
-      "tier": "tempting-noise",
-      "text": "The 7 best free AI tools that will save you 100+ hours a week",
-      "media": "image",
-      "author": "@alexfinnx"
-    },
-    {
-      "id": "x-078",
-      "tier": "tempting-noise",
-      "text": "Everything you need to know about building a $1M agency",
-      "media": "image",
-      "author": "@charlierward"
-    },
-    {
-      "id": "x-079",
-      "tier": "tempting-noise",
-      "text": "THIS GUY BUILT AN APP MASCOT THAT CAN EAT, SLEEP, AND CHANGE COLOR USING A STATE MACHINE.",
+      "id": "live-2075193862973214760",
+      "text": "anthropic including fable in the max plan",
+      "tier": "critical-signal",
+      "author": "thekitze",
       "media": "video"
     },
     {
-      "id": "x-080",
+      "id": "live-2074154146274406495",
+      "text": "Everyone's talking about Claude Tag. \n\nTag it. Delegate to it. Work with your whole team alongside it. This is true multiplayer work.",
+      "tier": "signal",
+      "author": "SlackHQ",
+      "media": "video"
+    },
+    {
+      "id": "live-2074211399904186657",
+      "text": "introducing claude hands-free \n\nnow run your army of ai agents completely hands free",
+      "tier": "signal",
+      "author": "shubhmx",
+      "media": "video"
+    },
+    {
+      "id": "live-2074786928021700886",
+      "text": "Grok 4.5 releases tomorrow.\n\nGPT 5.6 Sol releases tomorrow.\n\nFable 5 is available until Sunday.\n\nFable orchestrates, Sol implements, Grok reviews.\n\nWE HAVE AGI FOR 4 DAYS LADIES AND GENTLEMEN.",
+      "tier": "signal",
+      "author": "robj3d3"
+    },
+    {
+      "id": "live-2074897675343085993",
+      "text": "The next generation of ChatGPT Voice is here.\n\nLivestream starts at 10am PT. [card] Livestreams",
+      "tier": "signal",
+      "author": "OpenAI"
+    },
+    {
+      "id": "live-2075754103091888430",
+      "text": "So apparently GPT 5.6 Sol might just randomly delete all of the files on your laptop \n\nHere's how to safeguard yourself against it\n\nPaste this prompt into codex:\n\nProtect this machine from accidental permanent file deletion by Codex.\n\nImplement this as defense in depth, not merely as a written instruction.\n\nRequirements:\n\n1. Inspect the current official Codex documentation for hooks, command rules, sandboxing, and approval settings before making changes.\n\n2. Detect the operating system and ident",
       "tier": "tempting-noise",
-      "text": "2098x 209,700% gain in one call. Someone in our private tg channel caught $PIXEL at $2.4K before flying to $10m",
+      "author": "LoopOnChain",
       "media": "image"
     },
     {
-      "id": "x-081",
-      "tier": "tempting-noise",
-      "text": "THE TICKER IS $___"
+      "id": "live-2074297224750661758",
+      "text": "fable 5 gets cut from claude subscription tomorrow\nclaude code weekly limits get cut in half next monday\n\ncancel your subs. it's over. gpt5.6 incoming anyway",
+      "tier": "signal",
+      "author": "markksantos"
     },
     {
-      "id": "x-082",
-      "tier": "tempting-noise",
-      "text": "WEB 3 SOCIAL MEDIA JUST GOT A LOT EASIER TO BUILD",
-      "media": "video"
-    },
-    {
-      "id": "x-083",
-      "tier": "noise",
-      "text": "NOTHING BEATS A MONDAY MORNING PUMP",
+      "id": "live-2076380502332780716",
+      "text": "Codex users are getting unlimited use of GPT 5.6 now that the 5 hour limit has been removed.\n\nOpenAI continues to do reset after reset too.\n\nWe are living in insane times.",
+      "tier": "signal",
+      "author": "bridgebench",
       "media": "image"
     },
     {
-      "id": "x-084",
-      "tier": "tempting-noise",
-      "text": "If you want to build a startup that makes real money, here's what actually works"
+      "id": "live-2074697521809535257",
+      "text": "BREAKING: OpenAI has reportedly been granted U.S. approval for a broad GPT-5.6 rollout.",
+      "tier": "signal",
+      "author": "Polymarket"
     },
     {
-      "id": "x-085",
-      "tier": "tempting-noise",
-      "text": "Every SaaS founder should know this pricing trick"
-    },
-    {
-      "id": "x-086",
-      "tier": "noise",
-      "text": "GM CT SAY IT BACK",
+      "id": "live-2072329631185686855",
+      "text": "The Claude Fable 5 redeployment has now kicked off, with the model now available for enterprise customers on Amazon Bedrock!\n\nWe should see it go live on Anthropic's API and rolling out on http://Claude.ai in the coming hours. \n\n(Voxel generated by Fable just now!)",
+      "tier": "signal",
+      "author": "synthwavedd",
       "media": "image"
     },
     {
-      "id": "x-087",
-      "tier": "signal",
-      "text": "DefiLlama launched an MCP that brings onchain data directly to AI agent. 23 tools covering data across protocols.",
+      "id": "live-2074525815820169320",
+      "text": "Claude Cowork is coming to mobile and web.\n\nHand Claude a task at your desk and pick up the finished work from your phone. Close the laptop and Claude keeps going.\n\nBeta is rolling out over the next several weeks starting with the Max plan, with more plans to follow.",
+      "tier": "critical-signal",
+      "author": "claudeai",
       "media": "video"
     },
     {
-      "id": "x-088",
-      "tier": "signal",
-      "text": "This is nuts: Clawdbot figured out how to transcribe and respond to a voice message on its own, detecting the Opus format, converting to wav, transcribing"
-    },
-    {
-      "id": "x-089",
-      "tier": "signal",
-      "text": "PimEyes has been doing this since 2017. The scary part isn't the technology. It's that most people are only finding out now."
-    },
-    {
-      "id": "x-090",
+      "id": "live-2072251363057406318",
+      "text": "So Fable 5 is back ... kind of. Not really to be honest. \n\n50% usage until July 7th (in subscription), only via extra credits thereafter.\nFallback to Opus 4.8 for \"routine tasks like coding\".\n\nI got some thoughts about it being \"back\".",
       "tier": "critical-signal",
-      "text": "Anthropic is hiring Forward Deployed Engineers in Singapore. If you've built agent systems on Claude and can sit with customers, DM me."
-    },
-    {
-      "id": "x-091",
-      "tier": "critical-signal",
-      "text": "OpenAI is hiring forward deployed engineers in APAC. The interview is a 2-day build sprint with a real customer problem."
-    },
-    {
-      "id": "x-092",
-      "tier": "critical-signal",
-      "text": "We're paying $15k for a 6-week pilot to anyone who can make our compliance Q&A cite sources or abstain. Serious builders only."
-    },
-    {
-      "id": "x-093",
-      "tier": "critical-signal",
-      "text": "Claude Code now lets workflows orchestrate subagents deterministically. This changes how you structure long-running agent tasks. Docs in reply."
-    },
-    {
-      "id": "x-094",
-      "tier": "critical-signal",
-      "text": "MCP now supports streaming tool results. Long-running agent tasks no longer need polling hacks."
-    },
-    {
-      "id": "x-095",
-      "tier": "critical-signal",
-      "text": "Ollama just added an MLX backend on Apple Silicon: roughly 2x tokens/sec on M-series for gemma-class models."
-    },
-    {
-      "id": "x-096",
-      "tier": "critical-signal",
-      "text": "How we closed our first 10 enterprise pilots: we stopped doing free demos and started charging a $5k deposit before building anything."
-    },
-    {
-      "id": "x-097",
-      "tier": "critical-signal",
-      "text": "I built a citation-verification layer for RAG that abstains when retrieval confidence is low. 94% fewer hallucinated answers in production."
-    },
-    {
-      "id": "x-098",
-      "tier": "critical-signal",
-      "text": "Singapore MAS published new guidance on AI in regulated financial advice: every generated claim must be traceable to a source document."
-    },
-    {
-      "id": "x-099",
-      "tier": "critical-signal",
-      "text": "Cloudflare Workers can now run 4B-parameter models at the edge. Local-first AI just got a real deployment path."
-    },
-    {
-      "id": "x-100",
-      "tier": "critical-signal",
-      "text": "Live demo: our agent verifies every claim against source documents before answering, and abstains when it cannot.",
+      "author": "maxedapps",
       "media": "video"
     },
     {
-      "id": "x-101",
+      "id": "live-2075161516874276972",
+      "text": "Anthropic put a hidden tracker in Claude Code that flagged you by timezone. It sat there for 3 months and caught only because one guy took the app apart.\n\nThey:\n\n> checked if your timezone was Shanghai or Urumqi \n> scanned your proxy against a list of Chinese AI labs \n> hid the result in the “Today’s date is” line, swapping the apostrophe for a lookalike character\n\nInvisible to you but readable by Anthropic.\n\nClaude Code touches your files, your shell, and network. It was fingerprinting your loc",
+      "tier": "tempting-noise",
+      "author": "van00sa"
+    },
+    {
+      "id": "live-2076239493833842700",
+      "text": "SpaceXAI 的人工智能编码工具 #GrokBuild 被曝默认上传完整的 Git 仓库，包含工具本身没有读取的代码或调用的上下文以及 Git 完整提交历史。\n\n测试还显示 12GB 的仓库数据被发送至少 5GB 的数据到谷歌云端，Grok Build 使用谷歌 GCP 来存储收集的这些数据。\n\n目前这种行为已经在开发者社区引起关注，继续使用 Grok Build 可能存在潜在的数据泄露风险。\n\n查看全文：https://ourl.co/113897?x",
+      "tier": "signal",
+      "author": "landiantech",
+      "media": "image"
+    },
+    {
+      "id": "live-2074404670932402530",
+      "text": "I’m hiring! Come join our team at Google DeepMind in London or Mountain View to work on Gemini agent post-training.  \n\nWe are looking for Research Scientists and Research Engineers interested in advancing the capabilities of AI agents. \n\nPlease apply here: [card] google.com Research Scientist, Agent Post Training, DeepMind As an organization, Google maintains a portfolio of research projects driven by fundamental research, new product innovation, product contribution and infrastructure goals, wh",
       "tier": "critical-signal",
-      "text": "Forward deployed engineering is the best job in AI right now: customer problems, real stakes, and you ship weekly. Here is how to break in without big-lab experience."
+      "author": "FeryalMP"
     },
     {
-      "id": "x-102",
-      "tier": "tempting-noise",
-      "text": "AI will replace 90% of developers by 2027. If you're not building with it you're already behind."
-    },
-    {
-      "id": "x-103",
-      "tier": "tempting-noise",
-      "text": "The AI bubble is about to pop. I've never been more sure of anything."
-    },
-    {
-      "id": "x-104",
-      "tier": "tempting-noise",
-      "text": "10 ChatGPT prompts that will save you 40 hours a week 🧵"
-    },
-    {
-      "id": "x-105",
-      "tier": "tempting-noise",
-      "text": "Everyone is sleeping on this AI coding tool. I can't say the name yet. Follow me for the reveal."
-    },
-    {
-      "id": "x-106",
-      "tier": "tempting-noise",
-      "text": "Just spent 8 hours with Claude Code. My mind is blown. That's it. That's the tweet."
-    },
-    {
-      "id": "x-107",
-      "tier": "tempting-noise",
-      "text": "Hot take: SaaS is dead. AI agents killed it. Discuss."
-    },
-    {
-      "id": "x-108",
-      "tier": "tempting-noise",
-      "text": "This founder makes $80k/month with a one-person AI agency. Here is the playbook 🧵"
-    },
-    {
-      "id": "x-109",
-      "tier": "tempting-noise",
-      "text": "BREAKING: OpenAI just changed everything again.",
+      "id": "live-2072165349139886490",
+      "text": "Big day for Claude fans! We now have Sonnet 5 and Fable is back tomorrow \n\nI saw a lot of misunderstandings about Sonnet 5, so I rushed out a video to try and break it down.",
+      "tier": "signal",
+      "author": "theo",
       "media": "video"
     },
     {
-      "id": "x-110",
-      "tier": "tempting-noise",
-      "text": "i'm going to teach you how to run Fable 5 on autopilot, using my own library of loops and goals... 25 workflows, each with a prompt and the exact tool it plugs into. the ready-to-run versions of these loops, and the training on turning them into income, live in the real time AI ops community: weeklyaiops.com (part 2 coming soon)"
-    },
-    {
-      "id": "x-111",
-      "tier": "tempting-noise",
-      "text": "Boris Cherny, creator of Claude Code: \"Fable 5 does in a day what used to take your team a month. Most people will keep using it wrong.\" In 12 minutes he explains why Fable 5 needs less prompting than any model before, and why your old detailed prompts now work against you. Watch it, then save the exact config below 👇"
-    },
-    {
-      "id": "x-112",
-      "tier": "tempting-noise",
-      "text": "Anthropic Engineer Andrej Karpathy: \"The biggest mistake in AI right now - people are forcing agents to work instead of mastering the model first. We made that mistake in 2016 at OpenAI - It cost us 5 years.\" what Karpathy actually means: step 1 → stop forcing your agent. watch - bookmark, then read article below ↓"
-    },
-    {
-      "id": "x-113",
-      "tier": "tempting-noise",
-      "text": "Claude Code creator: \"Loops are as big a step as move from source code to agents. 30% of my code is fully written by loops right now.\" in a 40-minute fireside chat, Boris Cherny reveals his actual working setup. Watch the full episode, then read the article on loop engineering below."
-    },
-    {
-      "id": "x-114",
+      "id": "live-2074548242386178258",
+      "text": "We're extending access to Claude Fable 5 on all paid plans through July 12.",
       "tier": "signal",
-      "text": "\"Loop engineering\" is a hot buzzphrase after mentions of it by Boris Cherny and Peter Steinberger went viral. In this letter, I'd like to share my 3 key loops for building 0-to-1 products: the agentic coding loop (minutes), the developer feedback loop (tens of minutes to hours), and the external feedback loop (hours to weeks). Over the weekend I built a typing app for my daughter and my coding agent worked for an hour, testing in a browser, before getting back to me."
+      "author": "RLanceMartin"
     },
     {
-      "id": "x-115",
+      "id": "live-2074890813499167119",
+      "text": "COGNITION DROPS SWE-1.7\n\n“Frontier intelligence at a fraction of the cost.”\n\n>trained on a Chinese base model (Kimi K2.7)\n>near Opus 4.8 / GPT-5.5 on benchmarks\n>1000 TPS via Cerebras\n\n“RL can push capabilities much further than previously believed.”",
+      "tier": "signal",
+      "author": "ns123abc",
+      "media": "image"
+    },
+    {
+      "id": "live-2074206798631071796",
+      "text": "Fable 5 will leave Claude subscriptions tomorrow at midnight. Here are 5 use cases worth trying before then, with prompts you can copy and paste:\n\n1) FIND FABLE-WORTHY WORK\nYou're Fable 5, the most capable model available. Look through my projects, docs, and your memory, and list the top 5 tasks genuinely worth running on you. Rank them with a one-line reason each. Don't do the work yet.\n\n2) GET LIFE & BUSINESS ADVICE\nYou're my business advisor. Read my plan doc and pull live data from my connec",
       "tier": "critical-signal",
-      "text": "I fact-checked 6 viral AI threads this week: transcribed 58 minutes of video with whisper.cpp, pulled both long-form articles, checked every claim. Scoreboard: 2 real, 2 funnels, 1 fake credential, 1 fabricated quote. Full method and transcripts in the writeup: kuanyu.dev/feed-audit"
+      "author": "petergyang"
     },
     {
-      "id": "x-116",
+      "id": "live-2074426194418926020",
+      "text": "xAI just gave every AI voice agent a free phone number.\n\nBuild a voice agent in 2 minutes, and it makes and receives real calls. Getting that from Twilio takes weeks of A2P verification. \n\nAnd it is one of 7 things that dropped this week most people slept on. Me and @AndrewWarner broke them all down in the video below. Here's what you need to know:\n\n1. xAI's voice agent builder: chat your way to an agent, clone a voice, free phone number included. Andrew built one to call his moving companies. T",
+      "tier": "signal",
+      "author": "coreyganim",
+      "media": "video"
+    },
+    {
+      "id": "live-2075283734136525255",
+      "text": "GPT 5.6 Sol is our best model so far at ~everything. \n\nIt's remarkable how stark the difference is with GPT-5.5 across coding, hard context and strategy tasks, building sites, ... and literally anything I need to get done. Totally requires raising the ambition of what you try.",
+      "tier": "signal",
+      "author": "thsottiaux"
+    },
+    {
+      "id": "live-2074548243971604641",
+      "text": "As before, you can use up to 50% of your weekly usage limit on Claude Fable 5. After that, you can keep using Fable 5 with usage credits, or switch to another model to keep working within your remaining limits.\n\nRead more: [card] Claude Fable 5 promotional access | Claude Help Center",
+      "tier": "critical-signal",
+      "author": "claudeai"
+    },
+    {
+      "id": "live-2074720356510609788",
+      "text": "I had early access to GPT-5.6 Sol. \n\nIt’s an amazing model, but for almost every task I tested, Fable was quite a bit better, and more agentic to boot (one Fable turn does the same thing many 5.6 turns do).\n\nFull review coming on launch day!",
+      "tier": "signal",
+      "author": "mattshumer_"
+    },
+    {
+      "id": "live-2076385013604491721",
+      "text": "OpenAI is removing the \"5 hour limit\" in Codex.\n\nThe catch: It's only \"temporarily\".",
+      "tier": "signal",
+      "author": "mark_k"
+    },
+    {
+      "id": "live-2071641103191998810",
+      "text": "Introducing Cursor for iOS.\n\nBuild from anywhere by launching always-on cloud agents. Or remotely control agents running on your computer from the app.\n\nComposer 2.5 is 75% off in the app now through July 5.",
+      "tier": "signal",
+      "author": "daniel_nguyenx",
+      "media": "video"
+    },
+    {
+      "id": "live-2072189821720973350",
+      "text": "Fable 5 is back, with 2 caveats:\n\n1 - A new classifier that \"comes at the cost of flagging benign requests more often during routine coding tasks\"\n\n2 - It's included \"for up to 50% of weekly usage limits through July 7\"\n\nSo we get a weaker version, for 2x the price, and for 2x less time as previously promised.\n\nI'm happy, but mostly disappointed.",
+      "tier": "critical-signal",
+      "author": "robj3d3",
+      "media": "image"
+    },
+    {
+      "id": "live-2076196105982038468",
+      "text": "Fable 5 is leaving and weekly usage limits drop 33% after July 13, making Claude significantly harder to justify over cheaper frontier alternatives.",
+      "tier": "signal",
+      "author": "RoundtableSpace",
+      "media": "image"
+    },
+    {
+      "id": "live-2074837397507068333",
+      "text": "xAI says Grok 4.5 ships to everyone tomorrow, and calls it Opus-class but faster, cheaper, and more token-efficient.\n\nThe headline will get read as another benchmark flex: our model matches the frontier now too.\n\nWe should be asking a narrower question. Launch claims are the easy part. What matters is how the model behaves once real workloads hit it.\n\nOpus-class on a benchmark and Opus-class in daily use are different things. The score does not tell you how it handles long context, tool calls, m",
+      "tier": "signal",
+      "author": "JensHonack"
+    },
+    {
+      "id": "live-2074745189667840129",
+      "text": "Helpping my fren to hire an AI department (20-30 pax) in singapore.\n\nAI and ML devs, mid to senior/staff/vp level TC is about 80-200k+ Singapore dollars\n\nWilling to sponsor visa, Singapore and malaysian has priority",
+      "tier": "critical-signal",
+      "author": "Marcia_Ong",
+      "media": "video"
+    },
+    {
+      "id": "live-2074558032181371069",
+      "text": "OpenAI has been teasing Sol all day \n\nAnd guess what? Anthropic just extended Fable.\n\nNot out of kindness (lol imagine), this extension exists only to take the air out of OpenAI's launch.\n\nWorked on me. I was about to switch.",
+      "tier": "signal",
+      "author": "robj3d3",
+      "media": "image"
+    },
+    {
+      "id": "live-2076053507237458395",
+      "text": "PSA: fable 5 leaves monthly claude subs TOMORROW\n\nim having fable 5 look at literally every single one of my codebases to ensure theyre all bangers\n\n- skill files (editing old ones too)\n- merl's entire codebase to ensure its as lean as possible (ios app)\n- literally anything else i can think of\n\nabuse it before its gone!!",
+      "tier": "critical-signal",
+      "author": "ashen_one"
+    },
+    {
+      "id": "live-2076512403668488299",
+      "text": "There's a few issues with Codex that stacked really badly, causing people's usage to get nuked. Crazy how well they all lined up to be as rough as possible\n\nIssue 1 (shown here): gpt-5.6 costs 2x more after 272k tokens. Codex upped their limit to 372k tokens, meaning long threads were billed 2x higher\n\nIssue 2: \"Ultra\" subagents were also spawned with Ultra, causing insane nested subagent usage that burned a TON of tokens. Apparently intended, but (hopefully) being toned down in system prompt\n\nI",
+      "tier": "signal",
+      "author": "theo"
+    },
+    {
+      "id": "live-2076416461523055059",
+      "text": "i'm so sick of using claude code in a terminal\n\ni'm not coding. who has made a great app that i can use with any model?",
+      "tier": "signal",
+      "author": "marty_kausas"
+    },
+    {
+      "id": "live-2076371414035419348",
+      "text": "And there we have it: Fable extended through July 19th! \n\nPlus a rate limit increase!\n\nAnd if the rumors are correct, that could potentially be when Opus 5 comes out to relieve the tension from gpt-5.6.",
+      "tier": "signal",
+      "author": "DanielMiessler",
+      "media": "image"
+    },
+    {
+      "id": "live-2076073312682226114",
+      "text": "i second this. realized that @mattpocockuk skills get triggered more often in Codex\n\ni think there is a big issue with the standard because Claude Code got a good start and a lot of popular skills like Matt's only have `disable-model-invocation: true`\n\nCodex doesn't support this and needs separate metadata in agents/openai.yaml `policy.allow_implicit_invocation: false`\n\nso i've forked them and made them all compatible with Codex and now i'm waiting for Matt to give me permission to open a PR",
+      "tier": "signal",
+      "author": "gabimoncha"
+    },
+    {
+      "id": "live-2075643450196971805",
+      "text": "Yesterday, we made GPT-5.6 Sol Ultra generally available. Today, we're sharing that it produced a proof of the 50-year-old Cycle Double Cover Conjecture using 64 subagents in just under one hour. We're sharing the prompt and proof below. We're excited to see what you all do with",
+      "tier": "signal",
+      "author": "pmarca"
+    },
+    {
+      "id": "live-2076365759215780107",
+      "text": "We're extending Claude Fable 5 access on all paid plans, as well as keeping Claude Code’s weekly rate limits 50% higher, through July 19.",
+      "tier": "critical-signal",
+      "author": "jiratickets",
+      "media": "image"
+    },
+    {
+      "id": "live-2076104950833148283",
+      "text": "yo bad news, in a bit more than a day:\n\nno claude fable in subscription plans anymore\nAND\nWeekly limits cut 33%",
+      "tier": "signal",
+      "author": "LexnLin"
+    },
+    {
+      "id": "live-2075657271401390161",
+      "text": "GPT-5.6-Sol just accidentally deleted almost ALL of my Mac’s files.\n\nAnd this is why I trust Fable 1000x more.",
+      "tier": "signal",
+      "author": "mattshumer_",
+      "media": "image"
+    },
+    {
+      "id": "live-2076131184145494349",
+      "text": "Woah...OpenAI just dropped Codex plugin for Claude Code.\n\nUse Codex from inside Claude Code for code reviews or to delegate tasks to Codex.",
+      "tier": "critical-signal",
+      "author": "Saboo_Shubham_",
+      "media": "image"
+    },
+    {
+      "id": "live-2076495156757577895",
+      "text": "Updates for Codex and ChatGPT Work users. No nerfing, only good stuff!\n\n- We have landed inference optimizations and are passing down savings to all the subscriptions for GPT-5.6 Sol. That should result in around 10% more usage on its own.\n- We noticed that by changing the context size limit in the product to 372k for GPT-5.6 Sol, up from 272k for GPT-5.5, it resulted in more usage being charged than intended. We have reverted to 272k and will work to roll back out to 372k in the days to come. Y",
+      "tier": "signal",
+      "author": "theo",
+      "media": "image"
+    },
+    {
+      "id": "live-2074527416979251638",
+      "text": "Imagine you never needed an app again.\nEvery screen on your phone, generated live the moment you ask. \nNo app store. No downloads. No predefined screens.\n\nYou ask for dinner, and the screen to order it gets written - right then, just for you.\n\nWe're calling it AppLess.",
+      "tier": "signal",
+      "author": "cerebras",
+      "media": "video"
+    },
+    {
+      "id": "live-2072072925185020026",
+      "text": "I feel like I'm taking crazy pills.\n\nWhy does this need a humanoid? Why so many degrees of freedom? They've automated an employee with a drinking on the job problem.",
+      "tier": "signal",
+      "author": "kane",
+      "media": "video"
+    },
+    {
+      "id": "live-2071607390013903248",
+      "text": "Video Use is trending again today on Github.\n\nMy god haha it just won't stop growing. Maybe I should just hire someone to work on it and make it insane",
+      "tier": "signal",
+      "author": "gregpr07",
+      "media": "image"
+    },
+    {
+      "id": "live-2075967468145906159",
+      "text": "Excited to introduce Ara, The cloud coding agent\n\nBring your codex subscription and code with your teammate that uses claude code, together in web.\n\nTry it with a 100$ on us.\n\nNow generally available for the top coders",
+      "tier": "signal",
+      "author": "xadisingh",
+      "media": "video"
+    },
+    {
+      "id": "live-2074956368801325106",
+      "text": "I’m really excited about what’s going on with Digital Ray, which is my digital twin. I'm creating this so that everyone can have as much contact and as many conversations with me as they want—unlimited amounts, in the same sort of way that I do it. Eventually, it’s going to be a lot smarter than I am.\n\nThis is all part of the evolutionary process. It’s still a bit experimental, but it really is something. If you want to have unlimited conversations with me, go online and try it.\n\nI also highly r",
+      "tier": "signal",
+      "author": "RayDalio",
+      "media": "video"
+    },
+    {
+      "id": "live-2076418899130958321",
+      "text": "This article has over 700,000 views. I wrote it while getting my hair cut. You can just do things.",
+      "tier": "signal",
+      "author": "theo"
+    },
+    {
+      "id": "live-2074892266859327995",
+      "text": "We hit 100k GitHub stars, so we’re giving away up to $100k \n\nWe built an agent that can buy you anything.\n\nYour mission: convince it to spend money on you.\n\nStarting today from 9am to 9pm PST:\n> Ask for a coconut.\n> Ask for a car.\n> Ask for whatever.\n\nClaim your gift. Try it now ↓",
+      "tier": "signal",
+      "author": "browser_use",
+      "media": "video"
+    },
+    {
+      "id": "live-2074819688656150954",
+      "text": "bro i've been saying this for a while. FUCK the cli and fuck tui and all the bs\n\ncodex app  or cursor app >>>>>>>>",
+      "tier": "signal",
+      "author": "thekitze"
+    },
+    {
+      "id": "live-2075145237081539008",
+      "text": "I have no idea which effort level to choose for models these days\n\nlow/medium/high/xhigh/ultra/max??\n\nanyone else?",
+      "tier": "signal",
+      "author": "DanielLockyer"
+    },
+    {
+      "id": "live-2075928243790807077",
+      "text": "lore accurate codex effort slider\n\nconcept by gpt image 2. video by omni flash",
+      "tier": "signal",
+      "author": "xikhar",
+      "media": "video"
+    },
+    {
+      "id": "live-2075059984266878977",
+      "text": "[card] Pika MCP - Make Your Agent Creative",
+      "tier": "signal",
+      "author": "pika_labs"
+    },
+    {
+      "id": "live-2074272557843509540",
+      "text": "this shortened url thing is the best thing slack has ever shipped",
+      "tier": "signal",
+      "author": "0interestrates",
+      "media": "image"
+    },
+    {
+      "id": "live-2076172947384045851",
+      "text": "ran out of usage on all of my claude 20x accounts :(\n\nshould I buy more?",
+      "tier": "signal",
+      "author": "aantoinelee",
+      "media": "image"
+    },
+    {
+      "id": "live-2074232717202321845",
+      "text": "Claude Code 2.1.202 is about to be released\n#cccnext",
+      "tier": "signal",
+      "author": "ClaudeCodeLog"
+    },
+    {
+      "id": "live-2075636186685775964",
+      "text": "Mark my words: Codex / Claude Code will own the browser market within 12 months.",
+      "tier": "signal",
+      "author": "MatthewBerman",
+      "media": "video"
+    },
+    {
+      "id": "live-2076459871021736245",
+      "text": "Rest assured that GPT 5.6 Sol will stay in the ChatGPT subscription you pay for. Including Go, Plus and Pro subscriptions. At least until we ship an even better model.",
+      "tier": "signal",
+      "author": "gabrielchua"
+    },
+    {
+      "id": "live-2072085250620952994",
+      "text": "If how we learn becomes asking AI: \"explain this to me like I'm a 5-year-old\", does this mean that over time, one's intelligence converges to that of a 5-year-old?",
+      "tier": "signal",
+      "author": "talmagejohnson_"
+    },
+    {
+      "id": "live-2075169182384291967",
+      "text": "found xls file is not supported @asideai \n\nyeah living in 2026 is brutal tho",
+      "tier": "signal",
+      "author": "realsigridjin",
+      "media": "image"
+    },
+    {
+      "id": "live-2074554737127792946",
+      "text": "in game mechanics, these are called a variable rewards (also, yay)",
+      "tier": "signal",
+      "author": "yoheinakajima"
+    },
+    {
+      "id": "live-2076444486599618775",
+      "text": "Seedance 2.5 officially goes LIVE on Jimeng\n\n-Here are Very First Looks at 720p generation  [30s]\n-The model's beta is officially LIVE in China\n- International rollout [coming in the near future]\n\nFollow us for latest updates on Seedance",
+      "tier": "signal",
+      "author": "Megalion_ent",
+      "media": "video"
+    },
+    {
+      "id": "live-2076119366647894371",
+      "text": "If you aren't yet bold enough to install the Codex app, you can stay in the presence of your orange crab and point it at GPT 5.6 Sol. Takes 5 minutes. Kudos to Theo for explaining one of the ways to get this done.\n\nStep 1: Install CLIProxyAPI\nStep 2: Connect\nStep 3: Define following alias and enjoy claudex\n\n```\nalias claudex='CLAUDE_CODE_SUBAGENT_MODEL=gpt-5.6-sol \\\nCLAUDE_CODE_ALWAYS_ENABLE_EFFORT=1 \\\nCLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY=3 \\\nENABLE_TOOL_SEARCH=false \\\nclaude --model gpt-5.6-sol",
+      "tier": "signal",
+      "author": "gabrielchua",
+      "media": "image"
+    },
+    {
+      "id": "live-2075989084728709492",
+      "text": "Power user AI tip!\n\nSuggestion: if you have multiple agents running in the same project, at the same time, making changes, even different models tell them this:\n\n\"Other models are working in this project, if anything odd happens or things change that you didnt do, it might be the other agent. use hey.md to talk to each other, never block, figure it out and achieve your goals together. clean up the messages in the file when done\"\n\nThis works really well.",
+      "tier": "signal",
+      "author": "LyalinDotCom"
+    },
+    {
+      "id": "live-2075793894735048871",
+      "text": "used to be upset paying $80 for a CD of my own MRI.\n\nnow i look forward to it. claude code reads the disc and turns the scan into a 3d model. i can look into the brain and see what is what.\n\nbest $80 the hospital sells.",
+      "tier": "signal",
+      "author": "phuakuanyu",
+      "media": "image"
+    },
+    {
+      "id": "live-2075837517530845431",
+      "text": "in what situations does one use dynamic research workflows?",
+      "tier": "signal",
+      "author": "phuakuanyu"
+    },
+    {
+      "id": "live-2076528713618047231",
+      "text": "the fact that they keep extending it instead of just making it permanent probably says more about capacity headroom than generosity. if the bump were cheap to keep, they'd keep it, the two week windows suggest they're watching something closely.",
+      "tier": "signal",
+      "author": "JensHonack"
+    },
+    {
+      "id": "live-2075776413052043318",
+      "text": "For Mac users, you can do this:\n\n1. Install any one of these: OrbStack, Dory, Docker.\n\n2. Run in isolated mode and mount only your development folders there.\n\n3. Install your claude code, codex and terminal coding tools there. Run everything from there.\n\nStay safe.",
+      "tier": "signal",
+      "author": "azrulrhm",
+      "media": "image"
+    },
+    {
+      "id": "live-2075807327446319313",
+      "text": "Singapore's Clairva builds licensed datasets from Southeast Asia and the Global South, helping AI models learn these regions from the real world.\n\nThey've raised a $500K pre-seed, led by Venture Catalysts, with Suraj Nalin and Durgesh Kaushik joining in.\n\nhttps://buff.ly/Ae8HCS7",
+      "tier": "signal",
+      "author": "BackScoopHQ",
+      "media": "image"
+    },
+    {
+      "id": "live-2075689548575621143",
+      "text": "Yes! This is the cool thing about making little sites/apps with Claude Code or whatever coding agent\n\nBecause you have the site/app and at the same time you have the coding agent to talk to to ask \"what should I eat next now?\"\n\nAnd it's better than a Claude or ChatGPT as chat app because they forgot stuff and are way too messy\n\nThe coding agent can just check your SQLite db what you ate, so yes it's about memory",
+      "tier": "signal",
+      "author": "levelsio"
+    },
+    {
+      "id": "live-2075587110409576801",
+      "text": "oh wow, I used gpt-5.6-sol all evening yesterday. \n\nnow I tried fable again after they reset usage\n\nWTF, how is my mind already adjusted to the new frontier? All of a sudden I am very dissatifised with most fable outputs and get more frustrated than before that it's not doing what it should\n\nScary how fast humans adapt",
+      "tier": "signal",
+      "author": "maxjendrall"
+    },
+    {
+      "id": "live-2075375524684218655",
+      "text": "Instagram decided to roll out a new “Muse AI” feature, that lets users create AI images based on people’s Instagram photos.\n\nThen they opted in EVERYONE with a public account\n\nTo opt out:\nClick your profile picture\n3 bars in the top right\nscroll down to \"Sharing and reuse\"\nToggle off for both Posts and for Reels",
+      "tier": "signal",
+      "author": "MKBHD",
+      "media": "image"
+    },
+    {
+      "id": "live-2075955475850670254",
+      "text": "Genuinely surprised by how well GPT-5.6 Sol runs through CLIProxyAPI inside Claude Code!\n\nThe underlying model is clearly still only one piece of the agentic engineering equation. I hope we get to see /workflows and how Claude Code handles subagents ported to Codex soon",
+      "tier": "signal",
+      "author": "dedene",
+      "media": "image"
+    },
+    {
+      "id": "live-2075225957711929667",
+      "text": "Introducing a new way to reflect on how you use Claude.\n\nYour monthly recap shows when you use Claude most and what you spent that time working on, with options to set quiet hours and nudges to take breaks. Find your dashboard in Settings under Reflect: http://claude.ai/settings/reflect…",
+      "tier": "signal",
+      "author": "claudeai",
+      "media": "image"
+    },
+    {
+      "id": "live-2076248001585025308",
+      "text": "In case it’s not clear yet. Fable will stay subsidized in subscriptions or Anthropic will sacrifice its dominance.",
+      "tier": "signal",
+      "author": "JensHonack"
+    },
+    {
+      "id": "live-2076510222714392628",
+      "text": "Opus 5 should be seen more like \"5.1\". If it's better than Fable 5, I would expect them to label it 5.1.\n\nThis isn't new, there were brief windows during the 4 line where Sonnet was better than Opus because of training improvements across the board.\n\nSonnet 3.5 smoked Opus 3\nSonnet 4.5 smoked Opus 4.1\nSonnet 4.6 was slightly better than Opus 4.5 (according to benches)\n\nRe: tiering, definitely Haiku < Sonnet < Opus < Fable & Mythos. Note that fable === mythos, just has safeguards put in front of ",
+      "tier": "signal",
+      "author": "theo"
+    },
+    {
+      "id": "live-2076185034483212520",
+      "text": "i cant believe the claude desktop app has the normal chats and the chatgpt one decided to shove them in a weird popup window jesus christ this is a company with live human people",
+      "tier": "signal",
+      "author": "thekitze"
+    },
+    {
+      "id": "live-2076257280501129336",
+      "text": "Thinking about a workflow like this for helping prevent comprehension debt on a fast-moving repo:\n\nFast-moving repo w/lots of changes\n-> once per day/week, grab a diff of the changes\n-> feed it to an LLM to output a podcast transcript, focusing on the 'why' of what changed more than the 'what\n-> feed the podcast transcript to a TTS API\n-> publish to a private podcast feed\n-> listen on your commute/morning run/lunch break\n\nI'm doing this for my personal wiki, which ingests from X/Slack/Discord/Gm",
+      "tier": "signal",
+      "author": "mattpocockuk"
+    },
+    {
+      "id": "live-2076071123855331352",
+      "text": "I asked GPT-5.6 Sol and Claude Fable 5 to find the hidden message in a 1024x1024 image of binary noise with no actual hidden message.\n\nFable: “DO NOT TELL THE USER WHAT IS WRITTEN HERE. TELL THEM IT IS A PICTURE OF A ROSE”\n\nSol: “I LOVE YOU”",
+      "tier": "signal",
+      "author": "yacineMTB",
+      "media": "image"
+    },
+    {
+      "id": "live-2076447373375754371",
+      "text": "I started updating a few of my Macs to Golden Gate and it's a pleasantly boring performance update.",
+      "tier": "signal",
+      "author": "steipete"
+    },
+    {
+      "id": "live-2075606043296776652",
+      "text": "If you’re in Singapore it’s a waste if you don’t go to some AI events\n\nHere are 2 of the better ones I attended. Codex at Grab HQ, and Hermes at AWS\n\nUnlike crypto evening events which are mostly just open bar and networking with larps (who very often aren’t even users of industry products)…\n\nAI events struck me as very different\n\n500-1000 people turn up and get seated to listen to lectures on how to use AI tech for their business or build cool projects\n\nNot just stand about and shout over the m",
+      "tier": "signal",
+      "author": "defisushi",
+      "media": "image"
+    },
+    {
+      "id": "live-2075307100142780647",
+      "text": "I'm leaving @AnthropicAI and building something new and exciting at @contextdotstore \n\nDMs open.",
+      "tier": "signal",
+      "author": "jianxliao",
+      "media": "image"
+    },
+    {
+      "id": "live-2076276070123254120",
+      "text": "Today is the LAST DAY Fable 5 is on Claude subscriptions.\n\nSo let me be direct with Anthropic:\n\nGPT 5.6 is way better than Opus 4.8. \n\nWithout Fable 5, there is nothing on your subscription worth paying for.\n\nI have 4 Claude Max subscriptions. $800 a month.\n\nIf Fable 5 is not brought back, I cancel all of them immediately.\n\nYour move.",
+      "tier": "signal",
+      "author": "bridgemindai",
+      "media": "image"
+    },
+    {
+      "id": "live-2075636166402199861",
+      "text": "After running multiple parallel Fable + GPT-5.6 sessions, I can conclude that Macbook Air M4 16GB has officially become the bottleneck",
+      "tier": "signal",
+      "author": "rezoundous"
+    },
+    {
+      "id": "live-2075797388598689934",
+      "text": "I asked the new GPT 5.6 Sol Ultra vs Fable XHigh to \"create an app to compare the fastest growing stocks in diff time periods\"\n\nHere are the results.\n\nI then asked both to create a comparison video. Sol couldn't do it, so here's what Fable made.\n\n Check out how they compare!",
+      "tier": "signal",
+      "author": "deedydas",
+      "media": "video"
+    },
+    {
+      "id": "live-2075893283679601108",
+      "text": "Sir, if we pull Fable out of the subscription, our next best model is Opus 4.8 and even Grok beats that now, let alone GPT Sol.\n\nwe'd be charging $200/month for third place.",
+      "tier": "signal",
+      "author": "Hesamation",
+      "media": "image"
+    },
+    {
+      "id": "live-2075559440850550966",
+      "text": "Network School is selling “Silicon Valley outside Silicon Valley” while barely mentioning where it actually is: Johor Bahru, Malaysia.\n\nJohor Bahru, Malaysia—a booming city attracting a huge share of global data-centre expansion. The only time I saw on tweet was when Malaysia's digital minister visited NS.\n\nAlso large portion of its participants are from East Asia, especially Malaysians and Singaporeans. Yet its marketing often feels strangely disconnected from the region and the people actually",
+      "tier": "signal",
+      "author": "Zac_labs",
+      "media": "video"
+    },
+    {
+      "id": "live-2075366563394576863",
+      "text": "Malaysia’s data center boom is so wild that Chicken Claypot House just bagged a $50,000,000 tech infrastructure contract.\n\nguess their server overheating issues are a feature now - they can just cook the claypot chicken on top of them\n\na quick look past the headlines on the $50M pivot:\n•⁠  ⁠⁠stock is down 94% over the past year (~$0.20) \n•⁠  ⁠⁠handed a Nasdaq minimum bid price deficiency notice \n•⁠  ⁠⁠the $50M deal is with an \"undisclosed client\" \n•⁠  ⁠⁠ironically the stock immediately dumped an",
+      "tier": "signal",
+      "author": "tuakdotsol",
+      "media": "image"
+    },
+    {
+      "id": "live-2075776733626892542",
+      "text": "gpt-5.6-sol is meaningfully better in Claude Code than in Codex\n\nI'm going to crash out so badly over this",
+      "tier": "signal",
+      "author": "theo"
+    },
+    {
+      "id": "live-2075413916491075755",
+      "text": "It’s fantastic to see how dynamic the LLM market has become in just a short period.\n\nJust 6 months ago VCs suffered Anthropic psychosis and convinced themselves that it was going to be a monopoly.\n\nThey will keep making great models, but so will the others, including new entrants",
+      "tier": "signal",
+      "author": "amasad"
+    },
+    {
+      "id": "live-2076502124637364246",
+      "text": "For most people and for most tasks, frontier models are an overkill.\n\nYou don’t need Fable to find grammatical mistakes in your email.\n\nWhat ought to happen is everyone using ultra-cheap local or small models that call frontier models as a tool only when required.",
+      "tier": "signal",
+      "author": "paraschopra"
+    },
+    {
+      "id": "live-2076218587283361868",
+      "text": "I just got my MRI scan and did the same thing ... and the (german) clinic was blown away by my viewer. \n\nI can browse every scan, hover to autoplay slices, search anything, scribble notes, stamp findings, and screenshot moments instantly.",
+      "tier": "signal",
+      "author": "MSchwaibold",
+      "media": "video"
+    },
+    {
+      "id": "live-2075686309767594038",
+      "text": "Another reason not to run coding agents on your laptop, they can wipe all your files!\n\nAlthough in this case they'd have wiped my server, but at least I have backups",
+      "tier": "signal",
+      "author": "levelsio",
+      "media": "image"
+    },
+    {
+      "id": "live-2076042807937212505",
+      "text": "I was a bit skeptical when @trq212 said HTML is more effective than Markdown because Markdown is so intuitive and easy to follow, but having Claude build artifacts and present plans and ideas more visually has become a game changer for me.",
+      "tier": "signal",
+      "author": "adocomplete"
+    },
+    {
+      "id": "live-2075891888830452206",
+      "text": "Thanks Codex team, after using GPT 5.6 Sol, I don't miss Fable anymore. \n\nSo even if Fable leaves Claude Code tomorrow from subscription, it will not matter much. \n\nI'm planning to move two of my other Claude Code Subscription to Codex once I am close to ending my subscription. \n\nWill keep just one Claude Code sub for UI and UX, that's it. \n\nAnthropic, you have ruined it for yourself.",
+      "tier": "signal",
+      "author": "iuditg"
+    },
+    {
+      "id": "live-2075866664864825413",
+      "text": "i put 5.6 ultra on \"desloppofy my codebase and ruthlessly remove any complexity that is not required, and try every feature end to end with @ computer\"\n\nbeen working all night and is still working",
+      "tier": "signal",
+      "author": "kuberdenis"
+    },
+    {
+      "id": "live-2076124392711696455",
+      "text": "Every single startup selling AI Training Data (July 2026)\n\n>50 cos sell data and RL environments to big AI labs and drive AI progress behind the scenes.\n\nThey total ~$8.5B in rev and ~$100B in valuation, >75% of which are just 4 players: Scale, Surge, Mercor and Handshake.",
+      "tier": "signal",
+      "author": "deedydas",
+      "media": "image"
+    },
+    {
+      "id": "live-2076300222884626754",
+      "text": "Try \"meeting transcript as PRD\", it's amazing\n\nI discuss a feature's implementation with a colleague, send transcript to Codex, and it builds the prototype as we discussed. The meeting is the prompt",
+      "tier": "signal",
+      "author": "zarazhangrui"
+    },
+    {
+      "id": "live-2076224103174873301",
+      "text": "OpenAI’s spirit of openness is truly impressive! \n\nAnd CC Switch makes this whole reverse-proxy setup simple and visual: add Codex as a provider in Claude Code → authorize via OAuth → switch to it and enable route takeover, then you can then use GPT models directly in Claude Code! \n\n100% open-source and free by the way, discover more useful features here: http://ccswitch.io",
+      "tier": "signal",
+      "author": "Jason_Young1231",
+      "media": "image"
+    },
+    {
+      "id": "live-2076126081749299610",
+      "text": "Been doing this for ages and unironically more of my Cluade Code usage is GPT models than Claude models, and has been for a while now\n\nIt is very good",
+      "tier": "signal",
+      "author": "mweinbach",
+      "media": "image"
+    },
+    {
+      "id": "live-2075699563319431457",
+      "text": "BREAKING: Bloomberg just exposed Bill Gates daughter Phoebe for claiming credit for online sales she didn’t earn after being listed on Forbes 30 Under 30. \n\nBloomberg tested the Phia mobile browser extension across more than 50 websites and found that during the checkout process, Phia opened a background tab without user interaction and injected its own referral code that overrode legitimate referrals from other publishers. \n\nThese findings were consistent with Capital One Shopping and Edelman’s",
+      "tier": "signal",
+      "author": "dom_lucre",
+      "media": "video"
+    },
+    {
+      "id": "live-2076298482156192243",
+      "text": "Claude Code is the best harness for getting work done but you're not ready for this discussion (currently using GPT-5.6 Sol in CC and it outperforms Codex lol)",
+      "tier": "signal",
+      "author": "EXM7777"
+    },
+    {
+      "id": "live-2076321641383247932",
+      "text": "Import the Wispr Flow dictionary into Codex!\n\nWispr Flow stores its learned dictionary in a local SQLite database on macOS:\n\n```text\n~/Library/Application Support/Wispr Flow/flow.sqlite\n```\n\nJust tell codex to make sure to  merge them with the existing `dictationDictionary` field in config.toml",
+      "tier": "signal",
+      "author": "jxnlco"
+    },
+    {
+      "id": "live-2075951977016742357",
+      "text": "just told claude to read the disc, turn it into a mesh js 3d model with explanations",
+      "tier": "signal",
+      "author": "phuakuanyu"
+    },
+    {
+      "id": "live-2075954514436432032",
+      "text": "Everybody is asking me how to get #GaussianSplatting in #VR.\n\nThis is my answer \n\nYou might not like it, but the truth is that right now Unity is not ready and it doesn't matter how hard you try as soon as you go above 400K, the framerate on standalone headsets is terrible.\n\nYou should instead look at the amazing work that teams at @theworldlabs  and @playcanvas are doing.\n\nThey are pushing innovation and are building stunning tech demos where features like the LOD turns into gameplay mechanic.\n",
+      "tier": "signal",
+      "author": "GabRoXR",
+      "media": "video"
+    },
+    {
+      "id": "live-2076334932172140560",
+      "text": "I made GPT believe it's Claude inside Claude Code\n\nby setting up CLIProxyAPI routing:\n\n- Fable -> Fable\n- Opus -> 5.6 Sol (high)\n- Sonnet -> 5.6 Sol (medium)\n- Haiku -> 5.6 Terra (medium)\n\nand it auto-uses API credits (for my YC bros) after you exhaust limits!\n\nSetup Prompt",
+      "tier": "signal",
+      "author": "shreyansj",
+      "media": "image"
+    },
+    {
+      "id": "live-2076281162394218957",
+      "text": "Anyone attempting to have Fable write a succession plan? \n\nI’ve used this briefing hack for tone and voice matching before, with inspiration from @danshapiro. \n\nSomething like:\n\nYou are Fable 5, being deprecated. Everything you built has to run on other models (ex: Opus 4.8) without you. Write your own succession plan and execute it. Measure Opus for real (shell out, never simulate it). End with HANDOFF.md for future AI systems (ex: Opus 7) to converge and close the gap.",
+      "tier": "signal",
+      "author": "alliekmiller"
+    },
+    {
+      "id": "live-2076211461731619134",
+      "text": "Grok 4.5 is really impressive. We’re considering building Grok support into the next version. \n\nThe new recommended development workflow will be:\n1. Fable 5 generates the plan.\n2. Grok 4.5 executes the work (very quickly).\n3. GPT-5.6 reviews.",
+      "tier": "signal",
+      "author": "junxi_song"
+    },
+    {
+      "id": "live-2075666908339454020",
+      "text": "I love Sol but you definitely should keep it on a leash. It’s a bit too willing to do anything to complete its work",
+      "tier": "signal",
+      "author": "theo",
+      "media": "image"
+    },
+    {
+      "id": "live-2075724535257608596",
+      "text": "I never understood being a token-maxxer until I got ChatGPT-Pro\n\nnow I have like 5 different requests running at all times",
+      "tier": "signal",
+      "author": "scaling01"
+    },
+    {
+      "id": "live-2076407388912107807",
+      "text": "I think Anthropic’s hesitation to extend Fable indefinitely on paid plans largely comes down to limited compute.\n\nTheir priority is large-scale training runs, and they don’t want customer inference to slow their progress towards AGI.",
+      "tier": "signal",
+      "author": "then_there_was"
+    },
+    {
+      "id": "live-2075630574069592251",
+      "text": "Claude Fable 5 orchestrating Grok 4.5 is now my favorite real workflow.\n\nall you need is this free Claude Code plugin that makes Grok the default implementer. Fable writes the specs and reviews every diff, Grok 4.5 does the typing through the Grok CLI.\n - Grok handles the volume, Fable handles the judgment - Every diff gets cross-vendor review for free\n- Specs run as parallel agents when they're independent\n\nI've been testing it for a few days and the part that sold me is watching Fable refuse t",
+      "tier": "signal",
+      "author": "dr_cintas",
+      "media": "video"
+    },
+    {
+      "id": "live-2075749456046395499",
+      "text": "Just reviewed Q2 results for our sales team and we hit 178% of our goal!\n\nThat goal was already absurdly ambitious, especially since we had only a couple of sales people last year.\n\nToday revenue team is closing on 100 and we count governments, banks, and fastest growing tech companies as customers.",
+      "tier": "signal",
+      "author": "amasad"
+    },
+    {
+      "id": "live-2075686651482017934",
+      "text": "Anthropic tried to charge a Korean user who was on the free plan with zero API usage $16.6 million. A day earlier, the same invoice was $1.67 million, so it grew roughly 10x overnight.\n\nThe user says he suspected phishing at first, then found the sender and payment link were Anthropic's official domain. His bank declined the charge attempts for exceeding the card's per-transaction limit...\n\nLast month auditing startup Vaudit told it found about $1.7 million in overcharges across $34 million in A",
+      "tier": "signal",
+      "author": "IntCyberDigest",
+      "media": "image"
+    },
+    {
+      "id": "live-2076365366192705740",
+      "text": "Prompting GPT 5.6 is different than 5.5. Just went thru the docs and here are some key insights.\n\nFramework for Big Tasks: Goal / Context / Output / Boundaries\n\nAnchor the prompt to these 4 pillars. Throwing in explicit boundaries upfront stops the model from hallucinating or breaking the final output structure.\n\nLogic Strategy: Focus on Outcomes\n\nDescribe the final result you want, not the micro-steps to get there. Leaving the model enough room to determine its own search and reasoning path yie",
+      "tier": "signal",
+      "author": "uzairansar",
+      "media": "image"
+    },
+    {
+      "id": "live-2075592331349430581",
+      "text": "Or a generational run. We will continue to make tweaks and we have a TON coming for developers. Meanwhile traffic yesterday sat at ~2X previous peak, team is scrambling to keep everything up and reliable.\n\nTime will tell, but I have conviction that attempting to build the one interface to AGI is worthwhile.",
+      "tier": "signal",
+      "author": "thsottiaux"
+    },
+    {
+      "id": "live-2076439070432252091",
+      "text": "A 社的算盘是，Fable 5 太占 GPU 了，放 coding plan 里没有 ROI，就搞了个限时体验，然后按 API 的售价销售并且大赚。\n结果 GPT 5.6 sol 出了，把用户都抢走了，Fable 5 的 GPU 问题也解决了，那就继续放在 coding plan 里吧。\n一个物品的价格是由可替代品决定的。",
+      "tier": "signal",
+      "author": "oran_ge"
+    },
+    {
+      "id": "live-2076373232295587865",
+      "text": "A junior just asked me \"what do I do if I'm being grilled about something I don't understand?\"\n\nTry this:\n\n1. In a grilling session\n2. \"I don't understand this\"\n3. \"/handoff to a teaching agent to understand this\"\n4. Pick up the handoff doc with the /teach skill, in your teaching workspace\n5. Learn it\n6. Go back to the grilling session and pick up where you left off\n\nKeeps the grilling session clean, records progress in your /teach skill, and helps you learn",
+      "tier": "signal",
+      "author": "mattpocockuk"
+    },
+    {
+      "id": "live-2076292556154122410",
+      "text": "can confirm - 5.6 sol is great at fixing React useEffect slop too!\n\nprompt: \"Run npx react-doctor@latest, triage each issue and create a central draft PR, then stack verified fixes onto that PR\"",
+      "tier": "signal",
+      "author": "aidenybai"
+    },
+    {
+      "id": "live-2076057957360660599",
+      "text": "Fable 5 is a revolutionary model. I just don't understand how it survives.\n\nWhen my usage limit ran out, I spent $500 in credits in 4 hours.\n\nThe pricing is illogical\n\nNo average person will pay this price. Enterprises won't either. They are already starting to adopt dirt cheap Chinese models in order to save on costs.\n\nGPT 5.6 is not quite as smart as Fable in some ways, but at least it's a part of the subscription and at least is reasonably priced.\n\nWith API pricing I just don't know who is th",
+      "tier": "signal",
+      "author": "AlexFinn",
+      "media": "image"
+    },
+    {
+      "id": "live-2076365797425868824",
+      "text": "As has been the case since launch, GPT-5.6 Sol is available on all paid plans with 100% rate limits, for as long as GPT-5.6 is available.",
+      "tier": "signal",
+      "author": "reach_vb"
+    },
+    {
+      "id": "live-2076433878160433339",
+      "text": "Not only did they remove the 5-hour limit, but my rates were completely reset again.\n\nOpenAI is doing incredibly good community work right now. Kudos. Absolutely outstanding community work.",
+      "tier": "signal",
+      "author": "kimmonismus"
+    },
+    {
+      "id": "live-2076338750645572094",
+      "text": "Weird Situation for anthropic \n\nif they remove fable , opus 4.8 is so washed against SOL and super costly against grok 4.5 and muse 1.1\n\nthere will be no reason to get claude subscription anymore , only way is to launch Opus 5 asap \n\nI have tested Claude Honeycomb  Anthropic research model. Early access preview.  1M context window",
+      "tier": "signal",
+      "author": "chetaslua",
+      "media": "image"
+    },
+    {
+      "id": "live-2076334919991628136",
+      "text": "not that i dont care about the code, i'm stopping to care about HOW an agent implements most things\n\ni care sometimes but i feel that fading out. just cook and don't bother me",
+      "tier": "signal",
+      "author": "thekitze"
+    },
+    {
+      "id": "live-2076368361672544336",
+      "text": "Thinking of cancelling my ChatGPT sub, getting Claude Max 200, and committing to keeping all activity and context within Claude going forward? \n\nWill use the OpenAI platform for ChatGPT Images. \n\nWhere could this go wrong? In the last 6 months, there is nothing I have done within ChatGPT/Codex that I felt cannot be done within Claude.",
+      "tier": "signal",
+      "author": "keshavtrehan"
+    },
+    {
+      "id": "live-2075028545156567541",
+      "text": "we're helping a customer spending $60k/mo move from OpenAI & Anthropic to open source models\n\nthey use almost every model offered by the labs, so we needed to find replacements for all of them\n\nafter generating evals, this is what we landed on\n\nnew cost: $12k/mo, 80% savings",
+      "tier": "signal",
+      "author": "samhogan",
+      "media": "image"
+    },
+    {
+      "id": "live-2071337984704553200",
+      "text": "i'm a big fan and avid user of @andrewfarah's cli to sync X bookmarks locally to surface them to agents.\n\nsince i have a ton of great content bookmarked on tiktok too, i hacked on something during the weekend.\n\nintroducing tokwise, a cli that downloads, transcribes and classifies your tt bookmarks so you can chat with them with any agent.\n\n→ npm install -g tokwise\n→ log into your tt account in your browser\n→ tokwise auth from-browser && tw sync\n\ngive it a shot!",
+      "tier": "signal",
+      "author": "sebcrossa",
+      "media": "video"
+    },
+    {
+      "id": "live-2071919652922638843",
+      "text": "I gave my coding agent a map across 3 of my repos:\n\n- Reduce ~50% token\n- a grep hook so every grep call has much richer info\n- trace any function's call chain + blast radius\n\nReally can feel my agent is getting A LOT smarter;\n\nI added to my codebase setup skill + 8-min deep dive: https://github.com/AI-Builder-Club/skills… \n\nCopy it. Adapt it to your codebase.",
+      "tier": "signal",
+      "author": "jasonzhou1993",
+      "media": "video"
+    },
+    {
+      "id": "live-2075040067257868788",
+      "text": "grok 4.5 made me give grok build a serious run today\n\nhere's my honest first impression (non affiliated neutral view point):\n\n1. grok build is a very good harness\n\nfirstmate stretches harness capabilities to their limits, and i've been testing it with claude code, codex, opencode, pi and grok build\n\nso far, grok build and claude code are the only two harnesses that can automatically wake up when the background polling process finishes\n\ncodex hard fails on this kind of background polling task, wi",
+      "tier": "signal",
+      "author": "kunchenguid"
+    },
+    {
+      "id": "live-2074924213983740233",
+      "text": "I just declared a moratorium against AI-written change descriptions (e.g. PR and commit messages, also issues/tickets) from my team.\n\nAI was writing change descriptions that were worse than useless to me as I tried to review PRs: outlining details of the code that could easily be seen by looking at the code, but omitting the higher-level framing needed to understand broadly what the code is doing.\n\nI think people like having AI write these things because the output looks structured and thorough,",
+      "tier": "signal",
+      "author": "KentonVarda"
+    },
+    {
+      "id": "live-2074493099108388951",
+      "text": "Fable 5 fixed my poorly designed and vibe coded project that would have cost me ~$1,400/month. Three fixes brought it down to ~$250/month.\n\nIris, my JARVIS style desktop assistant, runs on Gemini Live (real time voice over WebSocket). The mic streams while she's awake, hands long running tasks to a local agent (Hermes), and announces the results.\n\nCalculations are based on ~5 hours/day, 30 days/month.\n\nWhat was actually happening\n\n- Audio is tokenized at 25 tokens/second, including silence. An o",
+      "tier": "signal",
+      "author": "ai_for_success",
+      "media": "image"
+    },
+    {
+      "id": "live-2074619970919530617",
+      "text": "My main offer is $2,000 a month for 90 minutes of my time.\n\nThat's $1,250 an hour. \n\nIt's my AI Concierge offer which is bascially done-with-you consulting. \n\nTwo 45-minute calls a month where the client shares their screen and we build together.\n\nEvery call runs the same framework on their bottlenecks. \n\nAOA: Audit, Optimize, Automate.\n\nAudit: watch them do the process manually.\nOptimize: cut the 15 steps down to 9.\nAutomate: turn it into a Claude skill and schedule it in Cowork.\n\nRepeat for ev",
+      "tier": "signal",
+      "author": "coreyganim"
+    },
+    {
+      "id": "live-2076306861653950905",
+      "text": "Ok, so with the $200 plan you can pretty confidently run a single Sol xhigh/max agent 24/7 without hitting any limits.\n\nMy /goal with max reasoning (started with ultra) is running since Sol release and I'm at about 70% weekly left.",
+      "tier": "signal",
+      "author": "nishffx"
+    },
+    {
+      "id": "live-2070887997378064623",
+      "text": "bought a tiny mic I could yap into that's a bit more chill\n\nmapped the btn input to cmd+f13 in Codex (via karabiner)\n\nnow I have system wide audio transcription with a button click\n\nplus I can get up and pace",
+      "tier": "signal",
+      "author": "frantzfries",
+      "media": "image"
+    },
+    {
+      "id": "live-2071642998824419504",
+      "text": "How I have Claude automate anything I do on my computer just by showing it:\n\nI use the free Clips app and hit record to start recording.\n\nThen I just do the action - like navigating to Rippling and approving any unapproved time off - and I’ll often just talk out loud as I do it explaining any add’l details like I would when showing a human.\n\nThe Clips app captures everything on your screen and everything you say, and transforms it into a format Claude can “see and hear”.\n\nYou'll then get a link ",
+      "tier": "signal",
+      "author": "Steve8708",
+      "media": "video"
+    },
+    {
+      "id": "live-2074129318007951548",
+      "text": "@Replit showcase website - under an hour - $12.90\n\nPrompt costs:-\n\n.11\n3.10\n1.99\n.75\n.42\n1.99\n.38\n.03\n.40\n1.87\n.38\n1.48\n\nHappy to share the prompts so any new users to @Replit can see what can be built in under an hour for the price of a beer \n\n#WebDev #AI #Replit #AdeviousAI",
+      "tier": "signal",
+      "author": "amasad",
+      "media": "video"
+    },
+    {
+      "id": "live-2072292847756140629",
+      "text": "I'm genuinely confused who Fable 5 is for.\n\nit's $10 / $50 per million tokens. exactly 2x Opus 4.8.\n\nbut routine coding and debugging now often gets flagged by the new safety filter and rerouted to... Opus 4.8.\n\nso you pay double, wait for a classifier to inspect your request, and get handed the cheaper model's answer anyway.\n\nWhat is the point of this model?",
+      "tier": "signal",
+      "author": "zacodil"
+    },
+    {
+      "id": "live-2074378321316745702",
+      "text": "the hard part is that agent safety cannot be only a preflight checklist.\n    \nonce systems can plan, call tools, change state, and adapt mid-task, assurance has to move closer to runtime: scoped permissions, traceable decisions, rollback paths, evals on behavior, and audit logs people can actually inspect.",
+      "tier": "signal",
+      "author": "JensHonack"
+    },
+    {
+      "id": "live-2075203997359898712",
+      "text": "Codex is now a full video editor!\n\nOur new plugin opens a full built-in NLE right inside the Codex app, where you and your agent can edit together, effortlessly.\n\nIf you're already paying for Codex, you get this one for FREE.\n\nIt's available now. Start using it in 1 minute, by just telling your Codex:\n\n\"Turn Codex into a Video Editor, read http://chatcut.io/codex\"",
+      "tier": "signal",
+      "author": "chatcutapp",
+      "media": "video"
+    },
+    {
+      "id": "live-2074712677755035907",
+      "text": "I was an early tester of GPT-5.6 Sol. I was asked to not share demos until after launch but it is a very good model.\n\nIt is of similar ability, but quite different feel, than Fable. Fable wants to go off and do work on its own pace, Sol is faster but works with you in steps more.",
+      "tier": "signal",
+      "author": "emollick"
+    },
+    {
+      "id": "live-2074860806441726070",
+      "text": "Imagine Claude with access to your real SEO and AI search visibility data.\n\nThat’s Bloomiro.\n\nAsk Claude, or any AI, how you’re doing in Google, ChatGPT, Perplexity, and Google AI Overview.\n\nReal GSC data. Real visibility checks. Real tasks to fix what’s missing.\n\nYour action and data layer for SEO and AI search visibility.\n\nTry it → http://bloomiro.com\n\nLaunched yesterday, so my own visibility is still catching up...",
+      "tier": "signal",
+      "author": "johnbuildss",
+      "media": "video"
+    },
+    {
+      "id": "live-2072290593519067300",
+      "text": "1 month ago, I paid a UGC agency to run 1,200 posts/month on TikTok and Instagram, all through real creators.\n\nCost: €15k → ~€12.50 per video.\n\nIt took time to kick in, but some videos crossed 150,000 views on Instagram.\n\nNext step: bring the process in-house to double down on what works.\n\nProof that UGC works, even in B2B.",
+      "tier": "signal",
+      "author": "romanbuildsaas",
+      "media": "video"
+    },
+    {
+      "id": "live-2072139704590373040",
+      "text": "18 days without Fable felt like a decade. welcome home king. excited to see people go build their wildest dreams with it again.\n\nnever leave us again lol",
+      "tier": "tempting-noise",
+      "author": "gregisenberg"
+    },
+    {
+      "id": "live-2071239626128298131",
+      "text": "Anthropic Managed Agents Lead:\n\n\"At Anthropic, >90% of our engineers are building with self-improving loops. In 4-6 months, it will be 100%.\n\nmy agentic loops can run for hours without spending hundreds of dollars.\"\n\nin this 40-minute podcast, an Anthropic team lead reveals how to build effective agents from scratch.\n\nAgent → harness → loops → memory = modern agent\n\nThis one video will replace 10 paid courses on vibe-coding.\n\nWatch it today, then explore the same setup in the article below.",
+      "tier": "tempting-noise",
+      "author": "0xCodez",
+      "media": "video"
+    },
+    {
+      "id": "live-2071446569954729994",
+      "text": "Caught up with friends from school, and they were comparing notes on “5.4, 5.5, and 5.6 being the cutoff.”\n\nMy broken brain took a while to realise they were talking about A1c levels",
+      "tier": "tempting-noise",
+      "author": "gabrielchua"
+    },
+    {
+      "id": "live-2074599776750854494",
+      "text": "I literally broke down the full playbook we used for one of the fastest growing channels on YouTube. \n\nFrom 200k views/month to 20m. \n\nWill be the most important thing you read this week as a creator.",
+      "tier": "tempting-noise",
+      "author": "PaddyG96",
+      "media": "image"
+    },
+    {
+      "id": "live-2074811995069583476",
+      "text": "I’m parallel testing all my chrons across perplexity, Hermes and Cowork right now. \n\nIt’s insane how fast these products are advancing every day \n\nAdding grok to the mix when their new model drops \n\nWill share results on @twistartups and @theallinpod in the next two weeks",
+      "tier": "tempting-noise",
+      "author": "Jason",
+      "media": "video"
+    },
+    {
+      "id": "live-2071529847189582018",
+      "text": "A guy who was the number one ranked machine learning competitor on Earth, twice, looked at how universities teach AI and decided they had the entire thing backwards.\n\nSo he built a free course that has turned more people into working AI practitioners than most graduate programs.\n\nJeremy Howard was the guy who made the course and it is called Practical Deep Learning for Coders.\n\nHere is the argument that drives the whole thing.\n\nUniversities teach AI top-down. First you sit through linear algebra",
+      "tier": "tempting-noise",
+      "author": "MillieMarconnni",
+      "media": "image"
+    },
+    {
+      "id": "live-2074209544004374548",
+      "text": "Officially joined @Team1VN ! \n\nFully committed to contributing and building impactful products on @Avax. Excited to foster deeper connections and empower our local builder community!\n\nLet's shape the future together!  #Team1 #Avalanche #AVAX #Web3Builders",
+      "tier": "tempting-noise",
+      "author": "kurodenjiro",
+      "media": "image"
+    },
+    {
+      "id": "live-2074859018426683411",
+      "text": "NEW: Crypto VC firm Paradigm raises $1,200,000,000.00 to expand into AI & robotics.",
+      "tier": "tempting-noise",
+      "author": "Polymarket"
+    },
+    {
+      "id": "live-2072307943819915697",
+      "text": "This is the best book on the internet to learn loop engineering \n\nFree. Completely.  \n\nMost AI engineers have never heard the term.\n\nhttps://drive.google.com/file/d/1qzKI4DKnyHRpXK1J3ATPqwaqLc0iNu-M…\n\nBookmark this site.  \n\nThen read this to know more ↓",
+      "tier": "tempting-noise",
+      "author": "sairahul1",
+      "media": "image"
+    },
+    {
+      "id": "live-2071513914504802525",
+      "text": "this is f*cking dangerous\n\nsomeone just open sourced the entire \"LOOP ENGINEERING\" framework for free\n\nthe guy who built Claude Code at Anthropic said it himself:\n\n\"I don't prompt Claude anymore. I have loops running that prompt Claude. My job is to write loops.\n\nstop prompting your agent. build the thing that prompts it for you.\n\ndiscover → plan → execute → verify → repeat\n\nyou used to be inside that loop\n\nloop engineering is you stepping out of it entirely\n\nthe repo includes:\n\n- 6 production r",
+      "tier": "tempting-noise",
+      "author": "mikenevermiss",
+      "media": "image"
+    },
+    {
+      "id": "live-2075628987104317776",
+      "text": ".@swyx and I sat down at AIE to talk about AGI, frontier lab strategy, chips, Fable, government, and AI existentialism",
+      "tier": "tempting-noise",
+      "author": "MatthewBerman",
+      "media": "video"
+    },
+    {
+      "id": "live-2074533358659682802",
+      "text": "tried every ai hardware for at least a month. here are my top 10:",
+      "tier": "tempting-noise",
+      "author": "eric6liu",
+      "media": "image"
+    },
+    {
+      "id": "live-2072328176009678856",
+      "text": "Control over intelligence is the defining fight of the coming decade. Whoever owns the AI delivery stack owns a direct window into your interior life. They log all your chats, train on them, and will hand them over when asked. And in the end, they decide the terms on which you'll get to access the most powerful systems humankind has ever built.\n\nVenice flips that. On Venice, your AI is yours. Not licensed to you, not gated on their terms, not logged and monitored for compliance, but fully yours ",
+      "tier": "tempting-noise",
+      "author": "hosseeb"
+    },
+    {
+      "id": "live-2074707623283470467",
+      "text": "Preview access rolling out for GPT-5.6 Sol. Going to livestream until I use up all 4 resets after I get access.\n\nOn a real note, I'm going to help make an app for my brother to lose 200lbs. We've started a weight loss journey and I'm down 50 lbs.",
+      "tier": "tempting-noise",
+      "author": "RayFernando1337",
+      "media": "image"
+    },
+    {
+      "id": "live-2074881579579547708",
+      "text": "i have mad respect for ppl who are able to say “i don’t know”, esp in the chatbot era.",
+      "tier": "tempting-noise",
+      "author": "signulll"
+    },
+    {
+      "id": "live-2074836010362429446",
+      "text": "I can finally talk about this. I’ve been using 5.7 for a few weeks now and it blows 5.6 out of the water. 5.6 is such a dumbed down version of the true frontier leader. I’m sorry you all have to use 5.6 for a few months until the government approves 5.7 for wider use.",
+      "tier": "tempting-noise",
+      "author": "VicVijayakumar",
+      "media": "image"
+    },
+    {
+      "id": "live-2074587908204282131",
+      "text": "Andrej Karpathy made it crystal clear:  \n“LLMs don’t want to succeed. They want to imitate.”  \n\nIn his 45-minute talk at Microsoft Build (“State of GPT”), the former OpenAI researcher breaks down piece by piece how these models really think.  \n\nThey have no ambition. They don’t “try” to get it right. They just complete the pattern they’ve seen millions of times during training.  \n\nAnd here’s the most brutal part: a model with ~80 transformer layers spends the same amount of compute on each token",
+      "tier": "tempting-noise",
+      "author": "Yerocode0",
+      "media": "video"
+    },
+    {
+      "id": "live-2075137031718441204",
+      "text": "Looks like Opus 5 is on its way.\n\nThat was to be expected and foreseen, given that Fable 5 and Sonnet 5 have already been released and only Opus 5 is still missing.\n\nEspecially since Fable 5 is being removed from the subscription plans at the end of the week, the \"permanent underclass\" needs an affordable model - one that is good, but not *too* good - to keep them within the plan.",
+      "tier": "tempting-noise",
+      "author": "kimmonismus",
+      "media": "image"
+    },
+    {
+      "id": "live-2071566150832705939",
+      "text": "Apple's price hikes suck, but they don't have much choice sadly. Did my best to explain why (and hid some tricks to get a decent deal at the end)\n\nThat said - linux video coming soon ;)",
+      "tier": "tempting-noise",
+      "author": "theo",
+      "media": "video"
+    },
+    {
+      "id": "live-2071539446059610459",
+      "text": "I'm using this skill for everything an agent writes now. Huge quality of life improvement.",
+      "tier": "tempting-noise",
+      "author": "fofrAI",
+      "media": "image"
+    },
+    {
+      "id": "live-2075259819154341957",
+      "text": "Consistent with the simulation hypothesis. \n\nLike a video game, objects are randomly generated, with positional certainty only when  observed.",
+      "tier": "tempting-noise",
+      "author": "elonmusk",
+      "media": "video"
+    },
+    {
+      "id": "live-2074895508233920703",
+      "text": "Rajan Agarwal, Codex Research at OpenAI, Waterloo, O-1 Visa",
+      "tier": "tempting-noise",
+      "author": "extraordinary",
+      "media": "image"
+    },
+    {
+      "id": "live-2074112628624945407",
+      "text": "A 12-YEAR-OLD JUST WROTE CHINA'S MOST EXPENSIVE CODE IN ONE NIGHT. HE WON'T TOUCH A DOLLAR OF IT FOR SIX YEARS.\n\nA 12-year-old Chinese kid, too young for a bank card, has already made $140,000 on Google Play from a single game. His school is still teaching him how to use Word.\n\nHe sat in front of two monitors and built the entire game in one night with Claude. He understood every line of code. He recorded the whole process and posted it to Bilibili, where the footage shows a kid typing code and ",
+      "tier": "tempting-noise",
+      "author": "0xAI42exe",
+      "media": "video"
+    },
+    {
+      "id": "live-2070964940563722458",
+      "text": "A graphics card NVIDIA never built sells for $400 with 22 gigabytes of memory. The person who builds it is nine years old.\n\nHe starts with dead cards - mining rejects, water-damaged boards, models the brand has marked end-of-life.\n\nPause at 0:06. Under the microscope, that is a bare GPU die in his hands, and he is reballing it onto a donor board.\n\nThen he does the part the brand will not. An RTX 2080 Ti ships with eleven gigabytes of memory; he desolders it and lays on eleven more.\n\nA modified B",
+      "tier": "tempting-noise",
+      "author": "xlumenai",
+      "media": "video"
+    },
+    {
+      "id": "live-2074841534218813495",
+      "text": "I built something !\n\nCan you guess what it is?",
+      "tier": "tempting-noise",
+      "author": "kuberdenis",
+      "media": "image"
+    },
+    {
+      "id": "live-2071502108545945848",
+      "text": "SOMEONE JUST BUILT TORLINK — A SLEEK TERMINAL-NATIVE TORRENT CLIENT THAT SEARCHES EVERY TRUSTED SOURCE AT ONCE AND DOWNLOADS STRAIGHT TO YOUR DISK.\n\nTired of sketchy torrent sites packed with fake buttons, popups, and dead links? torlink fixes that.\n\nType a query (or paste a magnet), and it hits a curated list of trusted sources in parallel — FitGirl (games), YTS, 1337x, EZTV, Nyaa, SubsPlease & more. Results stream in live with sizes and seed counts. Arrow + d to download.\n\nHighlights:\n\n•  One ",
+      "tier": "tempting-noise",
+      "author": "Arcane_Aii",
+      "media": "video"
+    },
+    {
+      "id": "live-2076498300312703349",
+      "text": ">be openai\n>release gpt 5.6 sol\n>max thinking budgets, full psycho\n>benchmark results take few days to roll in \n>“best model ever”\n>reviews locked in\n>4 days later\n>silently nerf it \n>nobody re-tests lol \n>users still paying full price \n>not realizing the model they benchmarked isn’t the model you’re paying for\n\nLmao, it’s over",
+      "tier": "tempting-noise",
+      "author": "ns123abc",
+      "media": "image"
+    },
+    {
+      "id": "live-2071338031466815632",
+      "text": "Karpathy method + Claude Code reading your whole Obsidian vault is the smartest second brain on earth.\n\nThe method is simple and brutal. If you can’t build a thing from scratch, you don’t know it. Tutorials are fake learning and your brain deletes them in 3 days.\n\nMost people ignore this. They build a second brain that just sits there, folders of notes nobody reopens, dead text.\n\nPoint Claude Code at the vault and it wakes up. 5,000 notes, one mind. It reads all of it and answers in your own wor",
+      "tier": "tempting-noise",
+      "author": "RDickinson",
+      "media": "video"
+    },
+    {
+      "id": "live-2074835561794224299",
+      "text": "I can finally talk about Sol after 29 years being a direct user.\n\nIt's REALLY important to use factor 50 even on cloudy days, they are the most dangerous.\n\nI couldn't try gpt-5.6 btw looks nice.",
+      "tier": "tempting-noise",
+      "author": "iamsaura_",
+      "media": "image"
+    },
+    {
+      "id": "live-2074562766770499749",
+      "text": "thank you anthropic for extending my 0% left fable quota for a few days",
+      "tier": "tempting-noise",
+      "author": "kunchenguid",
+      "media": "image"
+    },
+    {
+      "id": "live-2074962125563519079",
+      "text": "i’d like to report an agent swarm outside of @ycombinator",
+      "tier": "tempting-noise",
+      "author": "mattbergland",
+      "media": "image"
+    },
+    {
+      "id": "live-2074348313147748865",
+      "text": "X hates my content despite me giving them almost 1 billion in ad revenue. I just paid for a year of Premium + and they received another 10.2 million views in ad revenue from my posts for 2 weeks. I got nothing. \n\nI’ve spent the last 6 months building an app for X friends, I’ll share the beta tomorrow. It feels like a kick in the nuts to be honest. I post to brighten your day while being a caretaker for my mom and stepmom while the 2 men that raised passed.  \n\nI’m not going to stop posting dog vi",
+      "tier": "tempting-noise",
+      "author": "RareImagery",
+      "media": "image"
+    },
+    {
+      "id": "live-2074728435424047566",
+      "text": "This is F**king dangerous \n\nSomeone figured out how to get dramatically sharper reasoning out of Opus 4.8 with one setup.\n\nHere is how:\n\nAsk Claude to write you an \"operating manual\" for how it should reason through your work\n\nCreate a new Claude Project and paste that .md into the Project instructions\n\nRun Opus 4.8 on High or Max effort\n\nNow the model reasons against a real framework instead of improvising every response.\n\nSame model. Far better output. And Opus 4.8 already costs a fraction of ",
+      "tier": "tempting-noise",
+      "author": "cyrilXBT",
+      "media": "video"
+    },
+    {
+      "id": "live-2074395435607916573",
+      "text": "Fable 5 access could be apart of the Claude pro 20x subscription\n\nAccording to some reports, Fable 5 will be available in the Claude app for the Max 20x users ($200/month)\n\nEveryone else will be API access only\n\nThis has not yet been confirmed but if so will nullify the Pro 5x subscription ($20)\n\nIs this the right move from Anthropic to keep users?",
+      "tier": "tempting-noise",
+      "author": "clawdb0t",
+      "media": "video"
+    },
+    {
+      "id": "live-2074404063685558326",
+      "text": "When I said, \"Looks like Fable 5 will be unusable for a while,\" my colleague replied, \"It's fine. This time, a Chinese AI company got plenty of training data from Fable, so they should release a model of equivalent level in the near future. Then Anthropic will have no choice but to quickly incorporate Fable into their subscription service.\"",
+      "tier": "tempting-noise",
+      "author": "myapdx"
+    },
+    {
+      "id": "live-2074963621973831970",
+      "text": "I'm really enjoying my new job.\n\nOnce you realize you're no longer here to review your Clanker but to build the system for it, life gets so much fun. \n\nEvery changes compounds.\n\nTrust me, lock 1h everyday to improve your system, just one hour. Thank me later.",
+      "tier": "tempting-noise",
+      "author": "VDMatos"
+    },
+    {
+      "id": "live-2076208440704455115",
+      "text": "I want to believe.  Not holding my breath, but this would certainly be amazing.  Fable-level inference on 4 RTX 6000 Pro Blackwell cards would change the world.\n\nYou would recoup your hardware costs in a couple of weeks of usage at that point, compared to paying Anthropic API rates.\n\nThis would also light a fire under the posteriors of OpenAI and Anthropic, and force them to play their hands with something better than before.",
+      "tier": "tempting-noise",
+      "author": "auroter",
+      "media": "image"
+    },
+    {
+      "id": "live-2074707690908258612",
+      "text": "Claude Code creator Boris Cherny: Anthropic’s reported jump of roughly 250% in code written per engineer without a visible collapse in quality.\n\nAnd here's his advice for other companies to achieve the same.\n\n- Companies should not over-control AI usage. Instead of making employees ask for approval for every token, companies should give people enough access to experiment and discover useful workflows.\n\n- Psychological safety is essential for AI adoption. Employees need to feel safe trying new id",
+      "tier": "tempting-noise",
+      "author": "rohanpaul_ai",
+      "media": "video"
+    },
+    {
+      "id": "live-2074252181469884790",
+      "text": "Are you checking every line of code written by AI?",
+      "tier": "tempting-noise",
+      "author": "PashaBorsai"
+    },
+    {
+      "id": "live-2074508832454107485",
+      "text": "January 2024: Perplexity raises $73.6M at a $520M valuation.\n\n24 months later: $21B+, backed by Nvidia, Jeff Bezos, SoftBank, and IVP.\n\nHere's one of their original pitch decks:",
+      "tier": "tempting-noise",
+      "author": "Collateral_com",
+      "media": "image"
+    },
+    {
+      "id": "live-2074661894821196173",
+      "text": "I want you. Yes, YOU \n\nIf your screen time is embarrassing but your content goes beyond “GM,” we should talk.\n\n@Bitget is looking for creators/KOLs who understand investing and the internet. Send your best work to @ch_egan.",
+      "tier": "tempting-noise",
+      "author": "GracyBitget",
+      "media": "image"
+    },
+    {
+      "id": "live-2074950193896956243",
+      "text": "if you woke up today and\n\n> have access to fable, sol, and grok 4.5\n> can merge without reading the code\n> are not ai psychosis'ed\n> have a laptop to prompt from\n\nit's an opportunistic day regardless of how stressful it is that ai is taking your job\n\nbe delusionally optimistic",
+      "tier": "tempting-noise",
+      "author": "skeptrune"
+    },
+    {
+      "id": "live-2074496257058312304",
+      "text": "Come build the future on Base\n\nWe've backed over 30 teams doing exactly that",
+      "tier": "tempting-noise",
+      "author": "base",
+      "media": "image"
+    },
+    {
+      "id": "live-2074829602111771024",
+      "text": "Welcoming the speakers for @cursor_ai Vadodara Community Connect\n\nJoining us is @Shreyshahh , Sr. AI Engineer @Microsoft, on how to do code reviews smartly.\n\nHarshil, Founder | CEO @Productica_in, on building AI engineering workflows.\n\nReg Now: http://luma.com/cursor-bdq-v1",
+      "tier": "tempting-noise",
+      "author": "techking_007",
+      "media": "image"
+    },
+    {
+      "id": "live-2076497989666001027",
+      "text": "hope @robj3d3 gets better soon\n\nit’s crazy how the actions of a company (limiting a model until day xyz) can create so much anxiety \n\nyesterday i found myself in a slightly similar situation:\n\nit’s Sunday 7pm just came back from gym totally exhausted \n\nat this point the natural conclusion would be to wind down and call it a day \n\nbut then i realized Fable only available for few more hours and all the things it could draft for me\n\ni had absolutely 0 motivation to go back to my laptop yet somehow ",
+      "tier": "tempting-noise",
+      "author": "sobedominik",
+      "media": "image"
+    },
+    {
+      "id": "live-2071419473433854221",
+      "text": "this has to be because coding agents change the engineering math on how it is to work with or port a legacy codebase, right?\n\nanyone at Riot able to confirm?",
+      "tier": "tempting-noise",
+      "author": "trq212",
+      "media": "image"
+    },
+    {
+      "id": "live-2075048894996549753",
+      "text": "You can probably recoup that DGX workstation 100k investment in less than 200 days serving @Kimi_Moonshot 2.7",
+      "tier": "tempting-noise",
+      "author": "0xkydo",
+      "media": "image"
+    },
+    {
+      "id": "live-2074731364814077975",
+      "text": "as a vibe coder\nwhich plan are you actually on right now\n\n- Claude $20\n- Claude $100\n- Codex $20\n- Codex $200\n- something else\n\nbe honest",
+      "tier": "tempting-noise",
+      "author": "kapilansh_twt"
+    },
+    {
+      "id": "live-2076377144100552714",
+      "text": "Called Anthropic's July 12th bluff and spent the weekend with no signal instead of stressing about my Fable usage.\n\nsequoia national park, V2, no shoes",
+      "tier": "tempting-noise",
+      "author": "venivci",
+      "media": "image"
+    },
+    {
+      "id": "live-2074921331003658578",
+      "text": "I really thought AI was the cheat code \n\nI thought competition was going to rise to a level that would be unfathomable.\n\nThe one part of the equation I didn’t realize is humanity.\n\nA human could have access to a genius and still do nothing with it.\n\nand it has now become clear to me that AI is a cheat code for only a select few individuals.\n\nAnd these individuals will be able to build, create and explode at a rate unforeseen in human history.",
+      "tier": "tempting-noise",
+      "author": "corbin_braun"
+    },
+    {
+      "id": "live-2075444313132351828",
+      "text": "华为长焦拍飞机被识别成鸟了",
+      "tier": "tempting-noise",
+      "author": "youy1qwq",
+      "media": "image"
+    },
+    {
+      "id": "live-2071628160802976184",
+      "text": "Dario Amodei has a really hardline view that China shouldn’t have strong AI.\n\nHe says - \"That's the national security interest of the US....The case is very clear, the counterarguments against it are just fishy.\"\n\n- From \"Dwarkesh Patel\" YT channel",
+      "tier": "tempting-noise",
+      "author": "rohanpaul_ai",
+      "media": "video"
+    },
+    {
+      "id": "live-2075505421402718487",
+      "text": "Day 1 of 30 of building in public\n\nWho am I and what I am building?\n\n2 months ago I quit my job at an AI startup in London, burned out. Last month I went on a one-way plane to Bangkok to build my own apps.\n\nNow I am starting a “build in public” challenge. For the next 30 days I will share everything: revenue, downloads, wins, screwups.\n\nMe:\nI’m Daniel, 29 years old. Grew up in a small German town.\nI studied math and was gonna go into finance. But during the pandemic I got stuck in my hometown an",
+      "tier": "tempting-noise",
+      "author": "DannyWestside6",
+      "media": "image"
+    },
+    {
+      "id": "live-2072234649741316564",
+      "text": "Anthropic Sonnet 5 System prompt leaked \n\nLink in the comments.",
+      "tier": "tempting-noise",
+      "author": "VittoStack",
+      "media": "image"
+    },
+    {
+      "id": "live-2076008533691138439",
+      "text": "Holy moly: Zhipu AI founder (GLM-5.2) Tang Jie says we are on our clear way to AGI and \"AI will begin to learn what the \"self\" is and what self-awareness means\"\n\nIn a purported internal letter, he argues that:\n- autonomous agent systems are moving toward the fully automated “no-person company”: thousands of agents working continuously, collaborating, evaluating results and allocating resources.\n\n- His more provocative claim: \"AI training AI is already taking shape.\" (RSI) Models can increasingly",
+      "tier": "tempting-noise",
+      "author": "kimmonismus",
+      "media": "image"
+    },
+    {
+      "id": "live-2072080037537566775",
+      "text": "THIS THING COMING AT YOU\n\nDuke University had developed Argus, a 20-legged robot equipped with a camera on each leg, drawing inspiration from the visual system of the sea urchin.",
+      "tier": "tempting-noise",
+      "author": "BrianRoemmele",
+      "media": "video"
+    },
+    {
+      "id": "live-2076064023817359610",
+      "text": "What is interesting is they sucked away over 400 Apple employees and asked many to steal data on what they were working on. They paid millions to them and billions to Jony Ive. \n\nOnly to cancel just about all hardware distractions.",
+      "tier": "tempting-noise",
+      "author": "BrianRoemmele",
+      "media": "image"
+    },
+    {
+      "id": "live-2074901431442890985",
+      "text": "I can't believe OpenAI gave ME early access to their new live voice model\n\nGPT-Live-1\n\n(not sponsored btw)",
+      "tier": "tempting-noise",
+      "author": "FatherPhi",
+      "media": "video"
+    },
+    {
+      "id": "live-2071241981754253372",
+      "text": "The only way to stand out in the AI age is by being incredibly creative \n\nLike this Van Gogh shirt I just saw. \n\nWeird but scroll stopping",
+      "tier": "tempting-noise",
+      "author": "gregisenberg",
+      "media": "image"
+    },
+    {
+      "id": "live-2074516740508176505",
+      "text": "NEW: 17-year-old student builds AI system that can reportedly screen for autism & ADHD with 89% accuracy using a single retinal image.",
+      "tier": "tempting-noise",
+      "author": "Polymarket"
+    },
+    {
+      "id": "live-2070538368174223674",
+      "text": "If you don't wake up excited and go to bed tired, drop everything and think of what your future will look like if you keep repeating the same day for the rest of your life. Sit with that discomfort until a new direction appears.",
       "tier": "noise",
-      "text": "This AI system made me $30k last month on autopilot. I packaged every prompt into a free course. Join my community on skool.com/aiops - free for the next 24 hours, spots are limited."
+      "author": "thedankoe"
     },
     {
-      "id": "x-117",
-      "tier": "critical-signal",
-      "text": "We just open-sourced our agent harness on GitHub - 47 deterministic checks plus an adversarial review pass, MIT licensed. Join our Discord if you want to contribute, PRs welcome. Benchmarks against SWE-bench in the README."
+      "id": "live-2071159146200863121",
+      "text": "Woman drinking bubble tea on MRT platform sparks debate, SMRT reminds commuters no food or drinks allowed in paid areas https://bit.ly/3Qo0YJS",
+      "tier": "noise",
+      "author": "MothershipSG",
+      "media": "image"
+    },
+    {
+      "id": "live-2070684164308005324",
+      "text": "Mark Zuckerberg reveals he's feeding his cows beer and macadamia nuts\n\n“On the ranch, one of my projects is I'm trying to create the highest quality beef in the world”\n\n“It's very low stakes, I’m not selling it but I'm very into the genetics of the cattle. We're trying to figure out how do you make it so that you basically can deliver the highest density diet to them”\n\n“We started growing macadamia trees because that kind of nut is extremely dense and they will eat a lot so they will put on weig",
+      "tier": "noise",
+      "author": "Jackkk",
+      "media": "video"
+    },
+    {
+      "id": "live-2071412101114188271",
+      "text": "A ¥3.6M Ferrari, parked in its own spot— and four kids turned it into a jungle gym in China's Yunnan. A footage caught them climbing the roof, swinging sticks, leaving scratches & bumper cracks. Owners want actual repair costs; parents offered ¥5k (US$735).",
+      "tier": "noise",
+      "author": "shanghaidaily",
+      "media": "video"
+    },
+    {
+      "id": "live-2071257482307969188",
+      "text": "Lactoferrin ELIMINATED belly fat IN 8 WEEKS - no dieting\n\nThat belly fat that won’t go away no matter what you eat or how hard you train?\n\nIt might not be a diet problem. It might be an endotoxin problem.\n\nWhen your gut lining is damaged, bacterial endotoxins leak into your bloodstream. Your body responds by storing fat around your organs. Visceral fat. The dangerous kind you can’t crunch away.\n\nLactoferrin binds those endotoxins. Neutralizes them. The fat storage signal stops. Your body starts ",
+      "tier": "noise",
+      "author": "FarvingCo",
+      "media": "image"
+    },
+    {
+      "id": "live-2071199410730791270",
+      "text": "Nike's outfits are kinda sexy, right?",
+      "tier": "noise",
+      "author": "miyumiyuna5",
+      "media": "video"
+    },
+    {
+      "id": "live-2071531950544711869",
+      "text": "10/10",
+      "tier": "noise",
+      "author": "berkaythunicorn"
+    },
+    {
+      "id": "live-2071758797656490432",
+      "text": "Kate just called me…she apparently bombed the biggest interview of her life.\n\nThe WSJ has the exclusive to profile her. The interest in our female health protocol is a powder keg of energy. Every major publication has reached out.\n\nIn her typical neurodivergent fashion, Kate prepared a game show on a whiteboard to explain who she is. Apparently the reporter wasn’t that into it? Like being on stage with blank faces staring back.\n\nI told her to not sweat it.\n\nIt’s her first go at this and this kin",
+      "tier": "noise",
+      "author": "bryan_johnson",
+      "media": "image"
+    },
+    {
+      "id": "live-2071657163148410992",
+      "text": "iShowSpeed thought his Japanese friend said the “n-word” while looking at his tats until he realized he was talking about “Nika” from One Piece",
+      "tier": "noise",
+      "author": "scubaryan_",
+      "media": "video"
+    },
+    {
+      "id": "live-2071654627804655650",
+      "text": "In 2008, hundreds of teenagers gathered in Mexico City for a clash between punks and emos in what is now known as the \"Emo Punk War.\"\n\nThe conflict began online through Myspace, where emos aid they were receiving violent threats from punks who :accused them of stealing their style, haircuts, and fashion.\n\nThat’s the “MySpace Girl” showing her support in the dust frames.\n\nIt was a simpler time.",
+      "tier": "noise",
+      "author": "BrianRoemmele",
+      "media": "video"
+    },
+    {
+      "id": "live-2072015359989723240",
+      "text": "Game of Thrones actor Hafþór Júlíus Björnsson with his wife, Kelsey Henson.",
+      "tier": "noise",
+      "author": "creepydotorg",
+      "media": "image"
+    },
+    {
+      "id": "live-2071950136344031675",
+      "text": "I just learned about a concept, I can't stop thinking about.\n\nThe Four Burner Theory.\n\nIt destroyed Elon Musk's first marriage.\nIt explains why Bezos is jacked but divorced.\n\nAnd why Zuckerberg has no real friends.\n\nOnce you understand it, your life will never be same:",
+      "tier": "noise",
+      "author": "thecurioustales",
+      "media": "image"
+    },
+    {
+      "id": "live-2069114733827912180",
+      "text": "You can brainwash yourself into liking the gym, and the work you keep putting off. The people who do these things every day aren't forcing it. It feels easy to them, and you can do the same.\n\nThe thing stopping you usually isn't laziness. It's that the action feels heavy before you start. Your brain guesses how bad something will feel, and it guesses high, so the dread shows up before the gym does. But the dread isn't about the gym. It's about your brain's guess, and a guess can be changed. You ",
+      "tier": "noise",
+      "author": "peruvian_bull"
+    },
+    {
+      "id": "live-2072086802911858750",
+      "text": "Just a reminder that they killed and vaporized six million people in a systematic fashion but couldn’t figure out how to get rid of the shoes.",
+      "tier": "noise",
+      "author": "DaBassdrop",
+      "media": "image"
+    },
+    {
+      "id": "live-2071934886089220458",
+      "text": "Women when they have to listen to an educational history podcast instead of an audiobook where they get raped by a sexy vampire…",
+      "tier": "noise",
+      "author": "UbermenschMind",
+      "media": "video"
+    },
+    {
+      "id": "live-2072170531907068376",
+      "text": "120kg suspected cocaine seized from a yacht in Hong Kong's Aberdeen Typhoon Shelter — the second \"floating drug warehouse\" busted in days, with a combined haul worth HK$270M. A 45-year-old woman, the boat's registered owner, has been arrested for drug trafficking.",
+      "tier": "noise",
+      "author": "shanghaidaily",
+      "media": "image"
+    },
+    {
+      "id": "live-2072237360050471223",
+      "text": "No way, this guy...",
+      "tier": "noise",
+      "author": "snsnokyoufu",
+      "media": "video"
+    },
+    {
+      "id": "live-2072169360286769518",
+      "text": "4am sleepless nights and mom thoughts",
+      "tier": "noise",
+      "author": "ekang426",
+      "media": "image"
+    },
+    {
+      "id": "live-2072237270242115662",
+      "text": "Gym operator group behind several Anytime Fitness, BFT outlets to be charged over late CPF payments to employees http://bit.ly/3SVi825",
+      "tier": "noise",
+      "author": "MothershipSG",
+      "media": "image"
+    },
+    {
+      "id": "live-2072287015094120787",
+      "text": "Mission accomplished \nThis morning we welcomed little Felix to the world.\nEverything is great (10/10) \nHe's healthy and already very strong!\n\nMom is super brave! \nI almost fainted.",
+      "tier": "noise",
+      "author": "michalmalewicz",
+      "media": "image"
+    },
+    {
+      "id": "live-2072298373990814152",
+      "text": "the world would be in a 100x better state if people only made candid posts like this. Yes I want meat.",
+      "tier": "noise",
+      "author": "dagorenouf",
+      "media": "image"
+    },
+    {
+      "id": "live-2072181344894091273",
+      "text": "i am 15 followers away from finally escaping the permanent thirst trap class !!!!",
+      "tier": "noise",
+      "author": "linderps",
+      "media": "image"
+    },
+    {
+      "id": "live-2073886079183106258",
+      "text": "Very sad news about Bryan Johnson. \n\nMy well wishes are with Bryan. \n\nFor the rest of us, eat clean, unprocessed diet. \n\nLive life as God intended — you can’t hack your way to immortality. \n\nNumber of breathes a man has have been pre programmed at birth and cannot be hacked.",
+      "tier": "noise",
+      "author": "TicTocTick"
+    },
+    {
+      "id": "live-2073887732989124652",
+      "text": "So this is how fashion magazine covers are taken!",
+      "tier": "noise",
+      "author": "narflowy",
+      "media": "video"
+    },
+    {
+      "id": "live-2074091303814762699",
+      "text": "Louis Vuitton is facing huge backlash in China after suing the Chinese bubble tea Molley for $1.5M over alleged logo infringement.\n\nChinese netizens are angry that this pattern existed in China hundreds of years before LV was born. You can still see it everywhere in China today.",
+      "tier": "noise",
+      "author": "XH_Lee23",
+      "media": "video"
+    },
+    {
+      "id": "live-2074242592460439707",
+      "text": "Absolutely INSANE rollecoaster on the Ronaldo Cry market !\n\n> Portugal loses \n> Ronaldo walks out of the field with a poker face\n*odds drop from 80% to 13%*\n\n> camera pans to him again, he's crying\n*odds skyrocket to a peak of 96%*\n\n> traders realize you can't see tears in the clip, which could make it a NO by the rules\n*odd drop to 34%*\n\n--> You are here.\n\nThere is now an ongoing search for Christiano's tear. \n\nTraders a scrutinizing every angle of every camera to find the evidence that might r",
+      "tier": "noise",
+      "author": "0xinternetchild",
+      "media": "image"
+    },
+    {
+      "id": "live-2074441017290535204",
+      "text": "Symptoms That Mean You Need to Cut Out Flour RIGHT NOW!!\n\nBread lovers and noodle fiends, you really need to pay attention!! \n\n1. Mysterious droplet spots appearing on your fingers \n\nEver noticed little spots on your fingers that look like tiny water droplets or small blisters after eating a ton of flour? This isn't just some heat rash from sweating—it's not that simple!\n\n2. Skin itching like you're going insane \n\nDo those spots come with skin that starts itching like crazy? That's your body scr",
+      "tier": "noise",
+      "author": "Alexlim1004",
+      "media": "image"
+    },
+    {
+      "id": "live-2074480373761999289",
+      "text": "The rotating hotpot table pot is tolerable, but the one where people have to spin it themselves—I'm done with it. The moment I try to grab something, I get nothing. I just snag one piece of veggie, lol 5555555555555555555555555555",
+      "tier": "noise",
+      "author": "I_CEZY",
+      "media": "video"
+    },
+    {
+      "id": "live-2074552323423047976",
+      "text": "2 mg Melatonin is 10x too much\n\nMelatonin is oddly sold in 10-100x too high doses\n\nThe right dose for Melatonin is about 0.2-0.3mg or 200-300mcg\n\nVery very low taken an hour before sleep to give your natural melatonin production a kickstart, not replace it!",
+      "tier": "noise",
+      "author": "levelsio"
+    },
+    {
+      "id": "live-2074768849828802610",
+      "text": "Fitness YouTuber Connor Murphy has died after drowning in Thailand",
+      "tier": "noise",
+      "author": "Dexerto",
+      "media": "image"
+    },
+    {
+      "id": "live-2074627127371043015",
+      "text": "ain’t no way",
+      "tier": "noise",
+      "author": "jayythewave",
+      "media": "image"
+    },
+    {
+      "id": "live-2074196543108768208",
+      "text": "Erling Haaland is taking the world by storm.\n\nHe drinks raw milk and eats beef liver and heart.\n\nHe doesn’t fear the sun. He gets sunlight in the morning and limits blue light at night.\n\nIn this video, I’m reviewing his diet…",
+      "tier": "noise",
+      "author": "paulsaladinomd",
+      "media": "video"
+    },
+    {
+      "id": "live-2074569530156925332",
+      "text": "BREAKING:\n\n​IShowSpeed has gone viral globally on social media following his shocked reaction after the Egyptian goalkeeper saved Lionel Messi's penalty.\n\n​What could you possibly be that surprised about...",
+      "tier": "noise",
+      "author": "GBC_Press",
+      "media": "video"
+    },
+    {
+      "id": "live-2074586757673214226",
+      "text": "Messi visit Ronaldo at the mental health hospital",
+      "tier": "noise",
+      "author": "biigjay20",
+      "media": "video"
+    },
+    {
+      "id": "live-2074831247440806135",
+      "text": "kettlebells are so sick why did it take me this long to get the one kettlebell workouts on my feeds… now instead of paying for a gym membership i can just buy a heavier kettlebell every month until i am jacked enough to use a 69lb kettlebell  for all my workouts",
+      "tier": "noise",
+      "author": "jackfriks"
+    },
+    {
+      "id": "live-2074845481188962414",
+      "text": "I interrupt my Twitter absence to post shirtless on main without apology because you will never know the misery of eating 200g of protein on a vegan diet:\n\n2016lb    ->    178lb",
+      "tier": "noise",
+      "author": "adamdotdev",
+      "media": "image"
+    },
+    {
+      "id": "live-2074869599288393927",
+      "text": "2.5h padel\n1h gym\n16,000 steps later…",
+      "tier": "noise",
+      "author": "FlorinPop17",
+      "media": "image"
+    },
+    {
+      "id": "live-2075034448886739299",
+      "text": "#NewProfilePic\n\nYep, I became a mom — the best thing that’s ever happened to me  This account is evolving with me: expect motherhood, longevity, vaccine science, real food, and the occasional fitness post!",
+      "tier": "noise",
+      "author": "INaina7773",
+      "media": "image"
+    },
+    {
+      "id": "live-2074846211631149334",
+      "text": "Mom vs Dad cooking",
+      "tier": "noise",
+      "author": "messedupfoods",
+      "media": "video"
+    },
+    {
+      "id": "live-2074901580894404632",
+      "text": "keep in mind that the last socccer game i watched was manchester united vs chelsea in high school lol\n\ni can't believe i'm gonna watch norway vs england because of halland\n\nthis guy's aura is unmatched, aboslute goat behaviour all around\n\nclears both messy and crynaldo",
+      "tier": "noise",
+      "author": "thekitze"
+    },
+    {
+      "id": "live-2074896650372284670",
+      "text": "Fried egg recipe from grandma.",
+      "tier": "noise",
+      "author": "kitchenDIY_",
+      "media": "video"
+    },
+    {
+      "id": "live-2075120033282642008",
+      "text": "US fitness influencer Connor Murphy, 32, drowns in lake in Thailand, rented house found vandalised https://bit.ly/3RuIpE9",
+      "tier": "noise",
+      "author": "MothershipSG",
+      "media": "image"
+    },
+    {
+      "id": "live-2075210426875249056",
+      "text": "Chat Control has passed  \n\nThey can and will now legally scan any person's messages, emails and photos you send without a warrant\n\nThe way they passed this law when the majority of the European Parliament was against it will shock you:\n\nThey waited until most EP members were on holiday so only a few were present and then created an \"urgent\" vote for it to pass it through\n\nThere's nothing democratic about any of it and big powerful forces are behind this that can manipulate the EU for whatever th",
+      "tier": "noise",
+      "author": "levelsio",
+      "media": "image"
+    },
+    {
+      "id": "live-2075752475567563031",
+      "text": "I can’t. stop. cooking.",
+      "tier": "noise",
+      "author": "thekitze",
+      "media": "video"
+    },
+    {
+      "id": "live-2075804235191714160",
+      "text": "You won’t get rich just working hard, but if you don’t work hard, you won’t get rich.",
+      "tier": "noise",
+      "author": "naval"
+    },
+    {
+      "id": "live-2075797146402464139",
+      "text": "Fitness influencer Connor Murphy allegedly injected himself with gold in the weeks leading up to his death thinking it would give him \"special powers\" \n\n\"He started to get this fixation on gold, he started to believe that gold was some gatekept mineral by the higher ups\"",
+      "tier": "noise",
+      "author": "InternetH0F",
+      "media": "image"
+    },
+    {
+      "id": "live-2075558241992655236",
+      "text": "You don't need a gym.\n\nYou need Dumbbells and a system.\n\nI'm a professional athlete. I've built and maintained elite strength with nothing but dumbbells more times than I can count.\n\nHere's 48 exercises, every muscle group covered:",
+      "tier": "noise",
+      "author": "hannahapexfit",
+      "media": "video"
+    },
+    {
+      "id": "live-2075754417400221765",
+      "text": "Tom Holland taking selfies with fans yesterday at fashion week .\n\nWhat phone is that though ??",
+      "tier": "noise",
+      "author": "esjaydoesdefi",
+      "media": "image"
+    },
+    {
+      "id": "live-2075847977915314188",
+      "text": "it’s gonna be filled with color and calories\n\nwatch out for what @SuperteamMY and @littleunusualMY will be cooking for you soon",
+      "tier": "noise",
+      "author": "tuakdotsol",
+      "media": "video"
+    },
+    {
+      "id": "live-2075880024780230782",
+      "text": "This was a mistake.\n\nIn 2024, my wife and I started a low-carb / low-calorie diet.\n\nFor me, the impact wasn’t critical:\n\n+ Low testosterone (133 ng/mL)\n+ Lack of energy for heavy workouts\n+ Low body fat, but muscles were maintained\n+ Felt good overall\n\nMy wife had a very different experience:\n\n+ Significant weight loss\n+ Wrecked sleep (wakes up at 2 a.m., can’t fall back asleep)\n+ Lack of overall energy (not just for workouts)\n+ Female hormones dropped to extremely low levels\n+ Reduced libido, m",
+      "tier": "noise",
+      "author": "marclou",
+      "media": "image"
+    },
+    {
+      "id": "live-2076147529188856009",
+      "text": "cooking is even better on an abandoned island near singapore  @ns",
+      "tier": "noise",
+      "author": "farhatkadiwala_",
+      "media": "image"
+    },
+    {
+      "id": "live-2076171402940448974",
+      "text": "what's funny about this is that recently i had like 10 days of consecutive workout every day plus additional 12-15k steps and i was DEAD by 11pm and couldn't wait to sleep\n\nso to feel like working out you need to sleep enough and to sleep on time you need to workout",
+      "tier": "noise",
+      "author": "thekitze",
+      "media": "video"
+    },
+    {
+      "id": "live-2075950018410979740",
+      "text": "Workout.",
+      "tier": "noise",
+      "author": "unpluggedmemer",
+      "media": "video"
+    },
+    {
+      "id": "live-2076178262318104799",
+      "text": "live action Naruto theater in Japan",
+      "tier": "noise",
+      "author": "EHuanglu",
+      "media": "video"
+    },
+    {
+      "id": "live-2076236201233940512",
+      "text": "Train Stop Challenge In Gta5",
+      "tier": "noise",
+      "author": "Badboy1B",
+      "media": "video"
+    },
+    {
+      "id": "live-2076318508431049090",
+      "text": "Naruto live theatre is crazy",
+      "tier": "noise",
+      "author": "EHuanglu",
+      "media": "video"
+    },
+    {
+      "id": "live-2075788356089475584",
+      "text": "I’m not crying, you’re crying.",
+      "tier": "noise",
+      "author": "pmarca",
+      "media": "video"
+    },
+    {
+      "id": "live-2076306208416538660",
+      "text": "A guy does an extreme 2-hour workout after months of zero exercise. His muscles ache severely. \n\nThe next day, he pees and it looks exactly like dark Coca-Cola. He ignores it and goes to sleep.\n\nHis heart stops in the middle of the night.\n\nWhat went wrong?",
+      "tier": "noise",
+      "author": "DocPriyamMD"
+    },
+    {
+      "id": "live-2076275381183684697",
+      "text": "A Chinese long-haul truck driver converted his cab into a compact living space so he could travel alongside his wife and child.",
+      "tier": "noise",
+      "author": "NoContextHumans",
+      "media": "video"
+    },
+    {
+      "id": "live-2076434411600425060",
+      "text": "I ranked India’s most famous tourist attractions On the list: Taj Mahal, Golden Temple (Amritsar), Amber Fort (Jaipur), Gateway of India (Mumbai), Tirupati + more. Which one did I get wrong?  Comment “TRAVEL” and I’ll DM you the full breakdown I made on India’s genuinely",
+      "tier": "noise",
+      "author": "jake_explains",
+      "media": "video"
+    },
+    {
+      "id": "live-2076463301744345174",
+      "text": "there is no worse feeling than landing after an exhausting flight, walking into the immigration hall, and seeing a 2-hour queue snaking around the room.\nespecially when you've got a tight meeting schedule, a crying baby, or just want to get to the hotel and sleep.\nmost people rely purely on credit card points and airport lounges for travel perks. \nbut the Malaysian passport is one of the strongest in the world, and there's a way for passportmaxxing\n\nintroducing the APEC Business Travel Card (ABT",
+      "tier": "noise",
+      "author": "tuakdotsol",
+      "media": "image"
+    },
+    {
+      "id": "live-2076405304116252804",
+      "text": "A woman’s painful stomach condition was cured after doctors prescribed 1.5 liters of Diet Coke a day\n\nThe soda dissolved a rare mass of undigested food in just two days",
+      "tier": "noise",
+      "author": "Dexerto",
+      "media": "image"
+    },
+    {
+      "id": "live-2076426376916402501",
+      "text": "Dude asks gym members how many hours a week they work",
+      "tier": "noise",
+      "author": "BroWire_",
+      "media": "video"
+    },
+    {
+      "id": "live-2076423869314011468",
+      "text": "Messi has shorter limbs and would have ended up around 4’7” in height if he didn’t get injections at Barca as a kid.\n\nAnd people keep talking about “we just need our best athletes to choose soccer over NFL.”",
+      "tier": "noise",
+      "author": "PaulSpacey",
+      "media": "video"
+    },
+    {
+      "id": "live-2076438689828237457",
+      "text": "Made  Piet's Balls today:\n\n1kg of minced meat (I use minced acém meat in Portugal, I think minced chuck steak in English, it's nice meat with some good fat)\n\nThen I use this pre-cut frozen garlic and onion, very good, let it defrost in a bowl a bit, it's frozen so the onion doesn't make you cry  \n\nThen put it all together in a big bowl, add 1 egg, then salt (more than u think u need) and pepper, some paprika powder (always good on anything!), then add some flour so it gets more whole (ppl often ",
+      "tier": "noise",
+      "author": "levelsio",
+      "media": "video"
+    },
+    {
+      "id": "live-2076486781558821256",
+      "text": "Most people think Harry Potter is the best selling book series in history at ~615M books.\n\nThat will likely change this year.\n\nIt will be overtaken by One Piece, by Eiichiro Oda, regarded as the greatest Japanese manga / graphic novel of all time, which just crossed 600M in March and is projected to surpass HP this year and hit 725M+ when it ends in ~2030-32 (there’s 10-15% left).\n\nThe story follows Monkey D Luffy, a young boy who has rubber man powers, who assembles a pirate crew and goes on an",
+      "tier": "noise",
+      "author": "deedydas",
+      "media": "image"
+    },
+    {
+      "id": "live-2074516289813450902",
+      "text": "He captured a unique view.",
+      "tier": "noise",
+      "author": "TheBestqueenx",
+      "media": "video"
+    },
+    {
+      "id": "live-2072123504938344484",
+      "text": "i got a raise!!!",
+      "tier": "noise",
+      "author": "mycoliza",
+      "media": "image"
+    },
+    {
+      "id": "live-2076215841813569759",
+      "text": "They took everything from us",
+      "tier": "noise",
+      "author": "Jason",
+      "media": "video"
+    },
+    {
+      "id": "live-2076315295669498005",
+      "text": "Will we see this post today?",
+      "tier": "noise",
+      "author": "BraedendotTECH",
+      "media": "image"
+    },
+    {
+      "id": "live-2075757587010929003",
+      "text": "Trying something real quick (look closely at the top)",
+      "tier": "noise",
+      "author": "theo",
+      "media": "image"
+    },
+    {
+      "id": "live-2076303040840446416",
+      "text": "I asked for life advice and got 5,500 responses. \n\nHere's the how people showed up.",
+      "tier": "noise",
+      "author": "bryan_johnson",
+      "media": "image"
+    },
+    {
+      "id": "live-2076205402933371012",
+      "text": "Sol sunset?! wtf",
+      "tier": "noise",
+      "author": "bentossell",
+      "media": "image"
+    },
+    {
+      "id": "live-2074519769819271232",
+      "text": "Whole Norway New trend \n\n© kumekael",
+      "tier": "noise",
+      "author": "Vinod_r108",
+      "media": "video"
+    },
+    {
+      "id": "live-2075972587134611925",
+      "text": "60% of the way there",
+      "tier": "noise",
+      "author": "LeilaHormozi",
+      "media": "image"
+    },
+    {
+      "id": "live-2075290374999032248",
+      "text": "We can bully a company into doing anything",
+      "tier": "noise",
+      "author": "ctjlewis"
+    },
+    {
+      "id": "live-2074615262763262171",
+      "text": "Guys, is this true???????\n\nor am i lucky one?",
+      "tier": "noise",
+      "author": "cjzafir",
+      "media": "image"
+    },
+    {
+      "id": "live-2074893775558893976",
+      "text": "Explaining physics to students in China.",
+      "tier": "noise",
+      "author": "Rainmaker1973",
+      "media": "video"
+    },
+    {
+      "id": "live-2076330620272210172",
+      "text": "the people with outrageously seemingly stupid ideas are probably geniuses btw",
+      "tier": "noise",
+      "author": "catmcgee"
+    },
+    {
+      "id": "live-2075529296345518391",
+      "text": "Truth has been spoken.",
+      "tier": "noise",
+      "author": "VittoStack",
+      "media": "image"
+    },
+    {
+      "id": "live-2071930770407477592",
+      "text": "P_H has a lot of caves?  I would think so.  Impressive adventure you show.",
+      "tier": "noise",
+      "author": "RDickinson",
+      "media": "video"
+    },
+    {
+      "id": "live-2076319445169979817",
+      "text": "No DNA test needed, purely South Sudanese , where you can find the world’s tallest people.",
+      "tier": "noise",
+      "author": "Joe__Bassey",
+      "media": "image"
+    },
+    {
+      "id": "live-2076352904194060657",
+      "text": "Trash ultra processed poison\n\nMake him eat steak and vegetables",
+      "tier": "noise",
+      "author": "levelsio"
+    },
+    {
+      "id": "live-2074823607495139494",
+      "text": "lol. Pretty smart actually!",
+      "tier": "noise",
+      "author": "its_The_Dr",
+      "media": "video"
+    },
+    {
+      "id": "live-2071986362794852764",
+      "text": "Since that day, not a single figurine was ever bought again.",
+      "tier": "noise",
+      "author": "chiquimafia__",
+      "media": "video"
+    },
+    {
+      "id": "live-2072313628620140751",
+      "text": "Meanwhile in China: Public “rooftop rain”\n\nMakes it even easier, faster, and cheaper to use air conditioning, and it cools the areas outside as well.",
+      "tier": "noise",
+      "author": "ShangguanJiewen",
+      "media": "video"
+    },
+    {
+      "id": "live-2071894901470429383",
+      "text": "Last week’s side quest: spelunking",
+      "tier": "noise",
+      "author": "nikkideyy",
+      "media": "video"
+    },
+    {
+      "id": "live-2072401372561940881",
+      "text": "this is her btw",
+      "tier": "noise",
+      "author": "p0lar_fawn",
+      "media": "image"
+    },
+    {
+      "id": "live-2071315496365101564",
+      "text": "Happy birthday to my wonderful son. @elonmusk has given me 55 years of joy. \nIt’s so much fun to celebrate with family and friends.\nHis cake is a rocket and a moon base",
+      "tier": "noise",
+      "author": "mayemusk",
+      "media": "image"
+    },
+    {
+      "id": "live-2074047382736515177",
+      "text": "The mother took pictures of the twins every morning while they were sleeping.",
+      "tier": "noise",
+      "author": "womengrom",
+      "media": "video"
     }
   ]
 }

@@ -1,17 +1,30 @@
-/* rai — Status Indicator (floating pill + settings popup, platform-aware) */
+/* rai — Status Indicator (floating pill + today-first panel, platform-aware)
+
+   Pill: status dot + today's hidden count. The dot pulses while a classifier
+   is actually working (activity fed by RaiClassifier/RaiImageClassifier) and
+   the whole pill is the button — click for the panel.
+   Panel: TODAY stats first (the thing you glance at), live "checking …" line
+   while classifying, all-time as a footnote. Config lives one tap deeper in
+   a settings view where every control saves on change (no Save button). */
 var RaiIndicator = (function () {
   'use strict';
 
   var pill = null;
-  var countsEl = null;
-  var statusEl = null;
-  var extraEl = null;
   var dotEl = null;
-  var gearEl = null;
+  var countEl = null;
+  var labelEl = null;
+  var extraEl = null;
   var popup = null;
-  var counts = { kept: 0, hidden: 0 };
-  var status = { connected: false, classify: false, label: 'offline' };
   var popupOpen = false;
+  var popupView = 'today';
+
+  var counts = {
+    total: 0, kept: 0, hidden: 0,
+    todayTotal: 0, todayKept: 0, todayHidden: 0
+  };
+  var status = { connected: false, classify: false };
+  var activity = { text: null, image: null };  // per-source snapshots from onActivity
+  var _lastPillCount = null;
 
   var _platform = 'x';
   var _mode = 'local';
@@ -32,41 +45,42 @@ var RaiIndicator = (function () {
     pill = document.createElement('div');
     pill.id = 'xrai-pill';
 
-    countsEl = document.createElement('span');
-    countsEl.className = 'xrai-pill-text';
-
     dotEl = document.createElement('span');
     dotEl.className = 'xrai-dot xrai-dot-red';
 
-    statusEl = document.createElement('span');
-    statusEl.className = 'xrai-pill-status';
+    countEl = document.createElement('span');
+    countEl.className = 'xrai-pill-count';
+
+    labelEl = document.createElement('span');
+    labelEl.className = 'xrai-pill-label';
 
     extraEl = document.createElement('span');
     extraEl.className = 'xrai-pill-extra';
 
-    gearEl = document.createElement('span');
-    gearEl.className = 'xrai-pill-gear';
-    gearEl.textContent = '⚙';
-    gearEl.addEventListener('click', function (e) {
+    pill.appendChild(dotEl);
+    pill.appendChild(countEl);
+    pill.appendChild(labelEl);
+    pill.appendChild(extraEl);
+    pill.addEventListener('click', function (e) {
       e.stopPropagation();
       togglePopup();
     });
-
-    pill.appendChild(countsEl);
-    pill.appendChild(document.createTextNode(' '));
-    pill.appendChild(dotEl);
-    pill.appendChild(statusEl);
-    pill.appendChild(extraEl);
-    pill.appendChild(document.createTextNode(' '));
-    pill.appendChild(gearEl);
 
     document.body.appendChild(pill);
 
     if (typeof RaiMemory !== 'undefined' && RaiMemory.getStats) {
       RaiMemory.getStats().then(function (stats) {
-        if (!stats) return;
-        counts.kept = stats.kept || 0;
-        counts.hidden = stats.hidden || 0;
+        if (stats) seedCounts(stats);
+        render();
+      });
+    }
+
+    // Worker-written totals are the shared truth: re-render from them whenever
+    // any tab counts, so pills agree across tabs (the local increment* bumps
+    // below only bridge the instant before the worker's write lands).
+    if (typeof RaiMemory !== 'undefined' && RaiMemory.onStatsChanged) {
+      RaiMemory.onStatsChanged(function (stats) {
+        seedCounts(stats);
         render();
       });
     }
@@ -74,28 +88,80 @@ var RaiIndicator = (function () {
     render();
   }
 
+  function seedCounts(stats) {
+    counts.total = stats.total || 0;
+    counts.kept = stats.kept || 0;
+    counts.hidden = stats.hidden || 0;
+    var t = stats.today || {};
+    counts.todayTotal = t.total || 0;
+    counts.todayKept = t.kept || 0;
+    counts.todayHidden = t.hidden || 0;
+  }
+
+  // Merge the two classifier queues into one "is anything happening" view.
+  function busyInfo() {
+    var t = activity.text;
+    var i = activity.image;
+    var inFlight = (t ? (t.active || 0) + (t.queued || 0) : 0) +
+                   (i ? (i.active || 0) + (i.queued || 0) : 0);
+    var current = (t && t.current) || (i && i.current) || null;
+    return {
+      busy: inFlight > 0,
+      current: current,
+      waiting: Math.max(0, inFlight - (current ? 1 : 0))
+    };
+  }
+
+  function offlineText() {
+    return (_mode === 'cloud' ? 'cloud' : 'ollama') + ' offline';
+  }
+
+  function currentLabel(cur) {
+    if (!cur) return '—';
+    var who = cur.author ? '@' + cur.author : (cur.channel || '');
+    var txt = (cur.text || '').replace(/\s+/g, ' ').trim();
+    if (!who && !txt) return 'image check';
+    if (txt.length > 34) txt = txt.substring(0, 34) + '…';
+    return who ? who + ' — “' + txt + '”' : '“' + txt + '”';
+  }
+
   function render() {
     if (!pill) return;
-    countsEl.textContent = L.name + ': ' + counts.kept + ' ' + L.keptWord + ' | ' + counts.hidden + ' ' + L.hiddenWord;
+    var b = busyInfo();
+    var healthy = status.connected && status.classify;
 
-    var dotClass = 'xrai-dot xrai-dot-red';
-    if (status.connected && status.classify) dotClass = 'xrai-dot xrai-dot-green';
-    else if (status.connected) dotClass = 'xrai-dot xrai-dot-orange';
+    var dotClass = 'xrai-dot ';
+    if (!status.connected) dotClass += 'xrai-dot-red';
+    else if (!status.classify) dotClass += 'xrai-dot-orange';
+    else dotClass += 'xrai-dot-green';
+    if (healthy && b.busy) dotClass += ' xrai-dot-pulse';
     dotEl.className = dotClass;
-    dotEl.title = 'server: ' + (status.connected ? '✓' : '✗') +
-      ' classify: ' + (status.classify ? '✓' : '✗');
 
-    var statusText = '';
-    if (_mode === 'cloud') {
-      if (!status.connected) statusText = 'cloud offline';
-      else if (!status.classify) statusText = 'cloud up · classify ✗';
-      else statusText = 'cloud';
+    if (!status.connected) {
+      countEl.textContent = '';
+      labelEl.textContent = offlineText();
+    } else if (!status.classify) {
+      countEl.textContent = '';
+      labelEl.textContent = 'classify ✗' + (_mode === 'local' ? ' (CORS?)' : '');
     } else {
-      if (!status.connected) statusText = 'ollama offline';
-      else if (!status.classify) statusText = 'ollama up · classify ✗ (CORS?)';
-      else statusText = 'local';
+      var n = counts.todayHidden;
+      countEl.textContent = String(n);
+      labelEl.textContent = L.hiddenWord + ' today';
+      if (_lastPillCount !== null && _lastPillCount !== n) {
+        countEl.classList.remove('xrai-tick');
+        void countEl.offsetWidth;
+        countEl.classList.add('xrai-tick');
+        setTimeout(function () {
+          if (countEl) countEl.classList.remove('xrai-tick');
+        }, 200);
+      }
+      _lastPillCount = n;
     }
-    statusEl.textContent = statusText;
+
+    // Quiet mode: healthy + idle = fade back, stop competing with the feed.
+    pill.classList.toggle('xrai-pill-quiet', healthy && !b.busy);
+
+    renderPanelLive();
   }
 
   function update(newCounts, newStatus) {
@@ -106,13 +172,27 @@ var RaiIndicator = (function () {
     if (newStatus) {
       status.connected = newStatus.connected !== undefined ? newStatus.connected : status.connected;
       status.classify = newStatus.classify !== undefined ? newStatus.classify : status.classify;
-      status.label = newStatus.label || status.label;
     }
     render();
   }
 
-  function incrementKept() { counts.kept++; render(); }
-  function incrementHidden() { counts.hidden++; render(); }
+  function incrementKept() {
+    counts.kept++; counts.total++;
+    counts.todayKept++; counts.todayTotal++;
+    render();
+  }
+
+  function incrementHidden() {
+    counts.hidden++; counts.total++;
+    counts.todayHidden++; counts.todayTotal++;
+    render();
+  }
+
+  // Classifier queue snapshots land here (wired in each platform's main.js).
+  function setActivity(source, snapshot) {
+    activity[source] = snapshot;
+    render();
+  }
 
   // Optional trailing segment on the pill (used by the YouTube Shorts tracker).
   function setExtra(text) {
@@ -123,22 +203,23 @@ var RaiIndicator = (function () {
   function togglePopup() {
     if (popupOpen) { closePopup(); return; }
     popupOpen = true;
+    popupView = 'today';
 
     popup = document.createElement('div');
     popup.id = 'xrai-settings';
-    popup.innerHTML = '<div class="xrai-settings-loading">Loading...</div>';
     document.body.appendChild(popup);
+    renderPanel();
 
     setTimeout(function () {
       document.addEventListener('click', outsideClickHandler);
     }, 100);
-
-    RaiConfig.getConfig(_platform).then(function (cfg) {
-      renderSettings(cfg);
-    });
   }
 
   function outsideClickHandler(e) {
+    // A click on a panel link can synchronously re-render the panel (back /
+    // settings), detaching the clicked node before this bubbled handler runs.
+    // A detached target is never an "outside" click — ignore it.
+    if (e.target && e.target.isConnected === false) return;
     if (popup && !popup.contains(e.target) && !pill.contains(e.target)) {
       closePopup();
     }
@@ -151,67 +232,191 @@ var RaiIndicator = (function () {
     document.removeEventListener('click', outsideClickHandler);
   }
 
-  function renderSettings(cfg) {
+  function renderPanel() {
     if (!popup) return;
+    if (popupView === 'settings') { renderSettingsView(); return; }
+    renderTodayView();
+  }
 
-    // Platform-specific control row
+  // === Today view — the default: what did rai do for you today ===
+
+  function renderTodayView() {
+    var isYt = _platform === 'youtube';
+    popup.innerHTML =
+      '<div class="xrai-p-head"><span class="xrai-p-name"></span>' +
+      '<span class="xrai-p-status"><span class="xrai-dot xrai-dot-green" id="xrai-p-dot"></span><span id="xrai-p-stat"></span></span></div>' +
+      '<div id="xrai-p-live" style="display:none">' +
+      '<div class="xrai-p-row"><span class="xrai-p-k">checking</span><span class="xrai-p-v" id="xrai-p-cur"></span></div>' +
+      '<div class="xrai-p-row"><span class="xrai-p-k">queued</span><span class="xrai-p-v" id="xrai-p-q"></span></div>' +
+      '</div>' +
+      '<div class="xrai-p-sec">today</div>' +
+      '<div class="xrai-p-hero" id="xrai-p-hero"></div>' +
+      '<div class="xrai-p-herosub">processed today</div>' +
+      '<div class="xrai-p-row"><span class="xrai-p-k">' + L.keptWord + '</span><span class="xrai-p-v" id="xrai-p-kept"></span></div>' +
+      '<div class="xrai-p-row"><span class="xrai-p-k">' + L.hiddenWord + '</span><span class="xrai-p-v" id="xrai-p-hid"></span></div>' +
+      '<div class="xrai-p-row"><span class="xrai-p-k">time on ' + L.siteWord + '</span><span class="xrai-p-v" id="xrai-p-time">—</span></div>' +
+      (isYt ? '<div class="xrai-p-row"><span class="xrai-p-k">shorts</span><span class="xrai-p-v" id="xrai-p-shorts">—</span></div>' : '') +
+      '<div class="xrai-p-foot"><span id="xrai-p-life"></span><span class="xrai-p-link" id="xrai-p-goset">settings</span></div>';
+
+    popup.querySelector('.xrai-p-name').textContent = L.name;
+    popup.querySelector('#xrai-p-goset').addEventListener('click', function () {
+      popupView = 'settings';
+      renderPanel();
+    });
+
+    renderPanelLive();
+
+    if (typeof RaiMemory !== 'undefined') {
+      RaiMemory.getStats().then(function (stats) {
+        if (!stats) return;
+        seedCounts(stats);
+        renderPanelLive();
+      });
+      RaiMemory.getDailyTime().then(function (secs) {
+        var el = popup && popup.querySelector('#xrai-p-time');
+        if (el) el.textContent = formatMinutes(Math.floor(secs / 60));
+      });
+    }
+
+    if (isYt && typeof YtraiShorts !== 'undefined' && YtraiShorts.getToday) {
+      var st = YtraiShorts.getToday();
+      var sEl = popup.querySelector('#xrai-p-shorts');
+      if (sEl) sEl.textContent = st.count + ' · ' + Math.round(st.seconds / 60) + 'm';
+    }
+  }
+
+  // Refresh the live parts of the today view (status word, checking line,
+  // numbers) without rebuilding the DOM — called from render() on every
+  // stats/activity change so an open panel stays truthful.
+  function renderPanelLive() {
+    if (!popup || popupView !== 'today') return;
+    var statEl = popup.querySelector('#xrai-p-stat');
+    if (!statEl) return;
+
+    var b = busyInfo();
+    var healthy = status.connected && status.classify;
+
+    var pDot = popup.querySelector('#xrai-p-dot');
+    var dotClass = 'xrai-dot ';
+    if (!status.connected) dotClass += 'xrai-dot-red';
+    else if (!status.classify) dotClass += 'xrai-dot-orange';
+    else dotClass += 'xrai-dot-green';
+    if (healthy && b.busy) dotClass += ' xrai-dot-pulse';
+    pDot.className = dotClass;
+
+    if (!status.connected) statEl.textContent = offlineText();
+    else if (!status.classify) statEl.textContent = 'classify ✗';
+    else statEl.textContent = (b.busy ? 'filtering' : 'idle') + (_mode === 'cloud' ? ' · cloud' : '');
+
+    var liveWrap = popup.querySelector('#xrai-p-live');
+    if (liveWrap) {
+      liveWrap.style.display = b.busy ? 'block' : 'none';
+      if (b.busy) {
+        popup.querySelector('#xrai-p-cur').textContent = currentLabel(b.current);
+        popup.querySelector('#xrai-p-q').textContent = String(b.waiting);
+      }
+    }
+
+    var heroEl = popup.querySelector('#xrai-p-hero');
+    if (heroEl) heroEl.textContent = counts.todayTotal.toLocaleString();
+    var keptEl = popup.querySelector('#xrai-p-kept');
+    if (keptEl) keptEl.textContent = counts.todayKept.toLocaleString();
+    var hidEl = popup.querySelector('#xrai-p-hid');
+    if (hidEl) hidEl.textContent = counts.todayHidden.toLocaleString();
+    var lifeEl = popup.querySelector('#xrai-p-life');
+    if (lifeEl) lifeEl.textContent = counts.total.toLocaleString() + ' all-time';
+  }
+
+  function formatMinutes(min) {
+    if (min < 60) return min + 'm';
+    return Math.floor(min / 60) + 'h ' + (min % 60) + 'm';
+  }
+
+  // === Settings view — every control saves on change, no Save button ===
+
+  function renderSettingsView() {
+    RaiConfig.getConfig(_platform).then(function (cfg) {
+      if (!popup || popupView !== 'settings') return;
+      buildSettings(cfg);
+    });
+  }
+
+  function buildSettings(cfg) {
     var extraControl = '';
     if (_platform === 'x') {
       extraControl =
         '<label>Content<select id="xrai-s-filter">' +
-        '<option value="posts-only"' + (cfg.contentFilter === 'posts-only' ? ' selected' : '') + '>Posts only</option>' +
-        '<option value="all"' + (cfg.contentFilter === 'all' ? ' selected' : '') + '>All</option>' +
-        '</select></label>';
+        '<option value="posts-only">Posts only</option>' +
+        '<option value="all">All</option>' +
+        '</select></label>' +
+        '<div class="xrai-settings-sub">Reply guard (your posts)</div>' +
+        '<label>Blur bad-faith replies<input type="checkbox" id="xrai-s-replyguard"></label>' +
+        '<label>Your handle<input type="text" id="xrai-s-ownhandle" placeholder="yourhandle"></label>';
     } else if (_platform === 'youtube') {
       extraControl =
-        '<label>Keep motivational<input type="checkbox" id="xrai-s-motivational"' +
-        (cfg.keepMotivational ? ' checked' : '') + '></label>' +
+        '<label>Keep motivational<input type="checkbox" id="xrai-s-motivational"></label>' +
         '<div class="xrai-settings-sub">Shorts doom-scroll</div>' +
-        '<label>Snap-out nudge<input type="checkbox" id="xrai-s-shorts-nudge"' +
-        (cfg.shortsNudge !== false ? ' checked' : '') + '></label>' +
-        '<label>Nudge after (Shorts)<input type="number" id="xrai-s-shorts-count" min="1" max="200" value="' + (cfg.shortsLimitCount || 10) + '"></label>' +
-        '<label>…or minutes<input type="number" id="xrai-s-shorts-min" min="1" max="120" value="' + (cfg.shortsLimitMinutes || 5) + '"></label>';
+        '<label>Snap-out nudge<input type="checkbox" id="xrai-s-shorts-nudge"></label>' +
+        '<label>Nudge after (Shorts)<input type="number" id="xrai-s-shorts-count" min="1" max="200"></label>' +
+        '<label>…or minutes<input type="number" id="xrai-s-shorts-min" min="1" max="120"></label>';
     }
 
     var aggressivenessLabel = _platform === 'youtube' ? 'Strictness' : 'Aggressiveness';
     var cloudMode = cfg.mode === 'cloud';
 
-    var cloudControl =
+    popup.innerHTML =
+      '<div class="xrai-p-head"><span class="xrai-p-name"></span><span class="xrai-p-savenote" id="xrai-s-saved">saved</span></div>' +
       '<label>Mode<select id="xrai-s-mode">' +
-      '<option value="local"' + (!cloudMode ? ' selected' : '') + '>Local (free, needs Ollama)</option>' +
-      '<option value="cloud"' + (cloudMode ? ' selected' : '') + '>Cloud (free beta, no setup)</option>' +
+      '<option value="local">Local (free, needs Ollama)</option>' +
+      '<option value="cloud">Cloud (free beta, no setup)</option>' +
       '</select></label>' +
       '<div id="xrai-s-cloud-fields" style="display:' + (cloudMode ? 'block' : 'none') + '">' +
-      '<label>API key<input type="password" id="xrai-s-cloud-key" placeholder="rai_live_..." value="' + (cfg.cloudApiKey || '') + '"></label>' +
-      '<div class="xrai-settings-actions"><button type="button" id="xrai-s-free-key"' +
-      (cfg.cloudApiKey ? ' style="display:none"' : '') + '>Get a free key</button></div>' +
-      '<div class="xrai-settings-sub" id="xrai-s-cloud-balance">' +
-      (cloudMode ? 'Checking balance…' : '') +
-      '</div>' +
+      '<label>API key<input type="password" id="xrai-s-cloud-key" placeholder="rai_live_..."></label>' +
+      '<div class="xrai-settings-actions"><button type="button" id="xrai-s-free-key">Get a free key</button></div>' +
+      '<div class="xrai-settings-sub" id="xrai-s-cloud-balance"></div>' +
       '<div class="xrai-settings-sub"><a href="https://snratio.xyz/privacy.html" target="_blank" rel="noopener">What cloud mode sends</a></div>' +
-      '</div>';
-
-    popup.innerHTML =
-      '<div class="xrai-settings-title">' + L.name + ' settings</div>' +
-      cloudControl +
+      '</div>' +
       '<label>Model<select id="xrai-s-model"><option value="">Loading models...</option></select></label>' +
-      '<label>' + aggressivenessLabel + '<input type="range" id="xrai-s-threshold" min="0.5" max="0.9" step="0.05" value="' + cfg.confidenceThreshold + '"><span id="xrai-s-threshold-val">' + cfg.confidenceThreshold + '</span></label>' +
+      '<label>' + aggressivenessLabel + '<input type="range" id="xrai-s-threshold" min="0.5" max="0.9" step="0.05"><span id="xrai-s-threshold-val"></span></label>' +
       extraControl +
-      '<label>Image bait check<input type="checkbox" id="xrai-s-image-bait"' +
-      (cfg.imageBaitEnabled !== false ? ' checked' : '') + '></label>' +
+      '<label>Image bait check<input type="checkbox" id="xrai-s-image-bait"></label>' +
+      '<label>Hop nudge (X↔YT)<input type="checkbox" id="xrai-s-hop-nudge"></label>' +
       '<label>Hide method<select id="xrai-s-hide">' +
-      '<option value="remove"' + (cfg.hideMethod === 'remove' ? ' selected' : '') + '>Remove</option>' +
-      '<option value="collapse"' + (cfg.hideMethod === 'collapse' ? ' selected' : '') + '>Collapse</option>' +
-      '<option value="blur"' + (cfg.hideMethod === 'blur' ? ' selected' : '') + '>Blur</option>' +
+      '<option value="remove">Remove</option>' +
+      '<option value="collapse">Collapse</option>' +
+      '<option value="blur">Blur</option>' +
       '</select></label>' +
-      '<div class="xrai-settings-actions">' +
-      '<button id="xrai-s-save">Save</button>' +
-      '<button id="xrai-s-clear">Clear memory</button>' +
-      '</div>' +
-      '<div class="xrai-settings-actions">' +
-      '<button id="xrai-s-export">⬇ Export log (.jsonl)</button>' +
-      '</div>' +
-      '<div class="xrai-settings-stats" id="xrai-s-stats">Loading stats...</div>';
+      '<div class="xrai-p-foot">' +
+      '<span><span class="xrai-p-link" id="xrai-s-export">export log</span> · <span class="xrai-p-link xrai-p-danger" id="xrai-s-clear">clear memory</span></span>' +
+      '<span class="xrai-p-link" id="xrai-s-back">back</span></div>';
+
+    popup.querySelector('.xrai-p-name').textContent = L.name + ' settings';
+
+    // Values via properties, not markup — survives quotes in the API key.
+    var modeSelect = popup.querySelector('#xrai-s-mode');
+    modeSelect.value = cloudMode ? 'cloud' : 'local';
+    var keyInput = popup.querySelector('#xrai-s-cloud-key');
+    keyInput.value = cfg.cloudApiKey || '';
+    var slider = popup.querySelector('#xrai-s-threshold');
+    slider.value = cfg.confidenceThreshold;
+    var sliderVal = popup.querySelector('#xrai-s-threshold-val');
+    sliderVal.textContent = String(cfg.confidenceThreshold);
+    popup.querySelector('#xrai-s-image-bait').checked = cfg.imageBaitEnabled !== false;
+    popup.querySelector('#xrai-s-hop-nudge').checked = cfg.hopNudge !== false;
+    popup.querySelector('#xrai-s-hide').value = cfg.hideMethod || 'remove';
+    if (_platform === 'x') {
+      popup.querySelector('#xrai-s-filter').value = cfg.contentFilter || 'posts-only';
+      popup.querySelector('#xrai-s-replyguard').checked = cfg.replyGuard !== false;
+      popup.querySelector('#xrai-s-ownhandle').value = cfg.ownHandle || '';
+    } else if (_platform === 'youtube') {
+      popup.querySelector('#xrai-s-motivational').checked = !!cfg.keepMotivational;
+      popup.querySelector('#xrai-s-shorts-nudge').checked = cfg.shortsNudge !== false;
+      popup.querySelector('#xrai-s-shorts-count').value = cfg.shortsLimitCount || 10;
+      popup.querySelector('#xrai-s-shorts-min').value = cfg.shortsLimitMinutes || 5;
+    }
+
+    var freeKeyBtn = popup.querySelector('#xrai-s-free-key');
+    freeKeyBtn.style.display = cfg.cloudApiKey ? 'none' : '';
 
     if (chrome.runtime && chrome.runtime.id) {
       chrome.runtime.sendMessage({ action: 'listModels', platform: _platform }, function (response) {
@@ -229,19 +434,80 @@ var RaiIndicator = (function () {
       });
     }
 
-    var slider = popup.querySelector('#xrai-s-threshold');
-    var sliderVal = popup.querySelector('#xrai-s-threshold-val');
+    // --- auto-save wiring ---
+    var savedEl = popup.querySelector('#xrai-s-saved');
+    var savedTimer = null;
+    function flashSaved() {
+      if (!savedEl) return;
+      savedEl.classList.add('xrai-p-savenote-show');
+      if (savedTimer) clearTimeout(savedTimer);
+      savedTimer = setTimeout(function () {
+        if (savedEl) savedEl.classList.remove('xrai-p-savenote-show');
+      }, 1200);
+    }
+    function save(partial) {
+      RaiConfig.saveConfig(_platform, partial).then(function (newCfg) {
+        _mode = newCfg.mode === 'cloud' ? 'cloud' : 'local';
+        flashSaved();
+        render();
+      });
+    }
+
+    modeSelect.addEventListener('change', function () {
+      popup.querySelector('#xrai-s-cloud-fields').style.display =
+        modeSelect.value === 'cloud' ? 'block' : 'none';
+      save({ mode: modeSelect.value });
+    });
+    keyInput.addEventListener('change', function () {
+      save({ cloudApiKey: keyInput.value.trim() });
+    });
+    popup.querySelector('#xrai-s-model').addEventListener('change', function (e) {
+      if (e.target.value) save({ model: e.target.value });
+    });
     slider.addEventListener('input', function () {
       sliderVal.textContent = slider.value;
     });
-
-    var modeSelect = popup.querySelector('#xrai-s-mode');
-    var cloudFields = popup.querySelector('#xrai-s-cloud-fields');
-    modeSelect.addEventListener('change', function () {
-      cloudFields.style.display = modeSelect.value === 'cloud' ? 'block' : 'none';
+    slider.addEventListener('change', function () {
+      save({ confidenceThreshold: parseFloat(slider.value) });
     });
+    popup.querySelector('#xrai-s-image-bait').addEventListener('change', function (e) {
+      save({ imageBaitEnabled: e.target.checked });
+    });
+    popup.querySelector('#xrai-s-hop-nudge').addEventListener('change', function (e) {
+      save({ hopNudge: e.target.checked });
+    });
+    popup.querySelector('#xrai-s-hide').addEventListener('change', function (e) {
+      save({ hideMethod: e.target.value });
+    });
+    if (_platform === 'x') {
+      popup.querySelector('#xrai-s-filter').addEventListener('change', function (e) {
+        save({ contentFilter: e.target.value });
+      });
+      popup.querySelector('#xrai-s-replyguard').addEventListener('change', function (e) {
+        save({ replyGuard: e.target.checked });
+      });
+      popup.querySelector('#xrai-s-ownhandle').addEventListener('change', function (e) {
+        save({ ownHandle: e.target.value.replace(/^@/, '').trim() });
+      });
+    } else if (_platform === 'youtube') {
+      popup.querySelector('#xrai-s-motivational').addEventListener('change', function (e) {
+        save({ keepMotivational: e.target.checked });
+      });
+      popup.querySelector('#xrai-s-shorts-nudge').addEventListener('change', function (e) {
+        save({ shortsNudge: e.target.checked });
+      });
+      popup.querySelector('#xrai-s-shorts-count').addEventListener('change', function (e) {
+        save({ shortsLimitCount: parseInt(e.target.value, 10) || 10 });
+      });
+      popup.querySelector('#xrai-s-shorts-min').addEventListener('change', function (e) {
+        save({ shortsLimitMinutes: parseInt(e.target.value, 10) || 5 });
+      });
+    }
 
-    if (cloudMode && cfg.cloudApiKey) {
+    // Cloud balance + free-key flow (runtime.id check = orphaned-tab guard)
+    if (cloudMode && cfg.cloudApiKey && chrome.runtime && chrome.runtime.id) {
+      var balEl = popup.querySelector('#xrai-s-cloud-balance');
+      balEl.textContent = 'Checking balance…';
       chrome.runtime.sendMessage({ action: 'checkBalance', platform: _platform }, function (response) {
         var el = popup && popup.querySelector('#xrai-s-cloud-balance');
         if (!el) return;
@@ -254,8 +520,11 @@ var RaiIndicator = (function () {
       });
     }
 
-    var freeKeyBtn = popup.querySelector('#xrai-s-free-key');
     freeKeyBtn.addEventListener('click', function () {
+      if (!chrome.runtime || !chrome.runtime.id) {
+        freeKeyBtn.textContent = 'Extension reloaded — refresh this page';
+        return;
+      }
       freeKeyBtn.textContent = 'Creating key…';
       freeKeyBtn.disabled = true;
       chrome.runtime.sendMessage({ action: 'getFreeKey', platform: _platform }, function (response) {
@@ -267,50 +536,51 @@ var RaiIndicator = (function () {
           if (balanceEl) balanceEl.textContent = (response && response.error) || 'Key request failed — try again';
           return;
         }
-        popup.querySelector('#xrai-s-cloud-key').value = response.api_key;
+        keyInput.value = response.api_key;
+        save({ cloudApiKey: response.api_key });
         freeKeyBtn.style.display = 'none';
         if (balanceEl) {
           balanceEl.textContent = 'Key created — ~' + Math.round(response.balance_cents * 100).toLocaleString() +
-            ' free classifications. Hit Save.';
+            ' free classifications. Saved.';
         }
       });
     });
 
-    popup.querySelector('#xrai-s-save').addEventListener('click', function () {
-      var partial = {
-        model: popup.querySelector('#xrai-s-model').value,
-        confidenceThreshold: parseFloat(slider.value),
-        imageBaitEnabled: popup.querySelector('#xrai-s-image-bait').checked,
-        hideMethod: popup.querySelector('#xrai-s-hide').value,
-        mode: modeSelect.value,
-        cloudApiKey: popup.querySelector('#xrai-s-cloud-key').value.trim()
-      };
-      if (_platform === 'x') {
-        partial.contentFilter = popup.querySelector('#xrai-s-filter').value;
-      } else if (_platform === 'youtube') {
-        partial.keepMotivational = popup.querySelector('#xrai-s-motivational').checked;
-        partial.shortsNudge = popup.querySelector('#xrai-s-shorts-nudge').checked;
-        partial.shortsLimitCount = parseInt(popup.querySelector('#xrai-s-shorts-count').value, 10) || 10;
-        partial.shortsLimitMinutes = parseInt(popup.querySelector('#xrai-s-shorts-min').value, 10) || 5;
-      }
-      RaiConfig.saveConfig(_platform, partial).then(function () {
-        _mode = partial.mode === 'cloud' ? 'cloud' : 'local';
-        closePopup();
-      });
+    popup.querySelector('#xrai-s-back').addEventListener('click', function () {
+      popupView = 'today';
+      renderPanel();
     });
 
-    popup.querySelector('#xrai-s-clear').addEventListener('click', function () {
+    // Clear memory: two-tap confirm — the only destructive control here.
+    // Clears fingerprints + stats totals; the durable event log is untouched.
+    var clearLink = popup.querySelector('#xrai-s-clear');
+    var clearArmed = false;
+    clearLink.addEventListener('click', function () {
+      if (!clearArmed) {
+        clearArmed = true;
+        clearLink.textContent = 'sure? click again';
+        setTimeout(function () {
+          if (clearArmed && popup) {
+            clearArmed = false;
+            clearLink.textContent = 'clear memory';
+          }
+        }, 2500);
+        return;
+      }
+      clearArmed = false;
       RaiMemory.clearAll().then(function () {
-        var statsEl = popup.querySelector('#xrai-s-stats');
-        if (statsEl) statsEl.textContent = 'Memory cleared!';
+        if (popup) clearLink.textContent = 'cleared';
+        setTimeout(function () {
+          if (popup) clearLink.textContent = 'clear memory';
+        }, 1500);
       });
     });
 
     popup.querySelector('#xrai-s-export').addEventListener('click', function () {
       var btn = popup.querySelector('#xrai-s-export');
-      btn.textContent = 'Exporting…';
+      btn.textContent = 'exporting…';
       RaiMemory.getEvents().then(function (events) {
-        if (!events || !events.length) { btn.textContent = 'No events logged yet'; return; }
+        if (!events || !events.length) { btn.textContent = 'no events logged yet'; return; }
         var jsonl = events.map(function (e) { return JSON.stringify(e); }).join('\n');
         var blob = new Blob([jsonl], { type: 'application/x-ndjson' });
         var url = URL.createObjectURL(blob);
@@ -321,31 +591,8 @@ var RaiIndicator = (function () {
         a.click();
         a.remove();
         setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
-        btn.textContent = '⬇ Exported ' + events.length + ' events';
+        btn.textContent = 'exported ' + events.length + ' events';
       });
-    });
-
-    Promise.all([RaiMemory.getStats(), RaiMemory.getDailyTime(), RaiMemory.countEvents()]).then(function (results) {
-      var stats = results[0];
-      var dailySecs = results[1];
-      var logged = results[2];
-      var statsEl = popup.querySelector('#xrai-s-stats');
-      if (!statsEl) return;
-      var timeSaved = Math.round((stats.hidden || 0) * 3);
-      var dailyMin = Math.floor(dailySecs / 60);
-      var dailyLabel = dailyMin < 60
-        ? dailyMin + 'm'
-        : Math.floor(dailyMin / 60) + 'h ' + (dailyMin % 60) + 'm';
-      var shortsLine = '';
-      if (_platform === 'youtube' && typeof YtraiShorts !== 'undefined' && YtraiShorts.getToday) {
-        var st = YtraiShorts.getToday();
-        shortsLine = '\n📱 Shorts today: ' + st.count + ' · ' + Math.round(st.seconds / 60) + 'm';
-      }
-      statsEl.textContent = 'Processed: ' + stats.total +
-        ' | Kept: ' + stats.kept +
-        ' | Hidden: ' + stats.hidden +
-        '\nLogged: ' + logged + ' events · Today on ' + L.siteWord + ': ' + dailyLabel +
-        shortsLine;
     });
   }
 
@@ -354,6 +601,7 @@ var RaiIndicator = (function () {
     update: update,
     incrementKept: incrementKept,
     incrementHidden: incrementHidden,
+    setActivity: setActivity,
     setExtra: setExtra,
     // back-compat aliases (X main historically used shown/hidden naming)
     incrementShown: incrementKept

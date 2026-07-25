@@ -25,10 +25,22 @@ function loadTips() {
   return new Function(src + '\nreturn XraiTips;')();
 }
 
+// XraiReplyRoute — pure IIFE, no browser deps (reply-guard routing/immunity)
+function loadReplyRoute() {
+  const src = loadSource('extension/content/x/replyroute.js');
+  return new Function(src + '\nreturn XraiReplyRoute;')();
+}
+
 // YtraiPrefilter — pure IIFE, no browser deps
 function loadYoutubePrefilter() {
   const src = loadSource('extension/content/youtube/prefilter.js');
   return new Function(src + '\nreturn YtraiPrefilter;')();
+}
+
+// RaiHops — pure IIFE, no browser deps (hop-detection logic)
+function loadHops() {
+  const src = loadSource('extension/lib/hops.js');
+  return new Function(src + '\nreturn RaiHops;')();
 }
 
 // Prompts + parsers from the service worker (chrome stubbed)
@@ -42,6 +54,7 @@ function loadWorker() {
     'chrome',
     src +
       '\nreturn { X_CLASSIFY_SYSTEM: X_CLASSIFY_SYSTEM, parseXClassification: parseXClassification, ' +
+      'X_REPLY_SYSTEM: X_REPLY_SYSTEM, parseReplyClassification: parseReplyClassification, ' +
       'YT_CLASSIFY_SYSTEM: YT_CLASSIFY_SYSTEM, parseYoutubeClassification: parseYoutubeClassification };'
   )(chromeStub);
 }
@@ -58,6 +71,10 @@ function loadGolden() {
 
 function loadGoldenYoutube() {
   return JSON.parse(loadSource('benchmarks/golden-youtube.json'));
+}
+
+function loadGoldenReplies() {
+  return JSON.parse(loadSource('benchmarks/golden-replies-x.json'));
 }
 
 // Golden item → the `data` shape XraiPrefilter.prefilter() receives in production
@@ -98,6 +115,31 @@ function decide(prefilterResult, modelResult, threshold) {
 
 function isSignalTier(tier) {
   return tier === 'signal' || tier === 'critical-signal';
+}
+
+// Golden reply item → the `data` shape prefilterReply() receives in production
+function toReplyPrefilterData(item) {
+  return { text: item.text };
+}
+
+// Golden reply item → the exact user message classifyReply() sends to Ollama
+function toReplyUserMessage(item) {
+  return 'Reply' + (item.author ? ' from @' + item.author : '') + ': "' + (item.text || '') + '"';
+}
+
+// Mirror of replyVerdictOf()/applyReplyDecision() in extension/content/x/main.js.
+// Same asymmetry as the feed: a prefilter verdict blurs UNCONDITIONALLY; only
+// the model path respects replyConfidenceThreshold. Everything else is shown.
+function decideReply(prefilterResult, modelResult, threshold) {
+  if (prefilterResult) {
+    return { decision: 'blurred', stage: 'prefilter', verdict: prefilterResult.verdict, confidence: prefilterResult.confidence };
+  }
+  const bad = modelResult.verdict && modelResult.verdict !== 'fine' && modelResult.confidence >= threshold;
+  return { decision: bad ? 'blurred' : 'shown', stage: 'model', verdict: bad ? modelResult.verdict : 'fine', confidence: modelResult.confidence };
+}
+
+function isReplyKeepTier(tier) {
+  return tier === 'genuine' || tier === 'tempting-bad-faith';
 }
 
 // Golden YouTube item → the `data` shape YtraiPrefilter.prefilter() receives in production
@@ -143,18 +185,25 @@ function sha(text) {
 module.exports = {
   loadPrefilter,
   loadYoutubePrefilter,
+  loadHops,
   loadTips,
+  loadReplyRoute,
   loadWorker,
   loadConfigDefaults,
   loadGolden,
   loadGoldenYoutube,
+  loadGoldenReplies,
   toPrefilterData,
   toUserMessage,
   toYoutubePrefilterData,
   toYoutubeUserMessage,
+  toReplyPrefilterData,
+  toReplyUserMessage,
   decide,
   decideYoutube,
+  decideReply,
   isSignalTier,
   isKeepTier,
+  isReplyKeepTier,
   sha,
 };

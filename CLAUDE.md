@@ -6,7 +6,7 @@ Instructions for Claude Code when working on this repo.
 
 **rai** is a Chrome extension that filters social feeds using local AI (Ollama). One extension, two platforms, shared core:
 
-- **X / Twitter** (`x.com`): classifies tweets as **signal** (tech/AI/startup) or **noise** (everything else) and hides noise. Generates copy-paste reply suggestions for signal tweets.
+- **X / Twitter** (`x.com`): classifies tweets as **signal** (tech/AI/startup) or **noise** (everything else) and hides noise.
 - **YouTube** (`www.youtube.com`): classifies videos by **title + channel** as `music` / `motivational` / `other`. **Blurs everything except music and motivational videos** — the inverse of X (blur-by-default, reveal-the-good). For when you open YouTube to listen to music but get distracted by videos.
 
 The repo dir is still named `xrai` for history; the extension is `rai` (multi-platform).
@@ -21,20 +21,22 @@ extension/
   lib/
     config.js    → RaiConfig     # per-platform config (xrai_config / ytrai_config)
     memory.js    → RaiMemory     # per-platform stats/time/log + IndexedDB
+    hops.js      → RaiHops       # pure hop-detection logic (X↔YT doom-loop), worker-loaded
     ollama.js                    # legacy XraiOllama client (unused, not loaded)
   content/
     core/                        # SHARED, neutral Rai* namespace
-      classifier.js → RaiClassifier   # concurrent queue (max 5) + result cache, platform pass-through
+      classifier.js → RaiClassifier   # concurrent queue (3 in flight) + result cache + activity feed
       hider.js      → RaiHider        # blur / remove / collapse + peek button
-      indicator.js  → RaiIndicator    # status pill + per-platform settings
+      indicator.js  → RaiIndicator    # status pill (pulses while classifying) + today-first panel + auto-save settings
       dwell.js      → RaiDwell        # attention ledger: per-card dwell tracking (X only for now)
+      hopnudge.js   → RaiHopNudge     # X↔YT hop-loop overlay (detection in lib/hops.js via worker)
       styles.css                      # tag-agnostic selectors ([data-xrai-*])
     x/                           # X-specific, Xrai* namespace
       detector.js  → XraiDetector     # tweet detection + media + text expansion
-      prefilter.js → XraiPrefilter    # regex noise filter + tech safelist
+      prefilter.js → XraiPrefilter    # regex noise filter + tech safelist (+ prefilterReply)
+      replyroute.js → XraiReplyRoute  # reply-guard routing/immunity (pure, worker-free)
       tips.js      → XraiTips          # workflow-tip detection (feeds the tips ledger)
-      reply.js     → XraiReply         # reply generation (copy-paste only)
-      main.js      → XraiMain           # pipeline: hide noise, keep signal
+      main.js      → XraiMain           # pipeline: hide noise, keep signal + reply guard
     youtube/                     # YouTube-specific, Ytrai* namespace
       detector.js  → YtraiDetector     # video-card detection (recycle-aware)
       prefilter.js → YtraiPrefilter    # regex KEEP for obvious music/motivational
@@ -45,15 +47,16 @@ extension/
 
 **Namespace convention:** shared core = `Rai*` (RaiConfig/RaiMemory/RaiClassifier/RaiHider/RaiIndicator). X-specific = `Xrai*`. YouTube-specific = `Ytrai*`. Internal CSS classes, `data-xrai-*` attributes, and storage prefixes (`xrai_*` for X, `ytrai_*` for YouTube) are intentionally kept — they preserve user data and keep tests green. The service worker routes by a `platform` field on every message.
 
-**X pipeline** (`content/x/main.js`, scoped to `/home*`): reply filter → prefilter (regex) → result cache → Ollama (signal/noise). Off-home routes render untouched.
+**X pipeline** (`content/x/main.js`, scoped to `/home*`): reply filter → prefilter (regex) → result cache → Ollama (signal/noise). Off-home routes render untouched — except the user's OWN status pages, where the **reply guard** runs (see below).
 
 **YouTube pipeline** (`content/youtube/main.js`, scoped to home `/`, `/feed/subscriptions`, and the `/watch` sidebar): cache → prefilter (instant keep) → fail-open if Ollama down → blur immediately + classify → reveal only `music` (and `motivational` if enabled). The main watch video and channel/search pages are never touched.
 
 **Ollama** (local, port 11434):
 - X default model: `dhiltgen/gemma4:e2b-mlx-bf16`. YouTube default: `gemma2:2b` (fast — titles are short and the prefilter handles the obvious music).
 - X prompt: 4 dimensions (NOVELTY/SPECIFICITY/DENSITY/AUTHENTICITY) → `{prediction, confidence, reason}`.
+- X reply prompt: `{verdict: hostile|bot|spam|fine, confidence}` (reply guard, own status pages only).
 - YouTube prompt: `{category: music|motivational|other, confidence}`.
-- Both system prompts live in `extension/background/worker.js` (`X_CLASSIFY_SYSTEM`, `YT_CLASSIFY_SYSTEM`).
+- All system prompts live in `extension/background/worker.js` (`X_CLASSIFY_SYSTEM`, `X_REPLY_SYSTEM`, `YT_CLASSIFY_SYSTEM`).
 
 **Data Collector** (optional, port 11435):
 - `node scripts/collector.js` — receives classification data, splits per platform into `data/classifications-x.jsonl` / `data/classifications-youtube.jsonl`.
@@ -67,17 +70,21 @@ extension/
 | `extension/background/worker.js` | Service worker — platform-routed Ollama proxy + both prompts |
 | `extension/lib/config.js` | `RaiConfig` — per-platform config |
 | `extension/lib/memory.js` | `RaiMemory` — per-platform stats/time/log + IndexedDB |
-| `extension/content/core/classifier.js` | `RaiClassifier` — concurrent queue + cache (text) |
+| `extension/content/core/classifier.js` | `RaiClassifier` — concurrent queue (3 in flight) + cache (text) + activity feed |
 | `extension/content/core/image-classifier.js` | `RaiImageClassifier` — small queue + cache for the image bait check |
-| `extension/content/core/hider.js` | `RaiHider` — blur/remove/collapse + peek/wrong/label buttons |
+| `extension/content/core/hider.js` | `RaiHider` — blur/remove/collapse + peek/label buttons |
 | `extension/content/core/indicator.js` | `RaiIndicator` — pill + per-platform settings |
-| `extension/content/x/main.js` | `XraiMain` — X pipeline (hide noise) |
-| `extension/content/x/detector.js` | `XraiDetector` — tweet detection |
-| `extension/content/x/prefilter.js` | `XraiPrefilter` — regex noise filter |
+| `extension/content/x/main.js` | `XraiMain` — X pipeline (hide noise) + reply guard |
+| `extension/content/x/detector.js` | `XraiDetector` — tweet detection (+ `rescan()` for SPA revisits) |
+| `extension/content/x/prefilter.js` | `XraiPrefilter` — regex noise filter + `prefilterReply` (reply guard) |
+| `extension/content/x/replyroute.js` | `XraiReplyRoute` — reply-guard routing/immunity (pure; tests: `tests/replyfilter.test.js`) |
+| `benchmarks/golden-replies-x.json` | Tiered golden set for the reply guard (bad-faith / tempting-bad-faith / genuine) |
 | `extension/content/youtube/main.js` | `YtraiMain` — YouTube pipeline (blur all, reveal music) |
 | `extension/content/youtube/detector.js` | `YtraiDetector` — video-card detection (recycle-aware) |
 | `extension/content/youtube/prefilter.js` | `YtraiPrefilter` — regex keep for obvious music/motivational |
-| `scripts/collector.js` | Local HTTP server, per-platform classification logs + `/tips` + `/events` intake |
+| `scripts/collector.js` | Local HTTP server, per-platform classification logs + `/tips` + `/events` intake + `/easy` (board suggestion) |
+| `extension/lib/hops.js` | `RaiHops` — pure hop-detection logic (tests: `tests/hopnudge.test.js`) |
+| `extension/content/core/hopnudge.js` | `RaiHopNudge` — hop-loop overlay + visit reporting |
 | `scripts/tips.js` | Tips ledger CLI — digest / mark / stats over `data/tips.jsonl` |
 | `extension/content/core/dwell.js` | `RaiDwell` — attention ledger: per-card dwell tracking |
 | `extension/content/youtube/watch.js` | `YtraiWatch` — attention ledger: /watch time per video |
@@ -219,11 +226,13 @@ Every first-time decision on both platforms is written to a **durable IndexedDB 
 ```
 X records carry `prediction`/`text`/`author`/`tweetId` instead of `category`/`title`/`channel`/`videoId`. `source` distinguishes `prefilter:<reason>` (regex shortcut) from `model` (the prompt's actual output) — **filter to `source:"model"` to study/improve the prompt** (`raw` holds the model's verbatim output, `_input` was the exact user message).
 
-**Export:** ⚙ settings pill → "⬇ Export log (.jsonl)" downloads the full per-platform log. Programmatic: dispatch `xrai-export-request` / `ytrai-export-request`, then read `#xrai-export-data` / `#ytrai-export-data` on the `*-export-response` event.
+**Export:** pill → settings → "export log" downloads the full per-platform log. Programmatic: dispatch `xrai-export-request` / `ytrai-export-request`, then read `#xrai-export-data` / `#ytrai-export-data` on the `*-export-response` event.
 
-**Optional collector** (`scripts/collector.js`, port 11435) still receives a best-effort live mirror → `data/classifications-<platform>.jsonl` + `data/model-io.jsonl`, but is no longer required for durability.
+**Optional collector** (`scripts/collector.js`, port 11435) receives a best-effort live mirror, no longer required for durability: every decision record now rides `RaiMemory.mirrorEvent` → `POST /events` → `data/events-<platform>.jsonl` (flushed at 20 events, every 10s, and on tab close with `keepalive`), alongside the attention-ledger events. The worker separately POSTs raw model I/O → `data/model-io.jsonl`. (`data/classifications-<platform>.jsonl` is legacy — `logClassification` has no callers; `tail -f data/events-x.jsonl` is the live stream.)
 
-> **Ground truth (X, shipped):** a one-tap ✗ button on every kept and blur-hidden tweet calls `RaiMemory.saveCorrection` and writes a `{kind:"correction", was, correctedTo, source, tweetId}` event to the durable log — corrections join decisions on `tweetId`. This is the only live source of false-hide evidence, which is why X `hideMethod` defaults to `blur` (a `remove`-hidden tweet can never be corrected). Mined corrections should graduate into `benchmarks/golden-x.json`. YouTube does not have the affordance yet.
+**Stats totals + daily time** (`<prefix>_stats_totals` / `<prefix>_daily_time` in chrome.storage.local — the pill's numbers) are **worker-owned**: content scripts send `{action:'statsDelta'|'timeDelta'}` messages, the worker applies them through one serialized read-modify-write chain (same pattern as `rai_hop_state`), and pills re-render from `storage.onChanged` so all tabs converge. `_stats_totals` also carries a `today: {date, total, kept, hidden}` sub-record the worker resets on date rollover (worker-local clock) — the pill shows today's hidden count, the panel shows today's numbers with all-time as a footnote. Tabs never write these keys directly — per-tab copies with periodic overwrite was a lost-update race that corrupted counts whenever two X tabs were open.
+
+> **Ground truth (X):** the one-tap ✗ correction button was REMOVED (Jul 2026 — it went untapped for its whole life; `{kind:"correction"}` events may still exist in old logs). False-hide evidence now comes from **offline judge audits**: periodically re-judge the durable decision log with a stronger model (`codex exec -s read-only`, stratified by source/confidence — see the golden-set provenance note in Evals), send disagreements to Kuan for labeling, graduate them into `benchmarks/golden-x.json`. Because nothing needs to stay clickable, X `hideMethod` now defaults to `remove` (config v2 migration flips stored `blur` once; a deliberate re-pick of blur in settings sticks).
 
 ## Tips Ledger (workflow tips: seen → read → evaluated → implemented)
 
@@ -235,9 +244,9 @@ Answers "what useful workflow tips crossed the feed that we still haven't acted 
   tweets that survived filtering, so the classifier is the precision layer (funnel bait
   wearing tip clothing gets hidden before it can be captured). Tests pin the recall floor
   and the plain-noise-never-fires invariant (`tests/tips.test.js`).
-- **Capture** (`main.js maybeCaptureTip`): fires on feed-shown (cache/model/Ollama-off),
-  off-home reading (opening a tip's status page = strongest interest signal, context
-  `reading`), and corrected-to-signal (context `corrected`). Writes a `{kind:"tip"}` event
+- **Capture** (`main.js maybeCaptureTip`): fires on feed-shown (cache/model/Ollama-off)
+  and off-home reading (opening a tip's status page = strongest interest signal, context
+  `reading`). Writes a `{kind:"tip"}` event
   to the durable log + POSTs to the collector `/tips` → `data/tips.jsonl` (append-only,
   deduped by tweetId across restarts). Collector down = tips only in the durable log.
 - **Track** (`scripts/tips.js`): statuses in `data/tips-status.json` — `new` (implicit) →
@@ -268,6 +277,8 @@ record with goal mapping against `~/.claude/PAI/USER/TELOS/GOALS.md`.
 - **Egress**: events go to the durable IndexedDB log (source of truth) AND
   best-effort to the collector via `RaiMemory.mirrorEvent` → `POST /events` →
   `data/events-<platform>.jsonl` (pure append; collapsing is digest-time).
+  Classification decisions ride the same pipe (no `kind` field — digest
+  filters by kind, so it ignores them).
 - **Digest** (`scripts/digest.js`): deterministic CLI (tips.js philosophy) —
   totals, per-item lists, exact repeats across days → `data/daily/YYYY-MM-DD.md`.
   `--analyze` shells `codex exec -s read-only` for goal mapping / themes / semantic
@@ -281,14 +292,71 @@ record with goal mapping against `~/.claude/PAI/USER/TELOS/GOALS.md`.
 ```javascript
 // X (xrai_config)
 { model: 'dhiltgen/gemma4:e2b-mlx-bf16', confidenceThreshold: 0.7,
-  contentFilter: 'posts-only', hideMethod: 'blur', replyStyle: 'curious',
-  maxModelCallsPerMinute: 100 }
+  contentFilter: 'posts-only', hideMethod: 'remove',
+  maxModelCallsPerMinute: 100, hopNudge: true,
+  replyGuard: true, ownHandle: 'phuakuanyu', replyConfidenceThreshold: 0.7 }
 
 // YouTube (ytrai_config)
 { model: 'gemma2:2b', confidenceThreshold: 0.6, keepMotivational: true,
   hideMethod: 'blur', maxModelCallsPerMinute: 120,
-  shortsNudge: true, shortsLimitCount: 10, shortsLimitMinutes: 5 }
+  shortsNudge: true, shortsLimitCount: 10, shortsLimitMinutes: 5,
+  hopNudge: true }
 ```
+
+### Reply guard (`x/replyroute.js` + `prefilterReply` + `X_REPLY_SYSTEM`)
+Blurs bad-faith replies on the user's OWN status pages (`x.com/<ownHandle>/status/…`)
+— everywhere else off-home stays untouched. Targets **bad faith, not sentiment**:
+`hostile` (slurs, identity attacks, harm-wishes), `bot`, `spam` get blurred;
+criticism, skepticism, accusations, and mockery of the idea are `fine` and stay
+visible (hiding pushback = echo-chamber failure mode, pinned by tests).
+
+- **Pipeline** (`main.js handleOwnReply`, inverse trust posture from the feed):
+  shown-by-default while classifying (genuine replies never flash-blurred) →
+  cache (`reply:<id>` keys, so feed `{prediction}` and reply `{verdict}` never
+  collide) → `prefilterReply` (high-precision slur/spam regex, NO tech safelist,
+  blurs unconditionally) → fail-open if Ollama down → `classifyReply` on the
+  shared 3-in-flight queue, blur only at `confidence ≥ replyConfidenceThreshold`.
+- **Immunity** (`XraiReplyRoute.shouldGuard`, pure, pinned by tests): the main
+  tweet and the user's own replies are never touched; other users' status pages
+  never activate the guard.
+- **Always blur-with-peek**, ignoring `hideMethod` — a wrongly hidden reply on
+  your own post could be a lead, recoverability is non-negotiable. Peek clicks
+  log `{kind:'peek', surface:'own-replies'}` — free ground truth for false-
+  positive audits. Decision events carry `surface:'own-replies'` in the durable
+  log + collector mirror. Pill shows `🛡 blurred/screened replies` per thread.
+- **SPA revisits**: `main.js` polls the path; re-entering an own thread calls
+  `XraiDetector.rescan()` so cached verdicts re-apply (replays are not re-logged).
+- **Evals**: `tests/replyfilter.test.js` (no Ollama) pins prefilter-never-fires-
+  on-genuine/tempting tiers, parser fail-open, immunity rules, threshold edges,
+  and the `X_REPLY_SYSTEM` sha. A model-in-the-loop reply eval is deliberately
+  deferred until real `surface:'own-replies'` data accumulates. Feed eval gates
+  are untouched by design (`X_CLASSIFY_SYSTEM` sha pinned unchanged).
+
+### Hop nudge (`lib/hops.js` + `content/core/hopnudge.js` + worker)
+Notices the cross-platform avoidance loop — quickly bouncing X ↔ YouTube, or
+close-and-reopening the same feed — and interrupts it with a full-screen overlay
+that names the pattern, asks what's actually going on ("What are we trying to do?
+Avoiding something? About to start something big?"), and offers the smallest real
+next action.
+
+- **Detect**: both content scripts report `load` (fresh document) and `vis`
+  (tab foregrounded) visits via `{action:'hopVisit'}`; the worker evaluates them
+  against one shared window in `chrome.storage.local` (`rai_hop_state`, writes
+  serialized). A **churn** transition = platform switch within 4 min, or a
+  same-platform fresh load within 3 min (reopen/compulsive refresh).
+  Same-platform visibility flips NEVER churn — alt-tabbing to an editor is work.
+  3 churns within a 10-min horizon → nudge, then 20-min auto-cooldown ("Off for
+  today" snoozes to local midnight). Logic is pure (`RaiHops.evaluate`), pinned
+  by `tests/hopnudge.test.js`.
+- **Easy action**: overlay fetches collector `GET /easy` — today's needle's first
+  unchecked `doneWhen` item from `founder-home/state.json` (path override:
+  `RAI_STATE_JSON`), else the shortest `nextTry` among `now` tasks; static
+  fallback line when the collector's down.
+- **Ledger**: every fire writes `{kind:'hop', churn, spanMs}` to the durable log
+  + mirrors to `/events`, so the daily digest can count loop days.
+- Per-platform overlay toggle: `hopNudge` (settings popup, both platforms);
+  visits are recorded even when toggled off so the other platform stays accurate.
+- No prompt/prefilter/model/threshold changes → eval gates unaffected.
 
 ### Shorts consumption tracker (`content/youtube/shorts.js` → `YtraiShorts`)
 Separate from the blur filter (which doesn't touch `/shorts/`). Tracks Shorts watched + active time per day (`ytrai_shorts` in chrome.storage), detects a "binge" (continuous run, resets after a 3-min gap away from Shorts), and shows a dismissable **snap-out overlay** once a binge hits `shortsLimitCount` Shorts OR `shortsLimitMinutes`. Counts via `yt-navigate-finish` + a 2s tick poll (swipe events aren't always fired). Each Short is also written to the durable event log as `{kind:"short", videoId, ...}`. Pill shows `📱 N Shorts · Mm`; limits + nudge toggle live in the YouTube settings popup.
@@ -297,6 +365,5 @@ Separate from the blur filter (which doesn't touch `/shorts/`). Tracks Shorts wa
 
 - Never calls X's or YouTube's API — only reads already-rendered DOM
 - Never auto-posts, likes, follows, or clicks site actions
-- X replies are copy-paste only (never touches the composer)
 - CSS-only hiding/blurring (`display:none` / `filter: blur`)
 - No scraping — processes only what the user already sees

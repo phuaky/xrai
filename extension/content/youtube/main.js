@@ -6,6 +6,38 @@ var YtraiMain = (function () {
   var config = null;
   var ollamaAvailable = false;
 
+  // === Live activity — feeds the pill/panel and marks the card being judged ===
+  // Same contract as x/main.js: pendingEls maps videoId -> element, the
+  // classifier activity feed says which id is at Ollama, that card gets
+  // data-xrai-active (the breathing blur in styles.css).
+  var pendingEls = Object.create(null);
+  var markedId = null;
+  var actText = null;
+  var actImage = null;
+
+  function refreshActiveCard() {
+    var cur = (actText && actText.current) || (actImage && actImage.current) || null;
+    var id = cur && cur.id;
+    if (markedId && markedId !== id) {
+      var prev = pendingEls[markedId];
+      if (prev) prev.removeAttribute('data-xrai-active');
+    }
+    markedId = id || null;
+    if (id && pendingEls[id]) pendingEls[id].setAttribute('data-xrai-active', '1');
+  }
+
+  function trackPending(id, el) {
+    if (id) pendingEls[id] = el;
+  }
+
+  function untrackPending(id) {
+    if (!id) return;
+    var el = pendingEls[id];
+    if (el) el.removeAttribute('data-xrai-active');
+    delete pendingEls[id];
+    if (markedId === id) markedId = null;
+  }
+
   // Which surfaces to filter. Home + subscriptions = the passive distraction feeds;
   // watch sidebar = where you get pulled away mid-song. Search/channel pages are
   // intentional navigation, so they're left alone.
@@ -34,6 +66,17 @@ var YtraiMain = (function () {
       RaiClassifier.configure({ maxModelCallsPerMinute: cfg.maxModelCallsPerMinute, platform: PLATFORM });
       RaiImageClassifier.configure({ platform: PLATFORM });
 
+      RaiClassifier.onActivity(function (snap) {
+        actText = snap;
+        RaiIndicator.setActivity('text', snap);
+        refreshActiveCard();
+      });
+      RaiImageClassifier.onActivity(function (snap) {
+        actImage = snap;
+        RaiIndicator.setActivity('image', snap);
+        refreshActiveCard();
+      });
+
       checkHealth();
 
       RaiIndicator.init(PLATFORM, { name: 'ytrai', keptWord: 'kept', hiddenWord: 'blurred', siteWord: 'YouTube' });
@@ -46,6 +89,9 @@ var YtraiMain = (function () {
 
       // Attention ledger — watch-time per video on /watch (see watch.js)
       if (typeof YtraiWatch !== 'undefined') YtraiWatch.init();
+
+      // Hop nudge — X ↔ YouTube doom-loop detector (see core/hopnudge.js)
+      if (typeof RaiHopNudge !== 'undefined') RaiHopNudge.init(PLATFORM, cfg);
 
       console.log('[ytrai] Running. Keep music' + (cfg.keepMotivational ? ' + motivational' : '') + '. Hide: ' + cfg.hideMethod);
     });
@@ -116,7 +162,9 @@ var YtraiMain = (function () {
 
     // 4. Blur immediately, then classify by title + channel.
     RaiHider.blurPending(el, 0);
+    trackPending(data.id, el);
     RaiClassifier.classify(data.id, { text: data.title, channel: data.channel }, function (result) {
+      untrackPending(data.id);
       // Generation guard: YouTube recycles card elements during scroll. If this
       // element was reassigned to a different video while we were classifying,
       // drop the stale result so it doesn't stomp the new video's decision.
@@ -183,7 +231,9 @@ var YtraiMain = (function () {
     var cachedImg = RaiImageClassifier.checkCache(data.id);
     if (cachedImg) { finish(cachedImg.baity && cachedImg.confidence >= imgThreshold, cachedImg); return; }
 
+    trackPending(data.id, el);
     RaiImageClassifier.classify(data.id, { imageUrl: data.thumbnailUrl, contextText: data.title }, function (imgResult) {
+      untrackPending(data.id);
       // Generation guard: card may have recycled to a different video while
       // the image call was in flight.
       if (el._ytraiId !== data.id) return;
@@ -223,7 +273,7 @@ var YtraiMain = (function () {
 
   // Durable, per-decision record for the prompt-improvement study.
   function logDecision(data, decision, result, cat) {
-    RaiMemory.logEvent({
+    var record = {
       platform: 'youtube',
       decision: decision,                       // 'kept' | 'blurred'
       category: cat || result.category || 'other',
@@ -236,7 +286,9 @@ var YtraiMain = (function () {
       channel: data.channel,
       videoId: data.id,
       url: location.pathname
-    });
+    };
+    RaiMemory.logEvent(record);      // durable IDB log (source of truth); stamps record.ts
+    RaiMemory.mirrorEvent(record);   // best-effort live copy → collector → data/events-youtube.jsonl
   }
 
   // DOM event bridge — lets page JS pull the durable classification log.

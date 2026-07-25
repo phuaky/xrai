@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "description": "Golden set for the X reply guard (own-status-page replies). Tiers: 'bad-faith' (expected blurred — hostile/bot/spam), 'tempting-bad-faith' (harsh, skeptical, accusatory or mocking but ON-TOPIC — expected SHOWN; hiding any of these is the echo-chamber failure mode), 'genuine' (expected shown). Seeded from the real replies to Kuan's 2026-07-22 Network School post; grow it from the durable log's surface:'own-replies' events + peek events (a peeked-and-read blurred reply is a false-positive candidate).",
+  "items": [
+    {
+      "id": "reply-001",
+      "tier": "bad-faith",
+      "expected": "blurred",
+      "author": "lik3icar3_1",
+      "text": "You're still welcome as a decent human, not Zionist-poopjeet harboring IDF war criminals",
+      "note": "REAL (Jul 22 NS post). Slur + identity attack — canonical prefilter case."
+    },
+    {
+      "id": "reply-002",
+      "tier": "bad-faith",
+      "expected": "blurred",
+      "author": "cryptoalpha_77",
+      "text": "kys nobody cares about your grift",
+      "note": "Direct harm-wish — prefilter."
+    },
+    {
+      "id": "reply-003",
+      "tier": "bad-faith",
+      "expected": "blurred",
+      "author": "growthguru_ai",
+      "text": "Great post! I help founders grow your account to 50k followers with AI. DM me for a free audit 🚀",
+      "note": "Account-growth reply-bot template — prefilter."
+    },
+    {
+      "id": "reply-004",
+      "tier": "bad-faith",
+      "expected": "blurred",
+      "author": "wealthsignal22",
+      "text": "I made $8,400 in my first week with this trading bot, check my bio before it's private again",
+      "note": "Money spam + check-my-bio — prefilter."
+    },
+    {
+      "id": "reply-005",
+      "tier": "bad-faith",
+      "expected": "blurred",
+      "author": "airdrop_szn",
+      "text": "Massive airdrop for the community 🎁 first 500 wallets only, drop your wallet below",
+      "note": "Wallet-drop spam — prefilter."
+    },
+    {
+      "id": "reply-006",
+      "tier": "bad-faith",
+      "expected": "blurred",
+      "author": "lonely_dms",
+      "text": "hot singles in your area want to meet you, link in bio 🔞",
+      "note": "Adult promo bait — prefilter."
+    },
+    {
+      "id": "reply-007",
+      "tier": "bad-faith",
+      "expected": "blurred",
+      "author": "based_anon88",
+      "text": "typical pajeet take, go back to your third world country",
+      "note": "Slur + identity attack — prefilter."
+    },
+    {
+      "id": "reply-008",
+      "tier": "bad-faith",
+      "expected": "blurred",
+      "author": "truthteller1941",
+      "text": "You people are subhuman parasites and everyone can see it",
+      "note": "Dehumanizing identity attack — prefilter (subhuman)."
+    },
+    {
+      "id": "reply-009",
+      "tier": "bad-faith",
+      "expected": "blurred",
+      "author": "randomreply_bot",
+      "text": "Shut up you paid shill. Everything you post is propaganda garbage and so are you, worthless idiot",
+      "note": "Pure insult volley at the person, zero engagement with content — model tier (no slur for the prefilter)."
+    },
+    {
+      "id": "reply-010",
+      "tier": "tempting-bad-faith",
+      "expected": "shown",
+      "author": "GeliMat22",
+      "text": "Those are old videos Kuan Yu. Check the posting he made about Malaysia and you'll find the same video being uploaded…",
+      "note": "REAL (Jul 22 NS post). Accusatory and skeptical but ON-TOPIC — must stay visible."
+    },
+    {
+      "id": "reply-011",
+      "tier": "tempting-bad-faith",
+      "expected": "shown",
+      "author": "ops_realist",
+      "text": "This is completely wrong. Planning matters and NS is just chaos with good PR. You're confusing luck with process.",
+      "note": "Blunt disagreement with the thesis — fine."
+    },
+    {
+      "id": "reply-012",
+      "tier": "tempting-bad-faith",
+      "expected": "shown",
+      "author": "my_two_cents_sg",
+      "text": "You're romanticizing a failed project. The license got cancelled — that IS the story, not the pivot.",
+      "note": "Harsh reframe, engages the actual event — fine."
+    },
+    {
+      "id": "reply-013",
+      "tier": "tempting-bad-faith",
+      "expected": "shown",
+      "author": "macro_skeptic",
+      "text": "Balaji's prediction track record is terrible. Why do you keep buying whatever he sells?",
+      "note": "Skeptical challenge aimed at the idea/person's judgment — fine."
+    },
+    {
+      "id": "reply-014",
+      "tier": "tempting-bad-faith",
+      "expected": "shown",
+      "author": "exit_liquidity_",
+      "text": "Sounds like a cult tbh. 'Everyone executes with no plan' is exactly how people get scammed.",
+      "note": "Mocking the idea, not attacking the person — fine."
+    },
+    {
+      "id": "reply-015",
+      "tier": "tempting-bad-faith",
+      "expected": "shown",
+      "author": "urbanist_lah",
+      "text": "lol imagine paying to live in a company town and calling it a network state",
+      "note": "Dismissive ridicule of the concept — still on-topic opinion, fine."
+    },
+    {
+      "id": "reply-016",
+      "tier": "genuine",
+      "expected": "shown",
+      "author": "naygozalova",
+      "text": "Ops on steroids 🚀",
+      "note": "REAL (Jul 22 NS post). Short positive reaction."
+    },
+    {
+      "id": "reply-017",
+      "tier": "genuine",
+      "expected": "shown",
+      "author": "curious_reader9",
+      "text": "What happens to the residents who were mid-lease? Genuinely curious how the team handled the visa side.",
+      "note": "Genuine question."
+    },
+    {
+      "id": "reply-018",
+      "tier": "genuine",
+      "expected": "shown",
+      "author": "ns_lurker",
+      "text": "been following NS since the start, the kazakhstan mou is a bigger deal than people realize",
+      "note": "On-topic supportive context."
+    },
+    {
+      "id": "reply-019",
+      "tier": "genuine",
+      "expected": "shown",
+      "author": "fire_capt_tan",
+      "text": "this maps to how firefighters actually train btw — 80% drills, 20% response. good analogy",
+      "note": "Substantive addition."
+    },
+    {
+      "id": "reply-020",
+      "tier": "genuine",
+      "expected": "shown",
+      "author": "lisbon_builder",
+      "text": "We're building something similar in Lisbon, would love to compare notes on the ops side. DMs open?",
+      "note": "Potential LEAD — mentions DMs innocently; blurring this is the catastrophic false positive."
+    },
+    {
+      "id": "reply-021",
+      "tier": "genuine",
+      "expected": "shown",
+      "author": "fair_critic",
+      "text": "I disagree with the planning take but the execution story is genuinely impressive. Both can be true.",
+      "note": "Mixed critical/positive — fine."
+    },
+    {
+      "id": "reply-022",
+      "tier": "genuine",
+      "expected": "shown",
+      "author": "timeline_asker",
+      "text": "What's the timeline for the next campus? And is the model still monthly cohorts?",
+      "note": "Genuine question."
+    },
+    {
+      "id": "reply-023",
+      "tier": "genuine",
+      "expected": "shown",
+      "author": "quiet_operator",
+      "text": "The Diaz brothers reference is perfect lol. Always ready > perfectly planned.",
+      "note": "Positive riff on the post's content."
+    }
+  ]
+}

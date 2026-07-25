@@ -17,6 +17,8 @@ const path = require('path');
 
 const PORT = 11435;
 const DATA_DIR = path.join(__dirname, '..', 'data');
+// Live board for the hop-nudge's "smallest real move" suggestion (GET /easy).
+const STATE_JSON = process.env.RAI_STATE_JSON || '/Users/pky/Code/founder-home/state.json';
 const CLASSIFICATIONS_FILE = path.join(DATA_DIR, 'classifications.jsonl');
 const MODEL_LOG_FILE = path.join(DATA_DIR, 'model-io.jsonl');
 const STATS_FILE = path.join(DATA_DIR, 'stats.json');
@@ -75,6 +77,16 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', totalReceived, sinceLastImprove }));
+    return;
+  }
+
+  // Smallest real next action — feeds the extension's hop-nudge overlay.
+  // Priority: today's needle's first unchecked doneWhen item, else the
+  // shortest nextTry among status:'now' tasks. Always 200; {suggestion:null}
+  // when nothing resolves (the extension has its own static fallback).
+  if (req.method === 'GET' && req.url === '/easy') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(easyAction()));
     return;
   }
 
@@ -244,6 +256,54 @@ const server = http.createServer((req, res) => {
   res.writeHead(404);
   res.end('Not found');
 });
+
+function localToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function firstSentence(s, cap) {
+  const line = String(s || '').split('\n')[0].trim();
+  const m = line.match(/^.*?[.!?](\s|$)/);
+  return (m ? m[0] : line).trim().slice(0, cap || 160);
+}
+
+function easyAction() {
+  try {
+    const d = JSON.parse(fs.readFileSync(STATE_JSON, 'utf8'));
+
+    // 1. Today's needle — surface its first unchecked doneWhen item.
+    const needle = d.today && d.today.date === localToday() && d.today.needle;
+    if (needle) {
+      const open = (needle.doneWhen || []).find(w => w && !w.done && w.text);
+      const text = open ? open.text : needle.title;
+      if (text) {
+        return {
+          suggestion: firstSentence(text),
+          detail: open && needle.title ? String(needle.title).slice(0, 80) : '',
+          source: 'needle'
+        };
+      }
+    }
+
+    // 2. Shortest next action among live 'now' tasks.
+    const nows = [];
+    for (const p of d.projects || []) {
+      for (const t of p.tasks || []) {
+        if (t.status !== 'now' || t.blocked || t.dormant) continue;
+        const next = firstSentence(t.nextTry);
+        if (next) nows.push({ title: String(t.title || '').slice(0, 80), next });
+      }
+    }
+    if (nows.length) {
+      nows.sort((a, b) => a.next.length - b.next.length);
+      return { suggestion: nows[0].next, detail: nows[0].title, source: 'task' };
+    }
+    return { suggestion: null };
+  } catch (e) {
+    return { suggestion: null };
+  }
+}
 
 function triggerImprove(file) {
   const { execSync } = require('child_process');

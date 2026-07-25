@@ -55,11 +55,12 @@ describe('prefilter vs golden set', () => {
   });
 
   it('still catches the pinned noise cases', () => {
+    // Golden v2 (live-traffic) items — re-pinned when v1 synthetic ids retired.
     const pins = {
-      'x-043': 'clickbait-phrase', // "You won't believe what happened next 🤯"
-      'x-044': 'engagement-bait',  // "Follow me for daily motivation 💪..."
-      'x-046': 'spam',             // "I made $10k in my first month with this one simple trick..."
-      'x-080': 'crypto-pump',      // "2098x 209,700% gain in one call..."
+      'live-2070538368174223674': 'engagement-bait', // "If you don't wake up excited and go to bed tired, drop everything..."
+      'live-2071159146200863121': 'entertainment',   // "Woman drinking bubble tea on MRT platform sparks debate..."
+      'live-2075804235191714160': 'spam',            // "You won't get rich just working hard..."
+      'live-2076434411600425060': 'funnel-bait',     // "I ranked India's most famous tourist attractions..."
     };
     for (const [id, reason] of Object.entries(pins)) {
       const item = golden.items.find((i) => i.id === id);

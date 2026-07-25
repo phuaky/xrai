@@ -33,7 +33,10 @@ var RaiHider = (function () {
     element.style.position = '';
   }
 
-  function hide(element, method, reason) {
+  // onPeek (optional, blur method only): called on every reveal click.
+  // The reply guard uses it to log {kind:'peek'} events — a peeked reply is
+  // free ground truth for the offline false-positive audits.
+  function hide(element, method, reason, onPeek) {
     if (!element || element.getAttribute('data-xrai-hidden')) return;
     element.removeAttribute('data-xrai-pending');
     method = method || 'remove';
@@ -75,6 +78,9 @@ var RaiHider = (function () {
         } else {
           element.setAttribute('data-xrai-revealed', '1');
           btn.textContent = 'Hide';
+          if (onPeek) {
+            try { onPeek(); } catch (err) { /* listener error, keep revealing */ }
+          }
         }
       });
       element.appendChild(btn);
@@ -93,7 +99,7 @@ var RaiHider = (function () {
       var guard = function (e) {
         if (element.hasAttribute('data-xrai-revealed')) return;
         var t = e.target;
-        if (t && (t.closest('.xrai-peek-btn') || t.closest('.xrai-blur-label') || t.closest('.xrai-wrong-btn'))) return;
+        if (t && (t.closest('.xrai-peek-btn') || t.closest('.xrai-blur-label'))) return;
         e.preventDefault();
         e.stopPropagation();
       };
@@ -139,34 +145,6 @@ var RaiHider = (function () {
     if (element._xraiLabelBtns) {
       element._xraiLabelBtns.remove();
       delete element._xraiLabelBtns;
-    }
-    removeWrongButton(element);
-  }
-
-  // One-tap correction affordance ("✗" bottom-right). The click both fixes the
-  // card AND records ground truth — the only path that ever surfaces false-hides
-  // from live browsing, so it feeds the eval golden set.
-  function addWrongButton(element, onWrong, titleText) {
-    if (!element || element._xraiWrongBtn) return;
-    element.style.position = 'relative';
-    var btn = document.createElement('button');
-    btn.className = 'xrai-wrong-btn';
-    btn.textContent = '✗';
-    btn.title = titleText || 'Wrong call? Click to correct';
-    btn.addEventListener('click', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      removeWrongButton(element);
-      onWrong();
-    });
-    element.appendChild(btn);
-    element._xraiWrongBtn = btn;
-  }
-
-  function removeWrongButton(element) {
-    if (element && element._xraiWrongBtn) {
-      element._xraiWrongBtn.remove();
-      delete element._xraiWrongBtn;
     }
   }
 
@@ -219,8 +197,6 @@ var RaiHider = (function () {
     show: show,
     addKeepLabel: addKeepLabel,
     addSignalLabel: addKeepLabel, // back-compat alias
-    addWrongButton: addWrongButton,
-    removeWrongButton: removeWrongButton,
     addImageLabelButtons: addImageLabelButtons
   };
 })();

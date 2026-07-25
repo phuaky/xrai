@@ -7,6 +7,38 @@ var XraiMain = (function () {
   var ollamaAvailable = false;
   var offHomeLogged = Object.create(null);
 
+  // === Live activity — feeds the pill/panel and marks the card being judged ===
+  // pendingEls maps tweetId -> element for cards awaiting a verdict; the
+  // classifier activity feed says which id is at Ollama RIGHT NOW, and that
+  // card gets data-xrai-active (the breathing blur in styles.css).
+  var pendingEls = Object.create(null);
+  var markedId = null;
+  var actText = null;
+  var actImage = null;
+
+  function refreshActiveCard() {
+    var cur = (actText && actText.current) || (actImage && actImage.current) || null;
+    var id = cur && cur.id;
+    if (markedId && markedId !== id) {
+      var prev = pendingEls[markedId];
+      if (prev) prev.removeAttribute('data-xrai-active');
+    }
+    markedId = id || null;
+    if (id && pendingEls[id]) pendingEls[id].setAttribute('data-xrai-active', '1');
+  }
+
+  function trackPending(id, el) {
+    if (id) pendingEls[id] = el;
+  }
+
+  function untrackPending(id) {
+    if (!id) return;
+    var el = pendingEls[id];
+    if (el) el.removeAttribute('data-xrai-active');
+    delete pendingEls[id];
+    if (markedId === id) markedId = null;
+  }
+
   function isHomeFeed() {
     var path = window.location.pathname;
     return path === '/' || path === '/home' || path.indexOf('/home/') === 0;
@@ -24,6 +56,17 @@ var XraiMain = (function () {
       config = cfg;
       RaiClassifier.configure({ maxModelCallsPerMinute: cfg.maxModelCallsPerMinute, platform: PLATFORM });
       RaiImageClassifier.configure({ platform: PLATFORM });
+
+      RaiClassifier.onActivity(function (snap) {
+        actText = snap;
+        RaiIndicator.setActivity('text', snap);
+        refreshActiveCard();
+      });
+      RaiImageClassifier.onActivity(function (snap) {
+        actImage = snap;
+        RaiIndicator.setActivity('image', snap);
+        refreshActiveCard();
+      });
 
       chrome.runtime.sendMessage({ action: 'checkHealth', platform: PLATFORM }, function (response) {
         if (chrome.runtime.lastError) {
@@ -53,6 +96,27 @@ var XraiMain = (function () {
 
       // Attention ledger — per-card dwell tracking (see core/dwell.js)
       if (typeof RaiDwell !== 'undefined') RaiDwell.init(PLATFORM);
+
+      // Hop nudge — X ↔ YouTube doom-loop detector (see core/hopnudge.js)
+      if (typeof RaiHopNudge !== 'undefined') RaiHopNudge.init(PLATFORM, cfg);
+
+      // Reply guard vs SPA navigation: X rebuilds article nodes on soft nav
+      // and there is no nav event, so poll the path (same approach as dwell).
+      // Revisiting an own thread re-emits its cards (detector.rescan) so
+      // cached verdicts re-apply; leaving one clears the pill's reply count.
+      var lastGuardPath = window.location.pathname;
+      setInterval(function () {
+        if (window.location.pathname === lastGuardPath) return;
+        lastGuardPath = window.location.pathname;
+        var page = (config && config.replyGuard !== false && typeof XraiReplyRoute !== 'undefined')
+          ? XraiReplyRoute.guardPage(lastGuardPath, config.ownHandle)
+          : null;
+        if (page) {
+          XraiDetector.rescan();
+        } else {
+          RaiIndicator.setExtra('');
+        }
+      }, 1500);
 
       console.log('[xrai] Running. Filter: ' + cfg.contentFilter + ', Hide: ' + cfg.hideMethod);
     });
@@ -124,7 +188,7 @@ var XraiMain = (function () {
         decision: decision, source: source
       });
     }
-    RaiMemory.logEvent({
+    var record = {
       platform: 'x',
       decision: decision,            // 'shown' | 'hidden'
       prediction: prediction,        // 'signal' | 'noise'
@@ -139,7 +203,9 @@ var XraiMain = (function () {
       author: data.author,
       tweetId: data.id,
       url: location.pathname
-    });
+    };
+    RaiMemory.logEvent(record);      // durable IDB log (source of truth); stamps record.ts
+    RaiMemory.mirrorEvent(record);   // best-effort live copy → collector → data/events-x.jsonl
   }
 
   // === Workflow-tip capture — the tips-ledger intake ===
@@ -175,41 +241,6 @@ var XraiMain = (function () {
     } catch (e) { /* ignore */ }
   }
 
-  // === One-tap corrections — the ground-truth loop ===
-  // Correction events join the durable log on tweetId (see CLAUDE.md Data
-  // Pipeline). They are the ONLY live source of false-hide evidence: hidden
-  // signal is invisible in daily use unless the user can peek and object.
-
-  function attachWrongOnKept(el, data, text, confidence, source) {
-    RaiHider.addWrongButton(el, function () {
-      RaiMemory.saveCorrection(text, data.mediaType, 'signal', 'noise');
-      RaiMemory.logEvent({
-        platform: 'x', kind: 'correction', was: 'shown', correctedTo: 'noise',
-        source: source, confidence: confidence,
-        text: (text || '').substring(0, 500), author: data.author, tweetId: data.id
-      });
-      RaiHider.hide(el, 'blur', 'you marked: noise');
-    }, 'Noise? Click to hide it and record the correction');
-  }
-
-  function attachWrongOnHidden(el, data, text, confidence, source) {
-    // Only blur-hidden cards have visible UI to correct from.
-    if (el.getAttribute('data-xrai-hidden') !== 'blur') return;
-    RaiHider.addWrongButton(el, function () {
-      RaiMemory.saveCorrection(text, data.mediaType, 'noise', 'signal');
-      RaiMemory.logEvent({
-        platform: 'x', kind: 'correction', was: 'hidden', correctedTo: 'signal',
-        source: source, confidence: confidence,
-        text: (text || '').substring(0, 500), author: data.author, tweetId: data.id
-      });
-      RaiHider.show(el);
-      RaiHider.addKeepLabel(el, 'corrected: signal');
-      XraiReply.attachReplyButton(el, data);
-      // A corrected-to-signal tweet is user-vouched — capture if tip-shaped.
-      maybeCaptureTip(data, text, 'corrected');
-    }, 'Worth seeing? Click to reveal it and record the correction');
-  }
-
   // === Golden-set labeling — the image-bait ground-truth loop ===
   // Only offered on tweets that actually carry a checkable photo, so it never
   // spams text-only or video tweets.
@@ -240,7 +271,6 @@ var XraiMain = (function () {
         logTweet(el, 'hidden', data, enrichedText, 'bait-image', imgResult ? imgResult.confidence : 0.6, 'image-model', imgResult);
         RaiMemory.incrementStats('hidden');
         RaiIndicator.incrementHidden();
-        attachWrongOnHidden(el, data, enrichedText, imgResult ? imgResult.confidence : 0.6, 'image-model');
       } else {
         RaiHider.unblurPending(el);
         var signalLabel = (result && result.reason) ? 'AI: ' + result.reason : 'AI: signal (' + (confidence || 0.5) + ')';
@@ -249,8 +279,6 @@ var XraiMain = (function () {
         RaiMemory.incrementStats('kept');
         RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'signal');
         RaiIndicator.incrementKept();
-        XraiReply.attachReplyButton(el, data);
-        attachWrongOnKept(el, data, enrichedText, confidence || 0.5, source);
         maybeCaptureTip(data, enrichedText, 'feed');
       }
       attachNewTabHandler(el, data);
@@ -265,8 +293,152 @@ var XraiMain = (function () {
     if (cachedImg) { finish(cachedImg.baity && cachedImg.confidence >= imgThreshold, cachedImg); return; }
 
     RaiHider.blurPending(el, 0);
+    trackPending(data.id, el);
     RaiImageClassifier.classify(data.id, { imageUrl: data.imageUrl, contextText: enrichedText }, function (imgResult) {
+      untrackPending(data.id);
       finish(imgResult.baity && imgResult.confidence >= imgThreshold, imgResult);
+    });
+  }
+
+  // === Reply guard — bad-faith replies on the user's OWN status pages ===
+  // Inverse trust posture from the feed: everything is shown by default and
+  // stays shown while classifying (a genuine reply must never flash-blurred);
+  // only a hostile/bot/spam verdict blurs — always blur-with-peek, never
+  // remove, whatever hideMethod says. A wrongly hidden reply on your own post
+  // could be a lead, so recoverability is non-negotiable. Criticism and
+  // skepticism are "fine" by design — the guard targets bad faith, not
+  // sentiment (see X_REPLY_SYSTEM + prefilterReply).
+
+  var replyCounts = { statusId: null, screened: 0, blurred: 0 };
+  var replyGuardAnnounced = Object.create(null);
+
+  function bumpReplyCounts(page, bad) {
+    if (replyCounts.statusId !== page.statusId) {
+      replyCounts = { statusId: page.statusId, screened: 0, blurred: 0 };
+    }
+    replyCounts.screened++;
+    if (bad) replyCounts.blurred++;
+    RaiIndicator.setExtra('🛡 ' + replyCounts.blurred + '/' + replyCounts.screened + ' replies');
+  }
+
+  // Prefilter verdicts blur unconditionally (high-precision by contract);
+  // model verdicts respect replyConfidenceThreshold. Mirrored by
+  // decideReply() in benchmarks/load-extension.js — keep them in sync.
+  function replyVerdictOf(result, threshold) {
+    if (!result || !result.verdict || result.verdict === 'fine') return 'fine';
+    if (result.source && result.source.indexOf('prefilter') === 0) return result.verdict;
+    return result.confidence >= threshold ? result.verdict : 'fine';
+  }
+
+  function logReply(decision, data, text, verdict, confidence, source, result) {
+    var record = {
+      platform: 'x',
+      surface: 'own-replies',
+      decision: decision,            // 'shown' | 'blurred'
+      verdict: verdict,              // 'hostile' | 'bot' | 'spam' | 'fine'
+      confidence: confidence,
+      source: source,                // prefilter:<reason> | model | default
+      model: result && result._model,
+      raw: result && result._raw,
+      ms: result && result._ms,
+      text: (text || '').substring(0, 500),
+      author: data.author,
+      tweetId: data.id,
+      url: location.pathname
+    };
+    RaiMemory.logEvent(record);
+    RaiMemory.mirrorEvent(record);
+  }
+
+  function applyReplyDecision(el, data, page, text, result, replay) {
+    var threshold = (config && config.replyConfidenceThreshold) || 0.7;
+    var verdict = replyVerdictOf(result, threshold);
+    var bad = verdict !== 'fine';
+    bumpReplyCounts(page, bad);
+
+    if (bad) {
+      console.log('[xrai] RGUARD | @' + (data.author || '?') + ' | id:' + data.id + ' | blurred (' + verdict + ', ' + result.source + ') | ' + (text || '').substring(0, 80));
+      RaiHider.hide(el, 'blur', verdict + ' reply', function onPeek() {
+        var peek = {
+          platform: 'x', kind: 'peek', surface: 'own-replies',
+          verdict: verdict, tweetId: data.id, author: data.author,
+          url: location.pathname
+        };
+        RaiMemory.logEvent(peek);
+        RaiMemory.mirrorEvent(peek);
+        // Blurred replies only start accruing dwell once actually readable.
+        if (typeof RaiDwell !== 'undefined') {
+          RaiDwell.observe(el, {
+            id: data.id, author: data.author, snippet: text,
+            decision: 'peeked', source: 'reply-guard'
+          });
+        }
+      });
+    } else {
+      attachNewTabHandler(el, data);
+      if (typeof RaiDwell !== 'undefined') {
+        RaiDwell.observe(el, {
+          id: data.id, author: data.author, snippet: text,
+          decision: 'shown', source: replay ? 'reply-cache' : result.source
+        });
+      }
+      maybeCaptureTip(data, text, 'reading');
+    }
+
+    // Cache replays re-apply the decision but are never re-logged.
+    if (!replay) logReply(bad ? 'blurred' : 'shown', data, text, verdict, result.confidence, result.source, result);
+  }
+
+  function handleOwnReply(el, data, enrichedText, page) {
+    if (!replyGuardAnnounced[page.statusId]) {
+      replyGuardAnnounced[page.statusId] = true;
+      console.log('[xrai] RGUARD | active on /' + page.handle + '/status/' + page.statusId);
+    }
+
+    // Immunity: the main tweet and the user's own replies are never touched —
+    // they get the plain off-home reading treatment (dwell + tips).
+    if (!XraiReplyRoute.shouldGuard(data, page, config.ownHandle)) {
+      attachNewTabHandler(el, data);
+      if (typeof RaiDwell !== 'undefined') {
+        RaiDwell.observe(el, {
+          id: data.id, author: data.author, snippet: enrichedText,
+          decision: 'reading', source: 'own-status'
+        });
+      }
+      maybeCaptureTip(data, enrichedText, 'reading');
+      return;
+    }
+
+    // Reply cache ids are prefixed: the shared RaiClassifier cache also holds
+    // feed results keyed by tweetId, and a feed {prediction} must never be
+    // mistaken for a reply {verdict}.
+    var cacheId = 'reply:' + data.id;
+
+    var cached = RaiClassifier.checkCache(cacheId);
+    if (cached) {
+      applyReplyDecision(el, data, page, enrichedText, cached, true);
+      return;
+    }
+
+    var pf = XraiPrefilter.prefilterReply(data);
+    if (pf) {
+      var pfResult = { verdict: pf.verdict, confidence: pf.confidence, source: 'prefilter:' + pf.reason };
+      RaiClassifier.cacheResult(cacheId, pfResult);
+      applyReplyDecision(el, data, page, enrichedText, pfResult, false);
+      return;
+    }
+
+    if (!ollamaAvailable) {
+      // Fail open: no model, no blur — never guess a reply into the blur.
+      var offResult = { verdict: 'fine', confidence: 0.5, source: 'default' };
+      RaiClassifier.cacheResult(cacheId, offResult);
+      applyReplyDecision(el, data, page, enrichedText, offResult, false);
+      return;
+    }
+
+    RaiClassifier.classify(cacheId, { action: 'classifyReply', text: enrichedText, author: data.author }, function (result) {
+      if (!result.verdict) result = Object.assign({}, result, { verdict: 'fine', confidence: 0.5 });
+      applyReplyDecision(el, data, page, enrichedText, result, false);
     });
   }
 
@@ -284,13 +456,20 @@ var XraiMain = (function () {
       console.log('[xrai] EXPAND | @' + (data.author || '?') + ' | id:' + data.id + ' | quoted tweet text was expanded');
     }
 
-    // Off-home routes: user is reading intentionally, skip filtering.
+    // Own status page: reply guard — blur bad-faith replies, keep everything
+    // else (including criticism) visible. All other off-home routes skip.
     if (!isHomeFeed()) {
+      var guardPage = (config && config.replyGuard !== false && typeof XraiReplyRoute !== 'undefined')
+        ? XraiReplyRoute.guardPage(window.location.pathname, config.ownHandle)
+        : null;
+      if (guardPage) {
+        handleOwnReply(el, data, enrichedText, guardPage);
+        return;
+      }
       if (data.id && !offHomeLogged[data.id]) {
         offHomeLogged[data.id] = true;
         console.log('[xrai] SKIP   | path=' + window.location.pathname + ' | off-home, no filtering | id:' + data.id);
       }
-      XraiReply.attachReplyButton(el, data);
       attachNewTabHandler(el, data);
       // Off-home skips logTweet, so attach dwell explicitly — status-page
       // reading is the strongest attention signal and must not be dropped.
@@ -326,7 +505,6 @@ var XraiMain = (function () {
       RaiMemory.incrementStats('hidden');
       RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'noise');
       RaiIndicator.incrementHidden();
-      attachWrongOnHidden(el, data, enrichedText, pfResult.confidence, 'prefilter:' + pfResult.reason);
       attachNewTabHandler(el, data);
       return;
     }
@@ -340,7 +518,6 @@ var XraiMain = (function () {
       RaiMemory.markSeen(RaiMemory.computeFingerprint('', data.mediaType), 'noise');
       RaiHider.hide(el, 'blur', 'media-only: no text to classify');
       RaiIndicator.incrementHidden();
-      attachWrongOnHidden(el, data, '', 0.55, 'media-only');
       attachNewTabHandler(el, data);
       return;
     }
@@ -352,7 +529,6 @@ var XraiMain = (function () {
       RaiMemory.incrementStats('kept');
       RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'signal');
       RaiIndicator.incrementKept();
-      XraiReply.attachReplyButton(el, data);
       attachNewTabHandler(el, data);
       maybeCaptureTip(data, enrichedText, 'feed');
       return;
@@ -371,7 +547,6 @@ var XraiMain = (function () {
             : 'AI: noise (' + cached.confidence + ')';
         RaiHider.hide(el, config ? config.hideMethod : 'remove', cachedReason);
         RaiIndicator.incrementHidden();
-        attachWrongOnHidden(el, data, enrichedText, cached.confidence, cached.source || 'cache');
         attachNewTabHandler(el, data);
         return;
       }
@@ -384,9 +559,11 @@ var XraiMain = (function () {
 
     // Step 5: Blur immediately while waiting for classification
     RaiHider.blurPending(el);
+    trackPending(data.id, el);
 
     // Step 6: Classify (Ollama queue) — use enriched text for better context
     RaiClassifier.classify(data.id, { text: enrichedText, mediaType: data.mediaType, author: data.author }, function (result) {
+      untrackPending(data.id);
       if (result.prediction === 'noise' && result.confidence >= threshold) {
         var reasonLabel = result.reason
           ? 'AI: ' + result.reason
@@ -397,7 +574,6 @@ var XraiMain = (function () {
         RaiMemory.incrementStats('hidden');
         RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'noise');
         RaiIndicator.incrementHidden();
-        attachWrongOnHidden(el, data, enrichedText, result.confidence, result.source || 'model');
         attachNewTabHandler(el, data);
       } else {
         // Signal — element is already blurred from Step 5. finalizeSignal

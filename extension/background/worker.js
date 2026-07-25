@@ -1,5 +1,11 @@
 /* rai — Service Worker (proxies Ollama HTTP calls, platform-routed) */
 
+// Hop detection (X ↔ YouTube doom-loop) — pure logic in lib/hops.js, loaded
+// here because the pattern spans both platforms' content scripts and needs
+// one shared evaluation point. Guarded so benchmarks/load-extension.js can
+// still eval this file under node (where importScripts doesn't exist).
+if (typeof importScripts === 'function') importScripts('/lib/hops.js');
+
 var DEFAULT_URL = 'http://localhost:11434';
 var DEFAULT_MODEL = { x: 'dhiltgen/gemma4:e2b-mlx-bf16', youtube: 'gemma2:2b' };
 var DEFAULT_IMAGE_MODEL = 'qwen3-vl:30b';
@@ -26,10 +32,22 @@ var IMAGE_KEEP_ALIVE = '10m';
 // benefit and was the whole reason the model looked RAM-expensive in testing.
 var IMAGE_NUM_CTX = 4096;
 
+// Text classifiers: keep the model resident across a browsing session — the
+// 16-19s outliers in the model-io log were cold reloads after the default 5m
+// unload. 8K ctx (prompt is <1K tokens, worst-case note-tweet well under 8K)
+// caps the KV cache so OLLAMA_NUM_PARALLEL slots stay cheap; every text call
+// uses the same num_ctx so the runner never reloads on a param change.
+var TEXT_KEEP_ALIVE = '30m';
+var TEXT_NUM_CTX = 8192;
+
 // === X: signal vs noise ===
 var X_CLASSIFY_SYSTEM = 'You classify tweets as signal or noise. Output ONLY valid JSON.\nScore 4 dimensions (0 or 1 each):\n- NOVELTY: New info (1) or recycled take (0)?\n- SPECIFICITY: Concrete details (1) or vague claims (0)?\n- DENSITY: High insight per word (1) or filler (0)?\n- AUTHENTICITY: Genuine sharing (1) or engagement farming (0)?\n\nBAIT test — any hit forces AUTHENTICITY=0; two or more hits = noise regardless of other scores:\n- promises specifics it never delivers ("the exact prompt/config below", "bookmark this, then read")\n- funnel ending: join a community/telegram/discord/cohort, paid group, "part 2 coming soon", course tease\n- borrowed authority: the tweet IS a dramatic verbatim "quote" from a famous engineer/CEO, with an employer title and usually a video ("Anthropic Engineer X: \\"...\\" watch below"). Merely mentioning or recommending a famous person is NOT bait\n- manufactured urgency about acting on THIS post: buy/join/save before a deadline, "you will be left behind". Discussing risks or news topics is NOT bait\n- repost-farm framing: a breathless caption describing another person’s talk/video as the whole content, "watch the full episode, then read the article below"\n\nNOISE indicators: ALL CAPS text, vague hype ("insane", "wild", "crazy"), video+short text, no concrete details, crypto pumps.\nSIGNAL indicators: specific numbers/tools/results, personal experience with details, technical content. A person sharing their OWN work, data, or writing is signal even when it links out. A personal opinion, recommendation, or warning in the author own voice — even about famous people or alarming topics — is signal when there is no funnel, no video tease, and no verbatim quote-as-content.\n\nScore 3-4 = signal (confidence 0.75-0.95). Score 0-2 = noise (confidence 0.75-0.95). Score 2 with some specifics = noise confidence 0.6.\nOutput: {"prediction":"signal"|"noise","confidence":0.6-0.95,"reason":"1-5 word summary"}';
 
-var X_REPLY_SYSTEM = 'Generate short reply options for a tweet. Output ONLY valid JSON array.\nRules: 5-15 words each, max 80 chars, no hashtags, match energy.\nOutput: [{"style":"curious","text":"..."},{"style":"insight","text":"..."},{"style":"connect","text":"..."}]';
+// === X reply guard: bad-faith vs fine (runs on the user's OWN status pages) ===
+// Targets BAD FAITH, not sentiment. Criticism, skepticism, disagreement, and
+// accusations that engage with the post are "fine" by definition — hiding
+// pushback would turn the guard into an echo-chamber machine.
+var X_REPLY_SYSTEM = 'You judge a reply under someone\'s post as bad faith or fine. Output ONLY valid JSON.\nverdict is exactly one of:\n- "hostile": insults, slurs, identity attacks, harassment, wishing harm on the author or a group\n- "bot": generic template reply, unrelated self-promo, automated-looking engagement farming\n- "spam": crypto pumps, giveaways, DM-me funnels, adult-content promo, account-growth services, scam links\n- "fine": everything else\n\nDisagreement is NOT bad faith. Criticism, skepticism, accusations of being wrong, mockery of the IDEA, and negative opinions that engage with the post\'s content are all "fine" — even when rude or dismissive. Only clear hostility toward people, bots, or spam get flagged.\n\nOutput: {"verdict":"hostile"|"bot"|"spam"|"fine","confidence":0.0-1.0}';
 
 // === YouTube: music / motivational / other ===
 var YT_CLASSIFY_SYSTEM = 'You label a YouTube video as MUSIC, MOTIVATIONAL, or OTHER from its title and channel. Output ONLY valid JSON.\n\nMUSIC = songs, official music videos, audio tracks, albums, singles, EPs, live performances, concerts, covers, remixes, DJ sets, mixes, lo-fi / study / sleep / focus beats, instrumentals, classical, soundtracks/OST, full-song playlists. Strong hints: "Official Video", "Official Audio", "Official Music Video", "(Lyrics)", "ft."/"feat.", "remix", "VEVO", a channel ending in "- Topic".\nMOTIVATIONAL = motivational speeches, discipline / mindset / self-improvement talks meant to inspire action, workout motivation, stoicism, goal-setting pep talks.\nOTHER = everything else: vlogs, podcasts (unless purely motivational), gaming, news, politics, reactions, commentary, tutorials/how-to, reviews, unboxings, comedy/skits, sports, movie/TV/trailer clips, documentaries, interviews, explainers, cooking, travel, ASMR, kids content.\n\nRules:\n- Judge ONLY by the title + channel.\n- Background music inside a non-music video is still OTHER.\n- If unsure between MUSIC and OTHER, choose OTHER.\n\nOutput: {"category":"music"|"motivational"|"other","confidence":0.0-1.0}';
@@ -48,7 +66,7 @@ function getConfig(platform) {
       // ollamaUrl always points at local Ollama — the image bait-check stays
       // local-only in Cloud mode v1 (no hosted vision endpoint yet), so it
       // needs the real local URL even when text classification goes to the
-      // cloud. classifyUrl is the one text/reply/health calls should use.
+      // cloud. classifyUrl is the one text/health calls should use.
       resolve({
         ollamaUrl: cfg.ollamaUrl || DEFAULT_URL,
         classifyUrl: cloud ? CLOUD_URL : (cfg.ollamaUrl || DEFAULT_URL),
@@ -63,7 +81,7 @@ function getConfig(platform) {
 
 // Health check — tests an actual POST (catches CORS/403), not just GET
 function checkHealth(ollamaUrl, model, apiKey) {
-  var result = { available: false, models: [], classify: false, reply: false };
+  var result = { available: false, models: [], classify: false };
 
   return fetch(ollamaUrl + '/api/tags', {
     method: 'GET',
@@ -83,14 +101,14 @@ function checkHealth(ollamaUrl, model, apiKey) {
           messages: [{ role: 'user', content: 'ping' }],
           stream: false,
           think: false,
-          options: { num_predict: 1 }
+          keep_alive: TEXT_KEEP_ALIVE,
+          options: { num_predict: 1, num_ctx: TEXT_NUM_CTX }
         })
       });
     })
     .then(function (r) {
       if (r.ok) {
         result.classify = true;
-        result.reply = true;
       } else {
         result.postStatus = r.status;
         console.warn('[rai-worker] Health POST failed: HTTP ' + r.status);
@@ -150,7 +168,8 @@ function classifyX(text, mediaType, model, ollamaUrl, apiKey) {
       ],
       stream: false,
       think: false,
-      options: { temperature: 0.1, num_predict: 80 }
+      keep_alive: TEXT_KEEP_ALIVE,
+      options: { temperature: 0.1, num_predict: 80, num_ctx: TEXT_NUM_CTX }
     })
   })
     .then(function (r) { return r.json(); })
@@ -170,6 +189,42 @@ function classifyX(text, mediaType, model, ollamaUrl, apiKey) {
     });
 }
 
+function classifyReply(text, author, model, ollamaUrl, apiKey) {
+  var userMsg = 'Reply' + (author ? ' from @' + author : '') + ': "' + (text || '') + '"';
+  var start = Date.now();
+  return fetch(ollamaUrl + '/api/chat', {
+    method: 'POST',
+    headers: authHeaders(apiKey),
+    body: JSON.stringify({
+      model: model,
+      messages: [
+        { role: 'system', content: X_REPLY_SYSTEM },
+        { role: 'user', content: userMsg }
+      ],
+      stream: false,
+      think: false,
+      keep_alive: TEXT_KEEP_ALIVE,
+      options: { temperature: 0.1, num_predict: 40, num_ctx: TEXT_NUM_CTX }
+    })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var raw = (data.message && data.message.content) || '';
+      var parsed = parseReplyClassification(raw);
+      var elapsed = Date.now() - start;
+      logModelIO('x-reply', userMsg, raw, parsed, model, elapsed);
+      parsed._model = model;
+      parsed._raw = raw.slice(0, 1500);
+      parsed._input = userMsg.slice(0, 1000);
+      parsed._ms = elapsed;
+      return parsed;
+    })
+    .catch(function () {
+      // Fail open — a network/model error must never hide a reply.
+      return { verdict: 'fine', confidence: 0.5 };
+    });
+}
+
 function classifyYoutube(title, channel, model, ollamaUrl, apiKey) {
   var userMsg = 'Title: "' + (title || '') + '"';
   if (channel) userMsg += '\nChannel: "' + channel + '"';
@@ -185,7 +240,8 @@ function classifyYoutube(title, channel, model, ollamaUrl, apiKey) {
       ],
       stream: false,
       think: false,
-      options: { temperature: 0.1, num_predict: 40 }
+      keep_alive: TEXT_KEEP_ALIVE,
+      options: { temperature: 0.1, num_predict: 40, num_ctx: TEXT_NUM_CTX }
     })
   })
     .then(function (r) { return r.json(); })
@@ -286,34 +342,6 @@ function parseImageClassification(content) {
   return { baity: false, confidence: 0.5 };
 }
 
-// Generate reply (X only)
-function generateReply(tweetText, authorHandle, style, model, ollamaUrl, apiKey) {
-  var userMsg = 'Tweet by @' + (authorHandle || 'unknown') + ': "' + tweetText + '"';
-  userMsg += '\nPreferred style: ' + (style || 'curious');
-
-  return fetch(ollamaUrl + '/api/chat', {
-    method: 'POST',
-    headers: authHeaders(apiKey),
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: 'system', content: X_REPLY_SYSTEM },
-        { role: 'user', content: userMsg }
-      ],
-      stream: false,
-      think: false,
-      options: { temperature: 0.7, num_predict: 200 }
-    })
-  })
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      return parseReplies((data.message && data.message.content) || '');
-    })
-    .catch(function () {
-      return [{ style: 'error', text: 'Failed to generate reply. Is Ollama running?' }];
-    });
-}
-
 function listModels(ollamaUrl, apiKey) {
   return fetch(ollamaUrl + '/api/tags', { headers: authHeaders(apiKey), signal: AbortSignal.timeout(3000) })
     .then(function (r) { return r.json(); })
@@ -342,6 +370,27 @@ function parseXClassification(content) {
   } catch (e) { /* fallback */ }
   if (/signal/i.test(content)) return { prediction: 'signal', confidence: 0.6 };
   return { prediction: 'noise', confidence: 0.5 };
+}
+
+// Fail OPEN: anything that isn't a clean hostile/bot/spam verdict — garbage
+// output, unknown labels, missing JSON — comes back "fine" (shown). The raw
+// output still reaches the durable log via _raw for the offline audits.
+function parseReplyClassification(content) {
+  try {
+    var match = content.match(/\{[\s\S]*?\}/);
+    if (match) {
+      var obj = JSON.parse(match[0]);
+      var verdict = String(obj.verdict || '').toLowerCase();
+      if (verdict !== 'hostile' && verdict !== 'bot' && verdict !== 'spam') {
+        verdict = 'fine';
+      }
+      return {
+        verdict: verdict,
+        confidence: Math.min(1, Math.max(0, parseFloat(obj.confidence) || 0.5))
+      };
+    }
+  } catch (e) { /* fallback */ }
+  return { verdict: 'fine', confidence: 0.5 };
 }
 
 function parseYoutubeClassification(content) {
@@ -379,15 +428,119 @@ function parseYoutubeClassification(content) {
   return { category: 'other', confidence: 0.5 };
 }
 
-function parseReplies(content) {
-  try {
-    var match = content.match(/\[[\s\S]*?\]/);
-    if (match) {
-      var arr = JSON.parse(match[0]);
-      return arr.filter(function (r) { return r.text; }).slice(0, 3);
-    }
-  } catch (e) { /* fallback */ }
-  return [{ style: 'error', text: 'Could not parse reply.' }];
+// === Hop detection — cross-platform (X ↔ YouTube) doom-loop nudge ===
+// State lives in chrome.storage.local so it survives worker restarts.
+// Writes are serialized through a promise chain: both platforms' content
+// scripts can report visits at the same instant, and an interleaved
+// read-modify-write would drop one of them.
+var HOP_KEY = 'rai_hop_state';
+var _hopChain = Promise.resolve();
+
+function handleHopMessage(msg, sendResponse) {
+  _hopChain = _hopChain.then(function () {
+    return new Promise(function (resolve) {
+      chrome.storage.local.get(HOP_KEY, function (r) {
+        var state = (r && r[HOP_KEY]) || RaiHops.emptyState();
+        var out;
+        if (msg.action === 'hopSnooze') {
+          state = RaiHops.snooze(state, msg.untilTs || (Date.now() + RaiHops.SNOOZE_MS));
+          out = { ok: true };
+        } else {
+          var res = RaiHops.evaluate(
+            state,
+            { p: msg.platform === 'youtube' ? 'youtube' : 'x', e: msg.event === 'load' ? 'load' : 'vis' },
+            Date.now(),
+            msg.enabled !== false
+          );
+          state = res.state;
+          out = { nudge: res.nudge, churn: res.churn, spanMs: res.spanMs };
+        }
+        var obj = {};
+        obj[HOP_KEY] = state;
+        chrome.storage.local.set(obj, function () {
+          sendResponse(out);
+          resolve();
+        });
+      });
+    });
+  }).catch(function () {
+    try { sendResponse({ nudge: false }); } catch (e) { /* already responded */ }
+  });
+}
+
+// === Stats + daily-time accumulators — worker is the single writer ===
+// Tabs send {statsDelta}/{timeDelta} messages instead of writing the totals
+// themselves: each tab used to hold its own copy of the totals and blind-
+// overwrite the shared key, so two open X tabs erased each other's counts
+// (last writer wins). Same serialized-chain pattern as rai_hop_state above.
+var MEM_PREFIX = { x: 'xrai', youtube: 'ytrai' };
+var _memChain = Promise.resolve();
+
+function enqueueMemWrite(fn) {
+  _memChain = _memChain.then(fn, fn);
+}
+
+// Worker-local date (machine timezone) — one clock for the daily rollover so
+// per-tab clocks can't disagree about when "today" resets.
+function localDateStr() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function handleStatsDelta(msg, sendResponse) {
+  enqueueMemWrite(function () {
+    return new Promise(function (resolve) {
+      var key = (MEM_PREFIX[msg.platform] || 'xrai') + '_stats_totals';
+      chrome.storage.local.get(key, function (r) {
+        var s = (r && r[key]) || { total: 0, kept: 0, hidden: 0 };
+        // Back-compat: pre-rename installs stored {signal,noise}
+        if (s.signal !== undefined && s.kept === undefined) {
+          s.kept = s.signal;
+          s.hidden = s.noise || 0;
+        }
+        var d = msg.delta || {};
+        var date = localDateStr();
+        var t = (s.today && s.today.date === date) ? s.today : { total: 0, kept: 0, hidden: 0 };
+        var obj = {};
+        obj[key] = {
+          total: (s.total || 0) + (d.total || 0),
+          kept: (s.kept || 0) + (d.kept || 0),
+          hidden: (s.hidden || 0) + (d.hidden || 0),
+          today: {
+            date: date,
+            total: (t.total || 0) + (d.total || 0),
+            kept: (t.kept || 0) + (d.kept || 0),
+            hidden: (t.hidden || 0) + (d.hidden || 0)
+          }
+        };
+        chrome.storage.local.set(obj, function () {
+          var err = chrome.runtime.lastError;
+          try { sendResponse(err ? { ok: false } : { ok: true }); } catch (e) { /* port closed */ }
+          resolve();
+        });
+      });
+    });
+  });
+}
+
+function handleTimeDelta(msg, sendResponse) {
+  enqueueMemWrite(function () {
+    return new Promise(function (resolve) {
+      var key = (MEM_PREFIX[msg.platform] || 'xrai') + '_daily_time';
+      chrome.storage.local.get(key, function (r) {
+        var t = (r && r[key]) || {};
+        var obj = {};
+        obj[key] = (t.date === msg.date)
+          ? { date: msg.date, seconds: (t.seconds || 0) + (msg.seconds || 0) }
+          : { date: msg.date, seconds: msg.seconds || 0 };
+        chrome.storage.local.set(obj, function () {
+          var err = chrome.runtime.lastError;
+          try { sendResponse(err ? { ok: false } : { ok: true }); } catch (e) { /* port closed */ }
+          resolve();
+        });
+      });
+    });
+  });
 }
 
 // --- Message handler ---
@@ -395,6 +548,21 @@ function parseReplies(content) {
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   if (!msg || !msg.action) return false;
   var platform = msg.platform || 'x';
+
+  if (msg.action === 'hopVisit' || msg.action === 'hopSnooze') {
+    handleHopMessage(msg, sendResponse);
+    return true; // async response
+  }
+
+  if (msg.action === 'statsDelta') {
+    handleStatsDelta(msg, sendResponse);
+    return true; // async response
+  }
+
+  if (msg.action === 'timeDelta') {
+    handleTimeDelta(msg, sendResponse);
+    return true; // async response
+  }
 
   getConfig(platform).then(function (cfg) {
     // classifyUrl/apiKey route to the cloud endpoint in Cloud mode; the image
@@ -412,14 +580,12 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
         classify(platform, msg, model, url, apiKey).then(sendResponse);
         break;
 
-      case 'classifyImage':
-        classifyImage(platform, msg.imageUrl, msg.contextText, cfg.imageModel, cfg.ollamaUrl).then(sendResponse);
+      case 'classifyReply':
+        classifyReply(msg.text, msg.author, model, url, apiKey).then(sendResponse);
         break;
 
-      case 'reply':
-        generateReply(msg.tweetText, msg.authorHandle, msg.style, model, url, apiKey).then(function (replies) {
-          sendResponse({ replies: replies });
-        });
+      case 'classifyImage':
+        classifyImage(platform, msg.imageUrl, msg.contextText, cfg.imageModel, cfg.ollamaUrl).then(sendResponse);
         break;
 
       case 'listModels':

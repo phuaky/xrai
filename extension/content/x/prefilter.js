@@ -115,5 +115,34 @@ var XraiPrefilter = (function () {
     return null;
   }
 
-  return { prefilter: prefilter };
+  // === REPLY GUARD PREFILTER — own-status-page replies only ===
+  // Separate from the feed prefilter on purpose: no TECH_SIGNAL safelist here
+  // (a hostile reply stuffed with AI keywords is still hostile), and the bar
+  // is HIGH-PRECISION hostility/spam only. A deterministic false-hide of a
+  // genuine reply is the worst failure class — everything borderline goes to
+  // the model, and skepticism/criticism is never a pattern here by design.
+
+  // Slurs, identity attacks, and direct harm-wishes. Nothing in here can
+  // plausibly appear in good-faith pushback.
+  var REPLY_HOSTILE = /(\b(pajeet|poojeet|k[iy]ke|n[i1]gg(?:er|a)s?|f[a@]gg?[o0]ts?|tr[a@]nn(?:y|ie)s?|zionazi|subhuman|untermensch|goyim?\s*slave)\b|poopjeet|\bkys\b|kill\s*your\s*self|kill\s*yourself|rope\s*yourself|neck\s*yourself|\bgo\s*die\b|gas\s*the\s|back\s*to\s*your\s*(third.?world|shithole)\s*country)/i;
+
+  // Reply-bot / promo templates: account-growth DMs, adult-promo bait,
+  // wallet-drop spam. Reuses the feed's SPAM/CRYPTO_PUMP/NSFW patterns —
+  // spam is spam — plus reply-specific grow-your-account templates.
+  var REPLY_SPAM = /(grow\s*your\s*(account|audience|x|twitter)|i\s*(can|will)\s*help\s*you\s*(grow|monetize)|check\s*my\s*(bio|pinned|profile)|link\s*in\s*(my\s*)?bio|dm\s*me\s*(for|to|and)|drop\s*your\s*wallet|first\s*\d+\s*wallets|hot\s*singles|promote\s*it\s*on\s*my)/i;
+
+  function prefilterReply(data) {
+    var text = (data.text || '').trim();
+    if (!text) return null; // media-only replies go to the model path
+
+    if (REPLY_HOSTILE.test(text)) {
+      return { verdict: 'hostile', confidence: 0.95, reason: 'hostile-slur', source: 'prefilter' };
+    }
+    if (REPLY_SPAM.test(text) || SPAM.test(text) || CRYPTO_PUMP.test(text) || NSFW.test(text)) {
+      return { verdict: 'spam', confidence: 0.9, reason: 'reply-spam', source: 'prefilter' };
+    }
+    return null;
+  }
+
+  return { prefilter: prefilter, prefilterReply: prefilterReply };
 })();

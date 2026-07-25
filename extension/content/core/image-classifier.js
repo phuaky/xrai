@@ -11,6 +11,29 @@ var RaiImageClassifier = (function () {
   var queue = [];          // { id, payload, cb }
   var activeCount = 0;
 
+  // Activity feed for the status pill/panel — same contract as RaiClassifier.
+  // `current` is the most recently dispatched, still-unresolved item.
+  var _activityCb = null;
+  var _activeItem = null;
+
+  function onActivity(cb) { _activityCb = cb; }
+
+  function notifyActivity() {
+    if (!_activityCb) return;
+    try {
+      _activityCb({
+        current: _activeItem ? {
+          id: _activeItem.id,
+          text: (_activeItem.payload && _activeItem.payload.contextText) || '',
+          author: '',
+          channel: ''
+        } : null,
+        active: activeCount,
+        queued: queue.length
+      });
+    } catch (e) { /* listener error, keep classifying */ }
+  }
+
   function configure(cfg) {
     if (!cfg) return;
     if (cfg.platform) _platform = cfg.platform;
@@ -36,6 +59,7 @@ var RaiImageClassifier = (function () {
       return;
     }
     queue.push({ id: id, payload: payload || {}, cb: cb });
+    notifyActivity();
     drain();
   }
 
@@ -51,9 +75,13 @@ var RaiImageClassifier = (function () {
     if (!chrome.runtime || !chrome.runtime.id) {
       // Extension context invalidated (reload) — fail open, never hide on this.
       activeCount--;
+      notifyActivity();
       if (item.cb) item.cb({ baity: false, confidence: 0, source: 'error' });
       return;
     }
+
+    _activeItem = item;
+    notifyActivity();
 
     var msg = {
       action: 'classifyImage',
@@ -64,6 +92,8 @@ var RaiImageClassifier = (function () {
 
     chrome.runtime.sendMessage(msg, function (response) {
       activeCount--;
+      if (_activeItem === item) _activeItem = null;
+      notifyActivity();
 
       var result;
       if (chrome.runtime.lastError || !response) {
@@ -88,6 +118,7 @@ var RaiImageClassifier = (function () {
     checkCache: checkCache,
     cacheResult: cacheResult,
     clearCache: clearCache,
-    classify: classify
+    classify: classify,
+    onActivity: onActivity
   };
 })();

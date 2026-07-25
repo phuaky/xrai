@@ -13,11 +13,12 @@ var RaiConfig = (function () {
       ollamaUrl: 'http://localhost:11434',
       confidenceThreshold: 0.7,
       contentFilter: 'posts-only',
-      // 'blur' keeps hidden cards visible-but-quiet: the ✗ correction button
-      // stays reachable, so false-hides can be caught. 'remove' hides them
-      // completely and silently (no correction possible).
-      hideMethod: 'blur',
-      replyStyle: 'curious',
+      // 'remove' drops hidden cards from the feed entirely — noise costs zero
+      // attention. False-hide evidence comes from offline judge audits of the
+      // durable decision log now, not live corrections ('blur' + peek is
+      // still selectable in settings).
+      hideMethod: 'remove',
+      configVersion: 2,
       memoryRetentionDays: 30,
       maxModelCallsPerMinute: 100,
       batchSize: 5,
@@ -27,6 +28,17 @@ var RaiConfig = (function () {
       imageBaitEnabled: true,
       imageModel: 'qwen3-vl:30b',
       imageConfidenceThreshold: 0.6,
+      // Hop nudge — cross-platform X ↔ YouTube doom-loop detector (worker
+      // evaluates; this toggle only gates the overlay on this platform).
+      hopNudge: true,
+      // Reply guard — on the user's OWN status pages, classify replies as
+      // bad faith (hostile/bot/spam) vs fine and blur the bad ones. Targets
+      // bad faith, NOT sentiment: critical/skeptical on-topic replies stay
+      // visible. Replies are always blur-with-peek regardless of hideMethod —
+      // a wrongly hidden reply on your own post could be a lead.
+      replyGuard: true,
+      ownHandle: 'phuakuanyu',
+      replyConfidenceThreshold: 0.7,
       // Cloud mode — routes classification through the hosted endpoint
       // instead of local Ollama, for users who skip local setup. Free
       // while in beta, opt-in, off by default. See background/worker.js.
@@ -51,6 +63,8 @@ var RaiConfig = (function () {
       shortsNudge: true,             // show the snap-out overlay past the limit
       shortsLimitCount: 10,          // nudge after N Shorts in one binge
       shortsLimitMinutes: 5,         // ...or M minutes of continuous Shorts
+      // Hop nudge — see the x block above; one detector, per-platform overlay toggle.
+      hopNudge: true,
       // Cloud mode — see the x block above for details. X and YouTube share
       // one cloudApiKey (one account, one balance, both platforms).
       mode: 'local',
@@ -72,13 +86,44 @@ var RaiConfig = (function () {
     return typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
   }
 
+  // A tab opened before an extension reload keeps its old content script;
+  // chrome.storage calls in it throw "Extension context invalidated". Fail
+  // soft to defaults there — never spray uncaught errors from orphaned tabs.
+  function safeGet(key, cb) {
+    try {
+      chrome.storage.local.get(key, cb);
+    } catch (e) {
+      cb({});
+    }
+  }
+
+  function safeSet(obj, cb) {
+    try {
+      chrome.storage.local.set(obj, function () { if (cb) cb(); });
+    } catch (e) {
+      if (cb) cb();
+    }
+  }
+
   function getConfig(platform) {
     platform = platform || 'x';
     return new Promise(function (resolve) {
       if (cache[platform]) { resolve(Object.assign({}, cache[platform])); return; }
       if (hasStorage()) {
-        chrome.storage.local.get(keyFor(platform), function (result) {
-          cache[platform] = Object.assign({}, defaultsFor(platform), result[keyFor(platform)] || {});
+        safeGet(keyFor(platform), function (result) {
+          var stored = result[keyFor(platform)] || {};
+          // v2 migration (Jul 2026): X default flipped blur→remove when the ✗
+          // correction affordance was removed. Applies once to configs saved
+          // before configVersion existed; a deliberate blur re-pick afterwards
+          // sticks (saves carry configVersion from DEFAULTS).
+          if (platform === 'x' && !stored.configVersion && stored.hideMethod === 'blur') {
+            stored.hideMethod = 'remove';
+            stored.configVersion = 2;
+            var migrated = {};
+            migrated[keyFor(platform)] = stored;
+            safeSet(migrated);
+          }
+          cache[platform] = Object.assign({}, defaultsFor(platform), stored);
           resolve(Object.assign({}, cache[platform]));
         });
       } else {
@@ -95,7 +140,7 @@ var RaiConfig = (function () {
       if (hasStorage()) {
         var obj = {};
         obj[keyFor(platform)] = cache[platform];
-        chrome.storage.local.set(obj, function () {
+        safeSet(obj, function () {
           resolve(Object.assign({}, cache[platform]));
         });
       } else {
@@ -108,14 +153,18 @@ var RaiConfig = (function () {
     platform = platform || 'x';
     cache[platform] = null;
     return new Promise(function (resolve) {
-      if (hasStorage()) {
-        chrome.storage.local.remove(keyFor(platform), function () {
-          cache[platform] = Object.assign({}, defaultsFor(platform));
-          resolve(Object.assign({}, cache[platform]));
-        });
-      } else {
+      function toDefaults() {
         cache[platform] = Object.assign({}, defaultsFor(platform));
         resolve(Object.assign({}, cache[platform]));
+      }
+      if (hasStorage()) {
+        try {
+          chrome.storage.local.remove(keyFor(platform), toDefaults);
+        } catch (e) {
+          toDefaults();
+        }
+      } else {
+        toDefaults();
       }
     });
   }

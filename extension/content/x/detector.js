@@ -326,9 +326,22 @@ var XraiDetector = (function () {
     clearTimeout(debounceTimer);
   }
 
+  // Re-emit the cards currently in the DOM. X SPA-navigation rebuilds article
+  // nodes but `processed` remembers their ids, so a revisited thread would
+  // otherwise never re-fire onTweet — and the reply guard could not re-apply
+  // its cached decisions. Only clears ids that are actually on screen.
+  function rescan() {
+    document.querySelectorAll('article[data-testid="tweet"]').forEach(function (el) {
+      var id = extractTweetId(el);
+      if (id) processed.delete(id);
+    });
+    scanArticles();
+  }
+
   return {
     onTweet: onTweet,
     start: start,
-    stop: stop
+    stop: stop,
+    rescan: rescan
   };
 })();

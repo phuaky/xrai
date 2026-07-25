@@ -1,4 +1,6 @@
-/* rai — Content Memory (IndexedDB fingerprint store + stats/time/log, per-platform) */
+/* rai — Content Memory (IndexedDB fingerprint store + stats/time/log, per-platform).
+   Stats + daily time are worker-owned: tabs send deltas ({action:'statsDelta'|'timeDelta'}),
+   the worker serializes the read-modify-write, and pills converge via storage.onChanged. */
 const RaiMemory = (function () {
   'use strict';
 
@@ -6,6 +8,7 @@ const RaiMemory = (function () {
   // 'ytrai' for YouTube. All keys + the IndexedDB name derive from this prefix.
   var PREFIX = { x: 'xrai', youtube: 'ytrai' };
   var _prefix = 'xrai';
+  var _platformName = 'x'; // worker-facing platform id (delta messages route on this)
 
   var DB_VERSION = 2;
   const STORE_NAME = 'fingerprints';
@@ -18,7 +21,6 @@ const RaiMemory = (function () {
   function statsKey() { return _prefix + '_stats_totals'; }
   function timeKey() { return _prefix + '_daily_time'; }
   function classificationsKey() { return _prefix + '_classifications'; }
-  function correctionsKey() { return _prefix + '_corrections'; }
 
   // djb2 hash
   function djb2(str) {
@@ -30,7 +32,10 @@ const RaiMemory = (function () {
   }
 
   function init(platform) {
-    if (platform && PREFIX[platform]) _prefix = PREFIX[platform];
+    if (platform && PREFIX[platform]) {
+      _prefix = PREFIX[platform];
+      _platformName = platform;
+    }
     return new Promise(function (resolve, reject) {
       if (db) { resolve(db); return; }
       var req = indexedDB.open(dbName(), DB_VERSION);
@@ -203,62 +208,131 @@ const RaiMemory = (function () {
     });
   }
 
-  // In-memory stats accumulator — avoids async read-modify-write races.
+  // Stats totals are owned by the service worker: every decision sends a
+  // delta message and the worker applies it through one serialized
+  // read-modify-write chain. Tabs used to keep their own copy of the totals
+  // and blind-overwrite the shared key every 10s — with two tabs open that
+  // was a lost-update race (last writer wins), and a stale background tab's
+  // unload flush could erase everything counted since it opened.
   // Generic kept/hidden counters: for X, kept=signal hidden=noise; for
   // YouTube, kept=music/motivational hidden=everything blurred.
-  var _memStats = null;
-  var _statsFlushTimer = null;
-  var STATS_FLUSH_INTERVAL = 10000;
+  var _statsFailQueue = null; // deltas the worker never acked, re-merged into the next send
 
-  function _ensureStatsLoaded() {
-    return new Promise(function (resolve) {
-      if (_memStats) { resolve(); return; }
-      chrome.storage.local.get(statsKey(), function (result) {
-        if (!_memStats) {
-          _memStats = result[statsKey()] || { total: 0, kept: 0, hidden: 0 };
-          // Back-compat: migrate old {signal,noise} shape into {kept,hidden}
-          if (_memStats.signal !== undefined && _memStats.kept === undefined) {
-            _memStats.kept = _memStats.signal;
-            _memStats.hidden = _memStats.noise || 0;
-          }
-        }
-        resolve();
-      });
+  function _requeueStatsDelta(delta) {
+    if (!_statsFailQueue) _statsFailQueue = { total: 0, kept: 0, hidden: 0 };
+    _statsFailQueue.total += delta.total;
+    _statsFailQueue.kept += delta.kept;
+    _statsFailQueue.hidden += delta.hidden;
+  }
+
+  // chrome.storage access that survives extension reloads: a tab opened
+  // before the reload keeps its old content script, and every chrome.* call
+  // in it throws "Extension context invalidated". Orphaned tabs must fail
+  // soft (zeros / no-ops), not spray uncaught errors onto the extension card.
+  function storageGet(keys, cb) {
+    try {
+      chrome.storage.local.get(keys, cb);
+    } catch (e) {
+      cb({});
+    }
+  }
+
+  function storageSet(obj, cb) {
+    try {
+      chrome.storage.local.set(obj, function () { if (cb) cb(); });
+    } catch (e) {
+      if (cb) cb();
+    }
+  }
+
+  function _readStoredStats(cb) {
+    storageGet(statsKey(), function (result) {
+      var s = (result && result[statsKey()]) || { total: 0, kept: 0, hidden: 0 };
+      // Back-compat: pre-rename installs stored {signal,noise}
+      if (s.signal !== undefined && s.kept === undefined) {
+        s.kept = s.signal;
+        s.hidden = s.noise || 0;
+      }
+      cb(s);
     });
   }
 
-  function _flushStats() {
-    if (!_memStats) return;
-    var obj = {};
-    obj[statsKey()] = { total: _memStats.total, kept: _memStats.kept, hidden: _memStats.hidden };
-    chrome.storage.local.set(obj);
-  }
-
-  function _startStatsFlush() {
-    if (_statsFlushTimer) return;
-    _statsFlushTimer = setInterval(_flushStats, STATS_FLUSH_INTERVAL);
-  }
-
   function getStats() {
-    return _ensureStatsLoaded().then(function () {
-      return { total: _memStats.total, kept: _memStats.kept, hidden: _memStats.hidden };
+    return new Promise(function (resolve) {
+      _readStoredStats(function (s) {
+        var q = _statsFailQueue;
+        // Daily slice — worker resets it on date rollover; a stale stored date
+        // means nothing counted yet today. Unacked deltas are all "today" by
+        // definition, so the fail-queue merges into both views.
+        var t = (s.today && s.today.date === _todayStr()) ? s.today : { total: 0, kept: 0, hidden: 0 };
+        resolve({
+          total: (s.total || 0) + (q ? q.total : 0),
+          kept: (s.kept || 0) + (q ? q.kept : 0),
+          hidden: (s.hidden || 0) + (q ? q.hidden : 0),
+          today: {
+            date: _todayStr(),
+            total: (t.total || 0) + (q ? q.total : 0),
+            kept: (t.kept || 0) + (q ? q.kept : 0),
+            hidden: (t.hidden || 0) + (q ? q.hidden : 0)
+          }
+        });
+      });
     });
   }
 
   // outcome: 'kept' (shown) or 'hidden' (filtered/blurred)
   function incrementStats(outcome) {
-    return _ensureStatsLoaded().then(function () {
-      _memStats.total++;
-      if (outcome === 'kept') _memStats.kept++;
-      else if (outcome === 'hidden') _memStats.hidden++;
-      _startStatsFlush();
-      return { total: _memStats.total, kept: _memStats.kept, hidden: _memStats.hidden };
+    var delta = {
+      total: 1,
+      kept: outcome === 'kept' ? 1 : 0,
+      hidden: outcome === 'hidden' ? 1 : 0
+    };
+    if (_statsFailQueue) {
+      delta.total += _statsFailQueue.total;
+      delta.kept += _statsFailQueue.kept;
+      delta.hidden += _statsFailQueue.hidden;
+      _statsFailQueue = null;
+    }
+    return new Promise(function (resolve) {
+      try {
+        chrome.runtime.sendMessage(
+          { action: 'statsDelta', platform: _platformName, delta: delta },
+          function (resp) {
+            if (chrome.runtime.lastError || !resp || !resp.ok) _requeueStatsDelta(delta);
+            resolve();
+          }
+        );
+      } catch (e) {
+        // Extension context invalidated (reload mid-session) — hold the delta
+        // in case a later send works; lost with the page otherwise.
+        _requeueStatsDelta(delta);
+        resolve();
+      }
+    });
+  }
+
+  // Cross-tab convergence: the worker's writes land here in every tab, so
+  // each pill re-renders from the shared totals no matter which tab counted.
+  var _statsListeners = [];
+
+  function onStatsChanged(cb) {
+    _statsListeners.push(cb);
+    if (_statsListeners.length > 1) return;
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      if (area !== 'local' || !changes[statsKey()]) return;
+      var v = changes[statsKey()].newValue || { total: 0, kept: 0, hidden: 0 };
+      for (var i = 0; i < _statsListeners.length; i++) {
+        try { _statsListeners[i](v); } catch (e) { /* listener error, keep going */ }
+      }
     });
   }
 
   // === Daily time tracking ===
+  // Same delta contract as stats: ticks send elapsed seconds to the worker,
+  // which accumulates per day. A dropped tick loses ≤30s — acceptable — so
+  // there is no retry queue here.
   var _timeInterval = null;
-  var _memTime = null; // { date, seconds }
+  var _mirrorTimer = null;
   var _lastTickTime = 0;
 
   function _todayStr() {
@@ -266,82 +340,76 @@ const RaiMemory = (function () {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
-  function _ensureTimeLoaded() {
-    return new Promise(function (resolve) {
-      if (_memTime) { resolve(); return; }
-      chrome.storage.local.get(timeKey(), function (result) {
-        if (!_memTime) {
-          var data = result[timeKey()] || {};
-          var today = _todayStr();
-          _memTime = (data.date === today)
-            ? { date: today, seconds: data.seconds || 0 }
-            : { date: today, seconds: 0 };
-        }
-        resolve();
-      });
-    });
+  function _sendTimeDelta(seconds) {
+    try {
+      chrome.runtime.sendMessage(
+        { action: 'timeDelta', platform: _platformName, seconds: seconds, date: _todayStr() },
+        function () { void chrome.runtime.lastError; }
+      );
+    } catch (e) { /* extension context invalidated */ }
   }
 
   function startSession() {
     if (_timeInterval) return;
     _lastTickTime = Date.now();
 
-    _ensureTimeLoaded().then(function () {
-      _timeInterval = setInterval(function () {
-        if (!document.hidden) {
-          var now = Date.now();
-          var elapsed = Math.round((now - _lastTickTime) / 1000);
-          _lastTickTime = now;
-          _saveTimeIncrement(elapsed);
-        } else {
-          _lastTickTime = Date.now();
-        }
-      }, 30000);
-    });
+    _timeInterval = setInterval(function () {
+      var now = Date.now();
+      if (!document.hidden) {
+        var elapsed = Math.round((now - _lastTickTime) / 1000);
+        if (elapsed > 0) _sendTimeDelta(elapsed);
+      }
+      _lastTickTime = now;
+    }, 30000);
+
+    // Mirror buffer drains on size (MIRROR_FLUSH_AT); this timer bounds the
+    // wait so a slow session still tails live into the collector.
+    _mirrorTimer = setInterval(flushMirror, 10000);
 
     window.addEventListener('beforeunload', function () {
       if (_timeInterval) {
         clearInterval(_timeInterval);
         _timeInterval = null;
       }
+      if (_mirrorTimer) {
+        clearInterval(_mirrorTimer);
+        _mirrorTimer = null;
+      }
       if (_lastTickTime && !document.hidden) {
         var elapsed = Math.round((Date.now() - _lastTickTime) / 1000);
-        if (elapsed > 0) _saveTimeIncrement(elapsed);
+        if (elapsed > 0) _sendTimeDelta(elapsed);
       }
-      _flushStats();
+      // Last chance for deltas the worker never acked (it processes messages
+      // even after the sending page is gone).
+      if (_statsFailQueue) {
+        var q = _statsFailQueue;
+        _statsFailQueue = null;
+        try {
+          chrome.runtime.sendMessage({ action: 'statsDelta', platform: _platformName, delta: q });
+        } catch (e) { /* extension context invalidated */ }
+      }
+      flushMirror();
     });
   }
 
-  function _saveTimeIncrement(seconds) {
-    if (!_memTime) return;
-    var today = _todayStr();
-    if (_memTime.date !== today) {
-      _memTime = { date: today, seconds: 0 };
-    }
-    _memTime.seconds += seconds;
-    var obj = {};
-    obj[timeKey()] = { date: _memTime.date, seconds: _memTime.seconds };
-    chrome.storage.local.set(obj);
-  }
-
   function getDailyTime() {
-    if (_memTime) {
-      var today = _todayStr();
-      return Promise.resolve(_memTime.date === today ? _memTime.seconds : 0);
-    }
     return new Promise(function (resolve) {
-      chrome.storage.local.get(timeKey(), function (result) {
+      storageGet(timeKey(), function (result) {
         var data = result[timeKey()] || {};
-        resolve(data.date !== _todayStr() ? 0 : (data.seconds || 0));
+        resolve(data.date === _todayStr() ? (data.seconds || 0) : 0);
       });
     });
   }
 
   function clearAll() {
     return new Promise(function (resolve) {
-      chrome.storage.local.remove([statsKey(), timeKey()]);
-      _memStats = { total: 0, kept: 0, hidden: 0 };
-      _memTime = { date: _todayStr(), seconds: 0 };
+      // Key removal fires storage.onChanged, so every open tab's pill zeroes
+      // too (the old per-tab copies used to resurrect cleared totals on their
+      // next flush).
+      try {
+        chrome.storage.local.remove([statsKey(), timeKey()]);
+      } catch (e) { /* orphaned tab (extension reloaded) — nothing to clear from here */ }
+      _statsFailQueue = null;
       if (!db) { resolve(); return; }
       var tx = db.transaction(STORE_NAME, 'readwrite');
       tx.objectStore(STORE_NAME).clear();
@@ -357,7 +425,7 @@ const RaiMemory = (function () {
 
   function logClassification(text, mediaType, prediction, confidence, source) {
     return new Promise(function (resolve) {
-      chrome.storage.local.get(classificationsKey(), function (result) {
+      storageGet(classificationsKey(), function (result) {
         var log = result[classificationsKey()] || [];
         log.push({
           text: (text || '').substring(0, 300),
@@ -374,7 +442,7 @@ const RaiMemory = (function () {
         if (log.length > MAX_CLASSIFICATIONS) log = log.slice(-MAX_CLASSIFICATIONS);
         var obj = {};
         obj[classificationsKey()] = log;
-        chrome.storage.local.set(obj, function () { resolve(); });
+        storageSet(obj, function () { resolve(); });
       });
     });
   }
@@ -398,6 +466,8 @@ const RaiMemory = (function () {
   var MIRROR_FLUSH_AT = 20;
 
   function mirrorEvent(record) {
+    if (!record) return;
+    record.ts = record.ts || Date.now(); // collector dedupes on ts; don't rely on logEvent having stamped it
     _mirrorBuf.push(record);
     if (_mirrorBuf.length >= MIRROR_FLUSH_AT) flushMirror();
   }
@@ -410,71 +480,25 @@ const RaiMemory = (function () {
       fetch(COLLECTOR_URL + '/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: _prefix, entries: entries })
+        body: JSON.stringify({ platform: _prefix, entries: entries }),
+        // keepalive lets the beforeunload flush survive the tab closing
+        // (bodies stay well under the 64KB keepalive cap at 20 entries)
+        keepalive: true
       }).catch(function () { /* collector not running, that's fine */ });
     } catch (e) { /* ignore */ }
   }
 
   function getClassifications() {
     return new Promise(function (resolve) {
-      chrome.storage.local.get(classificationsKey(), function (result) {
+      storageGet(classificationsKey(), function (result) {
         resolve(result[classificationsKey()] || []);
       });
     });
   }
 
   function exportAll() {
-    return Promise.all([getClassifications(), getCorrections()]).then(function (results) {
-      return JSON.stringify({ classifications: results[0], corrections: results[1] }, null, 2);
-    });
-  }
-
-  function saveCorrection(text, mediaType, aiPrediction, userCorrection) {
-    return new Promise(function (resolve) {
-      chrome.storage.local.get(correctionsKey(), function (result) {
-        var corrections = result[correctionsKey()] || [];
-        corrections.push({
-          text: (text || '').substring(0, 300),
-          mediaType: mediaType || 'text',
-          aiPrediction: aiPrediction,
-          userCorrection: userCorrection,
-          timestamp: Date.now()
-        });
-        if (corrections.length > 500) corrections = corrections.slice(-500);
-        var obj = {};
-        obj[correctionsKey()] = corrections;
-        chrome.storage.local.set(obj, function () { resolve(); });
-      });
-    });
-  }
-
-  function getCorrections() {
-    return new Promise(function (resolve) {
-      chrome.storage.local.get(correctionsKey(), function (result) {
-        resolve(result[correctionsKey()] || []);
-      });
-    });
-  }
-
-  function getCorrectionCount() {
-    return new Promise(function (resolve) {
-      chrome.storage.local.get(correctionsKey(), function (result) {
-        resolve((result[correctionsKey()] || []).length);
-      });
-    });
-  }
-
-  function clearCorrections() {
-    return new Promise(function (resolve) {
-      var obj = {};
-      obj[correctionsKey()] = [];
-      chrome.storage.local.set(obj, function () { resolve(); });
-    });
-  }
-
-  function exportCorrections() {
-    return getCorrections().then(function (corrections) {
-      return JSON.stringify(corrections, null, 2);
+    return getClassifications().then(function (classifications) {
+      return JSON.stringify({ classifications: classifications }, null, 2);
     });
   }
 
@@ -485,15 +509,11 @@ const RaiMemory = (function () {
     markSeen: markSeen,
     pruneOld: pruneOld,
     getStats: getStats,
+    onStatsChanged: onStatsChanged,
     clearAll: clearAll,
     logClassification: logClassification,
     getClassifications: getClassifications,
     exportAll: exportAll,
-    saveCorrection: saveCorrection,
-    getCorrections: getCorrections,
-    getCorrectionCount: getCorrectionCount,
-    clearCorrections: clearCorrections,
-    exportCorrections: exportCorrections,
     incrementStats: incrementStats,
     startSession: startSession,
     getDailyTime: getDailyTime,

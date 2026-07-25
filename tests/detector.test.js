@@ -11,8 +11,8 @@ function loadDetectorInternals() {
   // Patch the IIFE to expose internals
   const patched = detectorSrc
     .replace(
-      'return {\n    onTweet: onTweet,\n    start: start,\n    stop: stop\n  };',
-      'return {\n    onTweet: onTweet,\n    start: start,\n    stop: stop,\n    _extractTweetId: extractTweetId,\n    _extractAuthor: extractAuthor,\n    _extractData: extractData\n  };'
+      'return {\n    onTweet: onTweet,\n    start: start,\n    stop: stop,\n    rescan: rescan\n  };',
+      'return {\n    onTweet: onTweet,\n    start: start,\n    stop: stop,\n    rescan: rescan,\n    _extractTweetId: extractTweetId,\n    _extractAuthor: extractAuthor,\n    _extractData: extractData\n  };'
     )
     .replace(/var XraiDetector\s*=\s*/, '');
   return eval(patched);

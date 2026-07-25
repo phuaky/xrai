@@ -12,27 +12,33 @@ import { loadTips, loadStatuses, setStatus, resolveTweetId, digest } from '../sc
 
 const tips = loadXraiTips();
 const golden = loadGolden();
-const text = (id) => golden.items.find((i) => i.id === id).text;
+
+// Inline fixtures (formerly golden v1 ids — golden v2 is live-traffic data, so
+// these recall-floor texts live here now instead of coupling to the eval set).
+const MUST_CAPTURE = {
+  'openclaw-mcp': 'The next version of OpenClaw is also an MCP, you can use it instead of Anthropic\'s message channel MCP to connect to a much wider range of message providers.',
+  'figma-mcp-workflow': 'the more I\'ve been digging into the new Figma MCP, the more excited I am about it. something new I\'m trying is starting with a very ugly sketch in Figma, and then having Claude Code flesh it out in Figma so I can tweak and edit before sending the final back to Claude Code',
+  'structured-outputs': 'Structured outputs are the most underrated feature in LLM APIs. Stop parsing markdown. Just define a schema.',
+  'three-key-loops': '"Loop engineering" is a hot buzzphrase after mentions of it by Boris Cherny and Peter Steinberger went viral. In this letter, I\'d like to share my 3 key loops for building 0-to-1 products: the agentic coding loop (minutes), the developer feedback loop (tens of minutes to hours), and the external feedback loop (hours to weeks). Over the weekend I built a typing app for my daughter and my coding agent worked for an hour, testing in a browser, before getting back to me.',
+  'whisper-fact-check': 'I fact-checked 6 viral AI threads this week: transcribed 58 minutes of video with whisper.cpp, pulled both long-form articles, checked every claim. Scoreboard: 2 real, 2 funnels, 1 fake credential, 1 fabricated quote. Full method and transcripts in the writeup: kuanyu.dev/feed-audit',
+  'agent-harness-oss': 'We just open-sourced our agent harness on GitHub - 47 deterministic checks plus an adversarial review pass, MIT licensed. Join our Discord if you want to contribute, PRs welcome. Benchmarks against SWE-bench in the README.',
+};
+const NON_TIP_SIGNAL = {
+  'sqlite-take': 'SQLite can handle 100k+ concurrent readers. Most apps don\'t need Postgres. We switched and our infrastructure cost dropped to $0.',
+  'trust-aphorism': 'Just because someone trusts you quickly doesn\'t mean you need to trust them quickly. It\'s a more advanced manipulation move, typically from people who need something from you.',
+  'sold-back-rant': 'The sun was free. They sold you SPF 50 and a vitamin D deficiency. Sleep was free. They sold you an app, a pill, and a wearable that tells you your sleep was bad. Walking was free. They sold you a treadmill, a fitness tracker, and a £180 pair of trainers. Fasting was free. They sold you meal replacement shakes and the anxiety that skipping breakfast would wreck your metabolism. The 20th century removed access to everything the body needs to function. The 21st century is selling it back, one subscription at a time.',
+};
 
 describe('XraiTips.isTip vs golden set', () => {
-  // Recall floor: tweets a tips ledger obviously must capture.
-  const MUST_CAPTURE = [
-    'x-014', // OpenClaw MCP — "use it instead of"
-    'x-016', // Figma MCP workflow — "something new I'm trying"
-    'x-027', // structured outputs tip
-    'x-114', // "share my 3 key loops"
-    'x-115', // whisper.cpp fact-check method
-    'x-117', // open-sourced agent harness
-  ];
   it('captures known tip-shaped signal', () => {
-    for (const id of MUST_CAPTURE) {
-      expect(tips.isTip(text(id)), `${id} should be a tip`).toBe(true);
+    for (const [name, text] of Object.entries(MUST_CAPTURE)) {
+      expect(tips.isTip(text), `${name} should be a tip`).toBe(true);
     }
   });
 
   it('ignores non-tip signal (aphorisms, commentary without a named tool)', () => {
-    for (const id of ['x-010', 'x-011', 'x-012']) {
-      expect(tips.isTip(text(id)), `${id} should NOT be a tip`).toBe(false);
+    for (const [name, text] of Object.entries(NON_TIP_SIGNAL)) {
+      expect(tips.isTip(text), `${name} should NOT be a tip`).toBe(false);
     }
   });
 

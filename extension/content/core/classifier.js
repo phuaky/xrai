@@ -2,7 +2,10 @@
 var RaiClassifier = (function () {
   'use strict';
 
-  var MAX_CONCURRENT = 5;
+  // 3 in flight — matched to OLLAMA_NUM_PARALLEL=4 (com.ollama.env plist);
+  // one slot is left free so the image bait-check and the other platform's
+  // classifier never queue behind a full feed burst.
+  var MAX_CONCURRENT = 3;
   var MAX_CALLS_PER_MINUTE = 100;
   var _platform = 'x';
 
@@ -10,6 +13,31 @@ var RaiClassifier = (function () {
   var queue = [];          // { id, payload, cb }
   var activeCount = 0;
   var callTimestamps = [];
+
+  // Activity feed for the status pill/panel: fires a snapshot on every queue
+  // transition. `current` is the most recently dispatched, still-unresolved
+  // item (with MAX_CONCURRENT>1 it is ONE of the items in flight — good
+  // enough for the pill; `active` carries the true in-flight count).
+  var _activityCb = null;
+  var _activeItem = null;
+
+  function onActivity(cb) { _activityCb = cb; }
+
+  function notifyActivity() {
+    if (!_activityCb) return;
+    try {
+      _activityCb({
+        current: _activeItem ? {
+          id: _activeItem.id,
+          text: (_activeItem.payload && _activeItem.payload.text) || '',
+          author: (_activeItem.payload && _activeItem.payload.author) || '',
+          channel: (_activeItem.payload && _activeItem.payload.channel) || ''
+        } : null,
+        active: activeCount,
+        queued: queue.length
+      });
+    } catch (e) { /* listener error, keep classifying */ }
+  }
 
   function configure(cfg) {
     if (!cfg) return;
@@ -45,6 +73,7 @@ var RaiClassifier = (function () {
       return;
     }
     queue.push({ id: id, payload: payload || {}, cb: cb });
+    notifyActivity();
     drain();
   }
 
@@ -65,14 +94,20 @@ var RaiClassifier = (function () {
       // Extension context invalidated (reload). Fail open so the caller can
       // clear the pending blur instead of leaving the card stuck forever.
       activeCount--;
+      notifyActivity();
       if (item.cb) item.cb({ source: 'error' });
       return;
     }
+
+    _activeItem = item;
+    notifyActivity();
 
     var msg = Object.assign({ action: 'classify', platform: _platform }, item.payload);
 
     chrome.runtime.sendMessage(msg, function (response) {
       activeCount--;
+      if (_activeItem === item) _activeItem = null;
+      notifyActivity();
 
       var result;
       if (chrome.runtime.lastError || !response) {
@@ -84,7 +119,7 @@ var RaiClassifier = (function () {
 
       try {
         console.log('[rai] OLLAMA | ' + _platform + ' | id:' + item.id + ' | ' +
-          (result.prediction || result.category || result.source) +
+          (result.prediction || result.category || result.verdict || result.source) +
           (result.confidence !== undefined ? ' (' + result.confidence + ')' : '') +
           ' | ' + ((item.payload && item.payload.text) || '').substring(0, 70));
       } catch (e) { /* logging is best-effort */ }
@@ -99,6 +134,7 @@ var RaiClassifier = (function () {
     checkCache: checkCache,
     cacheResult: cacheResult,
     clearCache: clearCache,
-    classify: classify
+    classify: classify,
+    onActivity: onActivity
   };
 })();
