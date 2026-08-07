@@ -25,7 +25,7 @@ extension/
     ollama.js                    # legacy XraiOllama client (unused, not loaded)
   content/
     core/                        # SHARED, neutral Rai* namespace
-      classifier.js → RaiClassifier   # concurrent queue (3 in flight) + result cache + activity feed
+      classifier.js → RaiClassifier   # serial low-latency queue + result cache + activity feed
       hider.js      → RaiHider        # blur / remove / collapse + peek button
       indicator.js  → RaiIndicator    # status pill (pulses while classifying) + today-first panel + auto-save settings
       dwell.js      → RaiDwell        # attention ledger: per-card dwell tracking (X only for now)
@@ -70,7 +70,7 @@ extension/
 | `extension/background/worker.js` | Service worker — platform-routed Ollama proxy + both prompts |
 | `extension/lib/config.js` | `RaiConfig` — per-platform config |
 | `extension/lib/memory.js` | `RaiMemory` — per-platform stats/time/log + IndexedDB |
-| `extension/content/core/classifier.js` | `RaiClassifier` — concurrent queue (3 in flight) + cache (text) + activity feed |
+| `extension/content/core/classifier.js` | `RaiClassifier` — serial queue + cache (text) + activity feed |
 | `extension/content/core/image-classifier.js` | `RaiImageClassifier` — small queue + cache for the image bait check |
 | `extension/content/core/hider.js` | `RaiHider` — blur/remove/collapse + peek/label buttons |
 | `extension/content/core/indicator.js` | `RaiIndicator` — pill + per-platform settings |
@@ -95,6 +95,8 @@ extension/
 | `benchmarks/eval-youtube.js` | YouTube full-pipeline eval + regression gate (see "Evals") |
 | `benchmarks/golden-youtube.json` | Tiered golden set — source of truth for YouTube eval data |
 | `benchmarks/load-extension.js` | Loads real prompt/parser/prefilter/config from extension source (both platforms) |
+| `benchmarks/bench-live-x.js` | Burst-latency benchmark over recent live X decisions |
+| `benchmarks/audit-live-x.js` | Prepare/judge/report workflow for stratified recent-traffic audits |
 | `tests/regression.test.js` | Fast no-Ollama pins: prefilter invariants, parser fail-open, prompt/config hashes |
 | `benchmarks/benchmark.js` | LEGACY — model-only benchmark; drifted from production (wrong models/prompt/format). Use eval-x.js |
 | `SPEC.md` | Full architecture specification (X — predates YouTube) |
@@ -127,6 +129,8 @@ node scripts/digest.js --json             # machine-readable (for kyu)
 bun run eval:x            # run against blessed baseline, exit 1 on regression
 bun run eval:x:bless      # re-bless baseline after an INTENTIONAL prompt/prefilter/model change
 node benchmarks/eval-x.js --limit 10   # quick smoke run
+node benchmarks/bench-live-x.js --since 2026-07-23 --sample 24
+node benchmarks/audit-live-x.js prepare --since 2026-07-23
 
 # YouTube eval + regression gate (needs Ollama; ~1 min)
 bun run eval:youtube            # run against blessed baseline, exit 1 on regression
@@ -224,7 +228,7 @@ Every first-time decision on both platforms is written to a **durable IndexedDB 
   "source":"model", "model":"gemma2:2b", "raw":"<raw model output>", "ms":240,
   "title":"...", "channel":"...", "videoId":"...", "ts":..., "id":1 }
 ```
-X records carry `prediction`/`text`/`author`/`tweetId` instead of `category`/`title`/`channel`/`videoId`. `source` distinguishes `prefilter:<reason>` (regex shortcut) from `model` (the prompt's actual output) — **filter to `source:"model"` to study/improve the prompt** (`raw` holds the model's verbatim output, `_input` was the exact user message).
+X records carry `prediction`/`text`/`author`/`tweetId` instead of `category`/`title`/`channel`/`videoId`. `source` distinguishes `prefilter:<reason>` (regex shortcut) from `model` (the prompt's actual output) — **filter to `source:"model"` to study/improve the prompt**. New decision records preserve the complete expanded tweet text. Records written before August 5, 2026 capped `text` at 500 characters, so long historical tweets cannot be reconstructed from the local mirror.
 
 **Export:** pill → settings → "export log" downloads the full per-platform log. Programmatic: dispatch `xrai-export-request` / `ytrai-export-request`, then read `#xrai-export-data` / `#ytrai-export-data` on the `*-export-response` event.
 
@@ -232,7 +236,7 @@ X records carry `prediction`/`text`/`author`/`tweetId` instead of `category`/`ti
 
 **Stats totals + daily time** (`<prefix>_stats_totals` / `<prefix>_daily_time` in chrome.storage.local — the pill's numbers) are **worker-owned**: content scripts send `{action:'statsDelta'|'timeDelta'}` messages, the worker applies them through one serialized read-modify-write chain (same pattern as `rai_hop_state`), and pills re-render from `storage.onChanged` so all tabs converge. `_stats_totals` also carries a `today: {date, total, kept, hidden}` sub-record the worker resets on date rollover (worker-local clock) — the pill shows today's hidden count, the panel shows today's numbers with all-time as a footnote. Tabs never write these keys directly — per-tab copies with periodic overwrite was a lost-update race that corrupted counts whenever two X tabs were open.
 
-> **Ground truth (X):** the one-tap ✗ correction button was REMOVED (Jul 2026 — it went untapped for its whole life; `{kind:"correction"}` events may still exist in old logs). False-hide evidence now comes from **offline judge audits**: periodically re-judge the durable decision log with a stronger model (`codex exec -s read-only`, stratified by source/confidence — see the golden-set provenance note in Evals), send disagreements to Kuan for labeling, graduate them into `benchmarks/golden-x.json`. Because nothing needs to stay clickable, X `hideMethod` now defaults to `remove` (config v2 migration flips stored `blur` once; a deliberate re-pick of blur in settings sticks).
+> **Ground truth (X):** the one-tap ✗ correction button was REMOVED (Jul 2026 — it went untapped for its whole life; `{kind:"correction"}` events may still exist in old logs). False-hide evidence now comes from **offline judge audits**: periodically re-judge the durable decision log with a stronger model (`benchmarks/audit-live-x.js`, stratified by source/confidence), send disagreements to Kuan for labeling, and graduate them into `benchmarks/golden-x.json`. Because nothing needs to stay clickable, X `hideMethod` now defaults to `remove` (config v2 migration flips stored `blur` once; config v3 disables the unevaluated image gate once; deliberate later settings changes stick).
 
 ## Tips Ledger (workflow tips: seen → read → evaluated → implemented)
 

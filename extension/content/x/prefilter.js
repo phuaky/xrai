@@ -12,14 +12,14 @@ var XraiPrefilter = (function () {
   // === NOISE PATTERNS ===
   var NSFW = /\b(onlyfans|thirst\s*trap|horny|nude[s]?|nudes|nsfw|xxx|porn|sexy|topless|lingerie|18\+|barely\s*legal|slutty|booty|thicc|come\s*see\s*me|link\s*in\s*bio.*\b(spicy|exclusive|content))\b/i;
 
-  var ENGAGEMENT_BAIT = /\b(follow\s*(for|4)\s*follow|f4f|ratio\s+this|retweet\s*if|like\s*if\s*you|rt\s*if|drop\s*your|comment\s*your|tag\s*(a\s*friend|someone)|who\s*(else|agrees)|unpopular\s*opinion.*:?\s*$|what'?s\s*your\s*excuse|bet\s*you\s*can'?t|only\s*\d+%\s*(of\s*people|can|will)|this\s*is\s*a\s*test)\b/i;
+  var ENGAGEMENT_BAIT = /\b(follow\s*(for|4)\s*follow|f4f|ratio\s+this|retweet\s*if|like\s*if\s*you|rt\s*if|drop\s*your|comment\s*your|who\s*(else|agrees)|unpopular\s*opinion.*:?\s*$|what'?s\s*your\s*excuse|bet\s*you\s*can'?t|only\s*\d+%\s*(of\s*people|can|will)|this\s*is\s*a\s*test)\b/i;
 
   var ENGAGEMENT_SUFFIX = /\b(who\s*agrees\??|thoughts\??|am\s*i\s*wrong\??|change\s*my\s*mind|let\s*that\s*sink\s*in|read\s*that\s*again|iykyk|no\s*cap)\s*[.!?]*$/i;
 
   var SPAM = /\b(free\s*money|giveaway|passive\s*income|make\s*\$?\d+[k]?\s*(a\s*day|daily|per\s*month|in\s*my\s*first)|get\s*rich|dm\s*me\s*for|crypto\s*gem|100x\s*potential|guaranteed\s*returns|airdrop|drop\s*wallet|whitelist\s*spot|one\s*simple\s*trick|one\s*weird\s*trick|this\s*one\s*trick|side\s*hustle|financial\s*freedom)\b/i;
 
   // Crypto pump/scam patterns — separate from general spam
-  var CRYPTO_PUMP = /(\d{2,}x\b|\d{1,3},?\d{3}%\s*gain|private\s*(tg|telegram)\s*(channel|group)|the\s*ticker\s*is|next\s*100x|buy\s*before|pump\s*(it|this)|rug\s*pull|moon\s*soon|degen\s*play|\$[A-Z]{2,8}\s*(at|before|from)\s*\$)/i;
+  var CRYPTO_PUMP = /(\d{2,}x\s*(gain|return|profit|upside|potential)|\d{1,3},?\d{3}%\s*gain|private\s*(tg|telegram)\s*(channel|group)|the\s*ticker\s*is|next\s*100x|buy\s*before|pump\s*(it|this)|rug\s*pull|moon\s*soon|degen\s*play|\$[A-Z]{2,8}\s*(at|before|from)\s*\$)/i;
 
   var CLICKBAIT_PHRASES = /\b(you\s*won'?t\s*believe|wait\s*(for|till)\s*(it|the\s*end)|this\s*is\s*so\s*(good|crazy|funny|wild|insane)|my\s*(grandma|mom|dad|kid)\s*(taught|showed|told)|i\s*can'?t\s*(believe|stop)|no\s*way|bro\s*what|absolute\s*madness|i'?m\s*dead|crying|screaming|watch\s*till\s*(the\s*)?end|what\s*happens\s*next\s*will\s*(shock|surprise|blow)|mind\s*blow|most\s*chaotic|100\s*\/\s*10|10\s*\/\s*10|\d+\/10\s*🍿|will\s*shock\s*you|stay\s*till\s*(the\s*)?end|this\s*will\s*(change|blow|shock|break)|you\s*need\s*to\s*see\s*this|i\s*wasn'?t\s*ready|nobody\s*expected|didn'?t\s*see\s*(this|that)\s*coming)\b/i;
 
@@ -99,15 +99,16 @@ var XraiPrefilter = (function () {
       return { prediction: 'noise', confidence: 0.85, reason: 'clickbait-phrase', source: 'prefilter' };
     }
 
-    // Entertainment/lifestyle content — not relevant to tech.
-    // 2+ distinct terms hide at any length; 1 term only hides short tweets.
+    // Entertainment/lifestyle reactions can be hidden instantly when short.
+    // Long-form posts go to the model even with several lifestyle terms:
+    // product ideas and business observations often use them as subject matter.
     var entMatches = text.match(ENTERTAINMENT_NOISE) || [];
     var entTerms = {};
     for (var i = 0; i < entMatches.length; i++) {
       entTerms[entMatches[i].toLowerCase().replace(/\s+/g, ' ')] = true;
     }
     var entCount = Object.keys(entTerms).length;
-    if (entCount >= 2 || (entCount === 1 && text.length <= ENTERTAINMENT_SINGLE_HIT_MAX_LEN)) {
+    if (entCount >= 1 && text.length <= ENTERTAINMENT_SINGLE_HIT_MAX_LEN) {
       return { prediction: 'noise', confidence: 0.80, reason: 'entertainment', source: 'prefilter' };
     }
 

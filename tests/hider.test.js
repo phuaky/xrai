@@ -140,6 +140,37 @@ describe('XraiHider', () => {
     });
   });
 
+  describe('memory-aware collapse', () => {
+    it('shows a labeled one-click reveal button without removing the tweet', () => {
+      const el = createMockElement();
+      let revealed = 0;
+      XraiHider.collapseMemory(el, 'familiar repeat', () => { revealed++; });
+
+      expect(el.getAttribute('data-xrai-memory-collapsed')).toBe('familiar repeat');
+      expect(el.getAttribute('aria-expanded')).toBe('false');
+      expect(el.style.display).not.toBe('none');
+      const button = el.querySelector('.xrai-memory-reveal-btn');
+      expect(button.textContent).toBe('familiar repeat — show');
+
+      button.click();
+      expect(el.hasAttribute('data-xrai-memory-collapsed')).toBe(false);
+      expect(el.querySelector('.xrai-memory-reveal-btn')).toBeNull();
+      expect(el.textContent).toContain('Tweet content');
+      expect(revealed).toBe(1);
+    });
+
+    it('does not create duplicate reveal controls and show cleans it up', () => {
+      const el = createMockElement();
+      XraiHider.collapseMemory(el, 'familiar repeat');
+      XraiHider.collapseMemory(el, 'value-free funnel');
+      expect(el.querySelectorAll('.xrai-memory-reveal-btn')).toHaveLength(1);
+
+      XraiHider.show(el);
+      expect(el.hasAttribute('data-xrai-memory-collapsed')).toBe(false);
+      expect(el.querySelector('.xrai-memory-reveal-btn')).toBeNull();
+    });
+  });
+
   describe('skip already hidden', () => {
     it('does not double-hide an element', () => {
       const el = createMockElement();

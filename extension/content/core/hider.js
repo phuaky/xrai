@@ -108,10 +108,49 @@ var RaiHider = (function () {
     }
   }
 
+  function revealMemory(element) {
+    if (!element || !element.hasAttribute('data-xrai-memory-collapsed')) return;
+    element.removeAttribute('data-xrai-memory-collapsed');
+    element.removeAttribute('aria-expanded');
+    if (element._xraiMemoryBtn) {
+      element._xraiMemoryBtn.remove();
+      delete element._xraiMemoryBtn;
+    }
+    var onReveal = element._xraiMemoryReveal;
+    delete element._xraiMemoryReveal;
+    if (onReveal) {
+      try { onReveal(); } catch (e) { /* the tweet is already revealed */ }
+    }
+  }
+
+  function collapseMemory(element, label, onReveal) {
+    if (!element || element.hasAttribute('data-xrai-memory-collapsed')) return false;
+    var text = String(label || 'familiar signal');
+    element.setAttribute('data-xrai-memory-collapsed', text);
+    element.setAttribute('aria-expanded', 'false');
+
+    var button = document.createElement('button');
+    button.className = 'xrai-memory-reveal-btn';
+    button.type = 'button';
+    button.textContent = text + ' — show';
+    button.setAttribute('aria-label', text + '. Show tweet');
+    button.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      revealMemory(element);
+    });
+    element.appendChild(button);
+    element._xraiMemoryBtn = button;
+    element._xraiMemoryReveal = onReveal;
+    return true;
+  }
+
   function show(element) {
     if (!element) return;
     element.removeAttribute('data-xrai-hidden');
     element.removeAttribute('data-xrai-expanded');
+    element.removeAttribute('data-xrai-memory-collapsed');
+    element.removeAttribute('aria-expanded');
 
     element.style.display = '';
     element.style.height = '';
@@ -130,6 +169,11 @@ var RaiHider = (function () {
       element._xraiPeekBtn.remove();
       delete element._xraiPeekBtn;
     }
+    if (element._xraiMemoryBtn) {
+      element._xraiMemoryBtn.remove();
+      delete element._xraiMemoryBtn;
+    }
+    delete element._xraiMemoryReveal;
     if (element._xraiBlurLabel) {
       element._xraiBlurLabel.remove();
       delete element._xraiBlurLabel;
@@ -195,6 +239,8 @@ var RaiHider = (function () {
     unblurPending: unblurPending,
     hide: hide,
     show: show,
+    collapseMemory: collapseMemory,
+    revealMemory: revealMemory,
     addKeepLabel: addKeepLabel,
     addSignalLabel: addKeepLabel, // back-compat alias
     addImageLabelButtons: addImageLabelButtons

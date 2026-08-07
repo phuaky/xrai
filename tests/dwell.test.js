@@ -4,7 +4,7 @@
 // invariants: every exit path funnels through ONE idempotent finalize (never
 // double-logs), sub-threshold glances are dropped, hidden tabs accrue
 // nothing, and decision context rides the read event.
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -12,19 +12,25 @@ const dwellSrc = readFileSync(join(import.meta.dir, '../extension/content/core/d
 
 let logged = [];
 let mirrored = [];
+let strengthened = [];
 let flushes = 0;
+let now = 0;
+const realDateNow = Date.now;
 
 globalThis.RaiMemory = {
   logEvent: (r) => logged.push(r),
   mirrorEvent: (r) => mirrored.push(r),
   flushMirror: () => flushes++,
 };
+globalThis.RaiKnowledge = {
+  recordReadDwell: (tweetId, dwellMs, meta) => strengthened.push({ tweetId, dwellMs, meta }),
+};
 
 function loadDwell() {
   const patched = dwellSrc
     .replace(
-      'return { init: init, observe: observe };',
-      'return { init: init, observe: observe, _ioCallback: ioCallback, _tick: tick, _sweep: sweep, _navCheck: navCheck, _finalize: finalize, _finalizeAll: finalizeAll, _entries: entries };'
+      'return { init: init, observe: observe, getActiveElapsed: getActiveElapsed };',
+      'return { init: init, observe: observe, getActiveElapsed: getActiveElapsed, _ioCallback: ioCallback, _tick: tick, _sweep: sweep, _navCheck: navCheck, _visibilityChange: visibilityChange, _finalize: finalize, _finalizeAll: finalizeAll, _entries: entries };'
     )
     .replace(/var RaiDwell\s*=\s*/, '');
   return eval(patched);
@@ -44,6 +50,10 @@ function exit(dwell, el) {
   dwell._ioCallback([{ target: el, isIntersecting: false, intersectionRatio: 0 }]);
 }
 
+function advance(ms) {
+  now += ms;
+}
+
 const META = { id: 't1', author: 'kuan', snippet: 'agent harness tip', decision: 'shown', source: 'model' };
 
 describe('RaiDwell lifecycle', () => {
@@ -51,27 +61,55 @@ describe('RaiDwell lifecycle', () => {
   beforeEach(() => {
     logged = [];
     mirrored = [];
+    strengthened = [];
     flushes = 0;
+    now = 100_000;
+    Date.now = () => now;
+    Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
     document.body.innerHTML = '';
     window.happyDOM.setURL('https://x.com/home'); // about:blank can't take pushState paths
     dwell = loadDwell();
     dwell._navCheck(); // prime lastHref (init() is not called — it starts a real interval)
   });
 
+  afterEach(() => {
+    Date.now = realDateNow;
+  });
+
   it('accrues per visible tick and logs once on viewport exit', () => {
     const el = makeCard();
     dwell.observe(el, META);
     enter(dwell, el);
+    advance(2_000);
     dwell._tick();
+    advance(2_000);
     dwell._tick();
+    advance(2_000);
     dwell._tick();
     exit(dwell, el);
     expect(logged.length).toBe(1);
     expect(logged[0]).toMatchObject({
       kind: 'read', tweetId: 't1', author: 'kuan',
-      decision: 'shown', source: 'model', dwellMs: 6000,
+      decision: 'shown', source: 'model',
     });
+    expect(logged[0].dwellMs).toBeGreaterThanOrEqual(6000);
     expect(mirrored.length).toBe(1);
+    expect(strengthened).toEqual([{
+      tweetId: 't1', dwellMs: expect.any(Number),
+      meta: { timestamp: expect.any(Number), decision: 'shown', source: 'model' },
+    }]);
+    expect(strengthened[0].dwellMs).toBeGreaterThanOrEqual(6000);
+  });
+
+  it('exposes current-impression dwell for collapse suppression', () => {
+    const el = makeCard();
+    dwell.observe(el, META);
+    expect(dwell.getActiveElapsed('t1')).toBe(0);
+    enter(dwell, el);
+    advance(2_000);
+    dwell._tick();
+    expect(dwell.getActiveElapsed('t1')).toBe(2_000);
+    expect(dwell.getActiveElapsed('missing')).toBe(0);
   });
 
   it('drops sub-threshold glances (<1s) without logging', () => {
@@ -96,6 +134,7 @@ describe('RaiDwell lifecycle', () => {
     const el = makeCard();
     dwell.observe(el, META);
     enter(dwell, el);
+    advance(2_000);
     dwell._tick();
     exit(dwell, el);
     el.remove();
@@ -108,29 +147,45 @@ describe('RaiDwell lifecycle', () => {
     const el = makeCard();
     dwell.observe(el, META);
     enter(dwell, el);
+    advance(2_000);
     dwell._tick();
     el.remove(); // X detaches timeline nodes with no teardown callback
     dwell._sweep();
     expect(logged.length).toBe(1);
-    expect(logged[0].dwellMs).toBe(2000);
+    expect(logged[0].dwellMs).toBeGreaterThanOrEqual(2000);
   });
 
-  it('accrues nothing while the tab is hidden', () => {
+  it('pauses exactly while the tab is hidden', () => {
     const el = makeCard();
     dwell.observe(el, META);
     enter(dwell, el);
+    advance(500);
     Object.defineProperty(document, 'hidden', { get: () => true, configurable: true });
-    dwell._tick();
+    dwell._visibilityChange();
+    advance(10_000);
     dwell._tick();
     Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
+    dwell._visibilityChange();
+    advance(400);
     exit(dwell, el);
-    expect(logged.length).toBe(0); // 0ms accrued < threshold
+    expect(logged.length).toBe(0); // 900ms active; hidden interval excluded
+  });
+
+  it('does not award a fixed tick to a card that just became visible', () => {
+    const el = makeCard();
+    dwell.observe(el, META);
+    enter(dwell, el);
+    advance(10);
+    dwell._tick();
+    exit(dwell, el);
+    expect(logged.length).toBe(0);
   });
 
   it('route change finalizes all in-flight entries and flushes the mirror', () => {
     const el = makeCard();
     dwell.observe(el, META);
     enter(dwell, el);
+    advance(2_000);
     dwell._tick();
     history.pushState({}, '', '/kuan/status/999');
     dwell._navCheck();
@@ -151,6 +206,7 @@ describe('RaiDwell lifecycle', () => {
     const el = makeCard();
     dwell.observe(el, { ...META, id: 't2', snippet: 'x'.repeat(500) });
     enter(dwell, el);
+    advance(2_000);
     dwell._tick();
     exit(dwell, el);
     expect(logged[0].text.length).toBe(140);

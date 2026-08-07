@@ -10,8 +10,8 @@
  * - Re-reads within one page load are lost: the X detector's `processed` set
  *   never re-emits a tweetId, so a card scrolled away and back never
  *   re-registers. Undercount, never double-count.
- * - Time accrues in fixed 2s ticks (the shorts.js pattern), so each entry's
- *   dwell is accurate to ~±2s.
+ * - A 2s sweep detects detached cards and SPA route changes. Dwell itself uses
+ *   active wall-clock intervals, pausing exactly while the tab is hidden.
  */
 var RaiDwell = (function () {
   'use strict';
@@ -21,7 +21,7 @@ var RaiDwell = (function () {
   var VISIBLE_RATIO = 0.5;    // half the card on screen counts as "looking at it"
 
   var platform = 'x';
-  var entries = new Map();    // id -> {el, id, author, snippet, decision, source, dwellMs, visible}
+  var entries = new Map();    // id -> {..., dwellMs, visible, activeStartedAt}
   var io = null;
   var timer = null;
   var lastHref = null;
@@ -39,6 +39,7 @@ var RaiDwell = (function () {
       io = new IntersectionObserver(ioCallback, { threshold: VISIBLE_RATIO });
     }
     timer = setInterval(tick, TICK_MS);
+    document.addEventListener('visibilitychange', visibilityChange);
     window.addEventListener('beforeunload', finalizeAll);
   }
 
@@ -55,7 +56,8 @@ var RaiDwell = (function () {
       decision: meta.decision,
       source: meta.source,
       dwellMs: 0,
-      visible: false
+      visible: false,
+      activeStartedAt: 0
     });
     if (io) io.observe(el);
   }
@@ -67,7 +69,10 @@ var RaiDwell = (function () {
       var entry = id && entries.get(id);
       if (!entry) continue;
       if (e.isIntersecting && e.intersectionRatio >= VISIBLE_RATIO) {
-        entry.visible = true;
+        if (!entry.visible) {
+          entry.visible = true;
+          if (!document.hidden) entry.activeStartedAt = Date.now();
+        }
       } else if (entry.visible) {
         // True exit after having been seen. (The initial below-the-fold
         // notification arrives with visible=false — keep waiting, don't drop.)
@@ -76,14 +81,38 @@ var RaiDwell = (function () {
     }
   }
 
+  function activeElapsed(entry) {
+    if (!entry) return 0;
+    var active = entry.visible && !document.hidden && entry.activeStartedAt
+      ? Math.max(0, Date.now() - entry.activeStartedAt)
+      : 0;
+    return entry.dwellMs + active;
+  }
+
+  function visibilityChange() {
+    var now = Date.now();
+    entries.forEach(function (entry) {
+      if (!entry.visible) return;
+      if (document.hidden) {
+        if (entry.activeStartedAt) {
+          entry.dwellMs += Math.max(0, now - entry.activeStartedAt);
+          entry.activeStartedAt = 0;
+        }
+      } else if (!entry.activeStartedAt) {
+        entry.activeStartedAt = now;
+      }
+    });
+  }
+
   // Every exit path funnels through finalize; map-delete-first makes it
   // idempotent, so IO-exit / sweep / nav / unload can never double-log.
   function finalize(id) {
     var entry = entries.get(id);
     if (!entry) return;
+    var elapsed = activeElapsed(entry);
     entries.delete(id);
     if (io) io.unobserve(entry.el);
-    if (entry.dwellMs < MIN_DWELL_MS) return;
+    if (elapsed < MIN_DWELL_MS) return;
     var record = {
       platform: platform,
       kind: 'read',
@@ -92,12 +121,23 @@ var RaiDwell = (function () {
       text: entry.snippet,
       decision: entry.decision,
       source: entry.source,
-      dwellMs: entry.dwellMs,
+      dwellMs: elapsed,
       date: todayStr(),
       url: window.location.pathname
     };
     if (typeof RaiMemory !== 'undefined' && RaiMemory.logEvent) RaiMemory.logEvent(record);
     if (typeof RaiMemory !== 'undefined' && RaiMemory.mirrorEvent) RaiMemory.mirrorEvent(record);
+    if (typeof RaiKnowledge !== 'undefined' && RaiKnowledge.recordReadDwell) {
+      try {
+        Promise.resolve(RaiKnowledge.recordReadDwell(entry.id, elapsed, {
+          timestamp: Date.now(), decision: entry.decision, source: entry.source
+        })).catch(function () {});
+      } catch (e) { /* knowledge projection must not affect attention logging */ }
+    }
+  }
+
+  function getActiveElapsed(id) {
+    return activeElapsed(entries.get(id));
   }
 
   function finalizeAll() {
@@ -125,13 +165,9 @@ var RaiDwell = (function () {
   }
 
   function tick() {
-    if (document.hidden) return;
     navCheck();
     sweep();
-    entries.forEach(function (entry) {
-      if (entry.visible) entry.dwellMs += TICK_MS;
-    });
   }
 
-  return { init: init, observe: observe };
+  return { init: init, observe: observe, getActiveElapsed: getActiveElapsed };
 })();

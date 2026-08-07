@@ -402,19 +402,28 @@ const RaiMemory = (function () {
   }
 
   function clearAll() {
-    return new Promise(function (resolve) {
-      // Key removal fires storage.onChanged, so every open tab's pill zeroes
-      // too (the old per-tab copies used to resurrect cleared totals on their
-      // next flush).
-      try {
-        chrome.storage.local.remove([statsKey(), timeKey()]);
-      } catch (e) { /* orphaned tab (extension reloaded) — nothing to clear from here */ }
-      _statsFailQueue = null;
+    // Key removal fires storage.onChanged, so every open tab's pill zeroes too.
+    // Append-only source events are deliberately preserved; only fingerprints
+    // and the derived knowledge/index stores are user-clearable memory.
+    try {
+      chrome.storage.local.remove([statsKey(), timeKey()]);
+    } catch (e) { /* orphaned tab (extension reloaded) — nothing to clear from here */ }
+    _statsFailQueue = null;
+
+    var fingerprints = new Promise(function (resolve) {
       if (!db) { resolve(); return; }
-      var tx = db.transaction(STORE_NAME, 'readwrite');
-      tx.objectStore(STORE_NAME).clear();
-      tx.oncomplete = function () { resolve(); };
-      tx.onerror = function () { resolve(); };
+      try {
+        var tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).clear();
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { resolve(); };
+      } catch (e) { resolve(); }
+    });
+
+    return fingerprints.then(function () {
+      if (_platformName !== 'x' || typeof RaiKnowledge === 'undefined' || !RaiKnowledge.clear) return;
+      try { return Promise.resolve(RaiKnowledge.clear()).catch(function () {}); }
+      catch (e) { /* derived knowledge clear is fail-soft */ }
     });
   }
 

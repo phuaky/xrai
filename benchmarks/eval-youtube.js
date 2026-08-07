@@ -45,7 +45,12 @@ async function classify(model, item, worker) {
       ],
       stream: false,
       think: false,
-      options: { temperature: 0.1, num_predict: 40 }, // mirror classifyYoutube exactly
+      keep_alive: worker.TEXT_KEEP_ALIVE,
+      options: {
+        temperature: 0.1,
+        num_predict: 40,
+        num_ctx: worker.TEXT_NUM_CTX,
+      },
     }),
   });
   const data = await res.json();

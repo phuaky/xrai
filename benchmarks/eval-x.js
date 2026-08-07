@@ -19,6 +19,7 @@
 //   node benchmarks/eval-x.js --bless    # run + write new baseline
 //   node benchmarks/eval-x.js --limit 10 # smoke run (no gate, no bless)
 //   node benchmarks/eval-x.js --model X  # override model
+//   node benchmarks/eval-x.js --golden X # replay a separate judged eval set
 //
 // Exit codes: 0 = pass, 1 = regression vs baseline, 2 = setup error.
 
@@ -48,7 +49,12 @@ async function classify(model, item, worker) {
       ],
       stream: false,
       think: false,
-      options: { temperature: 0.1, num_predict: 80 }, // mirror classifyX exactly
+      keep_alive: worker.TEXT_KEEP_ALIVE,
+      options: {
+        temperature: 0.1,
+        num_predict: 80,
+        num_ctx: worker.TEXT_NUM_CTX,
+      },
     }),
   });
   const data = await res.json();
@@ -66,8 +72,12 @@ async function main() {
   const limitIdx = args.indexOf('--limit');
   const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : null;
   const modelIdx = args.indexOf('--model');
+  const goldenIdx = args.indexOf('--golden');
+  const customGoldenPath = goldenIdx !== -1 ? path.resolve(args[goldenIdx + 1]) : null;
 
-  const golden = L.loadGolden();
+  const golden = customGoldenPath
+    ? JSON.parse(fs.readFileSync(customGoldenPath, 'utf8'))
+    : L.loadGolden();
   const prefilter = L.loadPrefilter();
   const worker = L.loadWorker();
   const defaults = L.loadConfigDefaults().x;
@@ -91,6 +101,7 @@ async function main() {
 
   const items = limit ? golden.items.slice(0, limit) : golden.items;
   console.log(`eval-x: ${items.length} items | model=${model} | threshold=${threshold} | prompt=${promptSha} | prefilter=${prefilterSha}\n`);
+  if (customGoldenPath) console.log(`custom golden: ${customGoldenPath}\n`);
 
   // Warm up
   await classify(model, items[0], worker);
@@ -183,6 +194,12 @@ async function main() {
 
   if (limit) {
     console.log('  (smoke run — no gate, no bless)');
+    return;
+  }
+
+  if (customGoldenPath) {
+    if (bless) throw new Error('--bless cannot be used with --golden');
+    console.log('  (custom golden run — no canonical baseline gate)');
     return;
   }
 

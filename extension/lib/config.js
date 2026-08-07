@@ -18,14 +18,17 @@ var RaiConfig = (function () {
       // durable decision log now, not live corrections ('blur' + peek is
       // still selectable in settings).
       hideMethod: 'remove',
-      configVersion: 2,
+      configVersion: 3,
       memoryRetentionDays: 30,
       maxModelCallsPerMinute: 100,
       batchSize: 5,
       batchFlushDelay: 2000,
       // Image bait check — gates image-bearing signal tweets behind a vision
       // model before reveal (blur first, same as YouTube). See CLAUDE.md.
-      imageBaitEnabled: true,
+      // Paused by default after 1,626 live checks produced zero bait verdicts
+      // at p50 4.8s / p95 16.0s. It remains available as an opt-in control
+      // while labeled image data accumulates.
+      imageBaitEnabled: false,
       imageModel: 'qwen3-vl:30b',
       imageConfidenceThreshold: 0.6,
       // Hop nudge — cross-platform X ↔ YouTube doom-loop detector (worker
@@ -39,6 +42,10 @@ var RaiConfig = (function () {
       replyGuard: true,
       ownHandle: 'phuakuanyu',
       replyConfidenceThreshold: 0.7,
+      // Post-reveal semantic-memory pass. Stage 1 remains authoritative; this
+      // can only request a reversible collapse after the tweet is visible.
+      memoryAware: true,
+      memoryConfidenceThreshold: 0.75,
       // Cloud mode — routes classification through the hosted endpoint
       // instead of local Ollama, for users who skip local setup. Free
       // while in beta, opt-in, off by default. See background/worker.js.
@@ -46,6 +53,7 @@ var RaiConfig = (function () {
       cloudApiKey: ''
     },
     youtube: {
+      configVersion: 1,
       model: 'gemma2:2b',
       ollamaUrl: 'http://localhost:11434',
       confidenceThreshold: 0.6,
@@ -56,7 +64,7 @@ var RaiConfig = (function () {
       // Image bait check — gates music/motivational thumbnails behind a
       // vision model before reveal, to catch bait thumbnails on titles that
       // would otherwise pass the text classifier.
-      imageBaitEnabled: true,
+      imageBaitEnabled: false,
       imageModel: 'qwen3-vl:30b',
       imageConfidenceThreshold: 0.6,
       // Shorts consumption tracker + gentle doom-scroll nudge
@@ -73,6 +81,14 @@ var RaiConfig = (function () {
   };
 
   var cache = {}; // platform -> config object
+  var listeners = {}; // platform -> config change listeners in this content world
+
+  function notify(platform) {
+    var snapshot = Object.assign({}, cache[platform] || defaultsFor(platform));
+    (listeners[platform] || []).forEach(function (listener) {
+      try { listener(snapshot); } catch (e) { /* config saved even if a listener fails */ }
+    });
+  }
 
   function keyFor(platform) {
     return (PREFIX[platform] || 'xrai') + '_config';
@@ -119,6 +135,14 @@ var RaiConfig = (function () {
           if (platform === 'x' && !stored.configVersion && stored.hideMethod === 'blur') {
             stored.hideMethod = 'remove';
             stored.configVersion = 2;
+          }
+          // Aug 2026: pause the unevaluated 30B vision gate after live
+          // telemetry showed multi-second waits and no positive catches.
+          // A deliberate re-enable after this one-time migration sticks.
+          var currentVersion = defaultsFor(platform).configVersion || 0;
+          if ((stored.configVersion || 0) < currentVersion) {
+            stored.imageBaitEnabled = false;
+            stored.configVersion = currentVersion;
             var migrated = {};
             migrated[keyFor(platform)] = stored;
             safeSet(migrated);
@@ -141,9 +165,11 @@ var RaiConfig = (function () {
         var obj = {};
         obj[keyFor(platform)] = cache[platform];
         safeSet(obj, function () {
+          notify(platform);
           resolve(Object.assign({}, cache[platform]));
         });
       } else {
+        notify(platform);
         resolve(Object.assign({}, cache[platform]));
       }
     });
@@ -155,6 +181,7 @@ var RaiConfig = (function () {
     return new Promise(function (resolve) {
       function toDefaults() {
         cache[platform] = Object.assign({}, defaultsFor(platform));
+        notify(platform);
         resolve(Object.assign({}, cache[platform]));
       }
       if (hasStorage()) {
@@ -169,10 +196,22 @@ var RaiConfig = (function () {
     });
   }
 
+  function onChanged(platform, listener) {
+    platform = platform || 'x';
+    if (typeof listener !== 'function') return function () {};
+    if (!listeners[platform]) listeners[platform] = [];
+    listeners[platform].push(listener);
+    return function () {
+      var index = listeners[platform].indexOf(listener);
+      if (index !== -1) listeners[platform].splice(index, 1);
+    };
+  }
+
   return {
     DEFAULTS: DEFAULTS,
     getConfig: getConfig,
     saveConfig: saveConfig,
-    resetConfig: resetConfig
+    resetConfig: resetConfig,
+    onChanged: onChanged
   };
 })();

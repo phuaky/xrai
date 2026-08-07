@@ -43,6 +43,12 @@ function loadHops() {
   return new Function(src + '\nreturn RaiHops;')();
 }
 
+// XraiMemoryPass policy — pure IIFE when run without the browser-only run() path
+function loadMemoryPass() {
+  const src = loadSource('extension/content/x/memorypass.js');
+  return new Function(src + '\nreturn XraiMemoryPass;')();
+}
+
 // Prompts + parsers from the service worker (chrome stubbed)
 function loadWorker() {
   const src = loadSource('extension/background/worker.js');
@@ -54,8 +60,30 @@ function loadWorker() {
     'chrome',
     src +
       '\nreturn { X_CLASSIFY_SYSTEM: X_CLASSIFY_SYSTEM, parseXClassification: parseXClassification, ' +
-      'X_REPLY_SYSTEM: X_REPLY_SYSTEM, parseReplyClassification: parseReplyClassification, ' +
-      'YT_CLASSIFY_SYSTEM: YT_CLASSIFY_SYSTEM, parseYoutubeClassification: parseYoutubeClassification };'
+      'classifyX: classifyX, X_REPLY_SYSTEM: X_REPLY_SYSTEM, ' +
+      'parseReplyClassification: parseReplyClassification, ' +
+      'X_MEMORY_SYSTEM: X_MEMORY_SYSTEM, X_MEMORY_NOVELTY_SYSTEM: X_MEMORY_NOVELTY_SYSTEM, ' +
+      'X_MEMORY_HIGH_OVERLAP_SYSTEM: X_MEMORY_HIGH_OVERLAP_SYSTEM, ' +
+      'X_MEMORY_UPDATE_RECHECK_SYSTEM: X_MEMORY_UPDATE_RECHECK_SYSTEM, ' +
+      'X_MEMORY_UPDATE_CONFIRM_SYSTEM: X_MEMORY_UPDATE_CONFIRM_SYSTEM, ' +
+      'X_MEMORY_LAUNCH_REPEAT_SYSTEM: X_MEMORY_LAUNCH_REPEAT_SYSTEM, ' +
+      'X_MEMORY_COLLAPSE_GUARD_AI_SYSTEM: X_MEMORY_COLLAPSE_GUARD_AI_SYSTEM, ' +
+      'X_MEMORY_COLLAPSE_GUARD_NS_SYSTEM: X_MEMORY_COLLAPSE_GUARD_NS_SYSTEM, ' +
+      'X_MEMORY_COLLAPSE_GUARD_EVENT_SYSTEM: X_MEMORY_COLLAPSE_GUARD_EVENT_SYSTEM, ' +
+      'X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM: X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM, ' +
+      'X_MEMORY_IMPORTANCE_SYSTEM: X_MEMORY_IMPORTANCE_SYSTEM, ' +
+      'parseMemoryNovelty: parseMemoryNovelty, parseMemoryImportance: parseMemoryImportance, ' +
+      'parseMemoryClassification: parseMemoryClassification, ' +
+      'buildMemoryUserMessage: buildMemoryUserMessage, ' +
+      'buildMemoryImportanceUserMessage: buildMemoryImportanceUserMessage, ' +
+      'buildMemoryNoveltyUserMessage: buildMemoryNoveltyUserMessage, ' +
+      'classifyMemory: classifyMemory, scheduleMemoryClassification: scheduleMemoryClassification, ' +
+      'embedLocal: embedLocal, YT_CLASSIFY_SYSTEM: YT_CLASSIFY_SYSTEM, ' +
+      'parseYoutubeClassification: parseYoutubeClassification, ' +
+      'TEXT_KEEP_ALIVE: TEXT_KEEP_ALIVE, TEXT_NUM_CTX: TEXT_NUM_CTX, ' +
+      'MEMORY_MAX_CONTEXTS: MEMORY_MAX_CONTEXTS, ' +
+      'MEMORY_HIGH_SIMILARITY_THRESHOLD: MEMORY_HIGH_SIMILARITY_THRESHOLD, ' +
+      'scheduleLocalText: scheduleLocalText, scheduleMemoryText: scheduleMemoryText };'
   )(chromeStub);
 }
 
@@ -89,7 +117,7 @@ function toPrefilterData(item) {
 
 // Golden item → the exact user message classifyX() sends to Ollama
 function toUserMessage(item) {
-  let msg = 'Tweet: "' + (item.text || '') + '"';
+  let msg = 'Tweet' + (item.author ? ' by @' + item.author : '') + ': "' + (item.text || '') + '"';
   if (item.media && item.media !== 'text') msg += ' [has ' + item.media + ']';
   return msg;
 }
@@ -186,6 +214,7 @@ module.exports = {
   loadPrefilter,
   loadYoutubePrefilter,
   loadHops,
+  loadMemoryPass,
   loadTips,
   loadReplyRoute,
   loadWorker,

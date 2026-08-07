@@ -5,41 +5,65 @@ Filter your feeds with local AI. One Chrome extension, two platforms:
 - **X / Twitter** — noise disappears, signal stays.
 - **YouTube** — everything blurs except **music** and **motivational** videos.
 
-**Everything runs on your machine.** No cloud APIs. No accounts. No data leaves your computer.
+**Local-first by default.** Ollama handles inference on your machine with no account required. Optional cloud mode routes text classification through `api.snratio.xyz` only when explicitly enabled; X semantic memory, embeddings, and contextual filtering remain local.
 
 ## What it does
 
-**On X:** classifies every tweet as **signal** (worth reading) or **noise** (skip) using a local AI model via [Ollama](https://ollama.ai). Noise tweets are hidden instantly. Signal tweets with a photo get one more check — a vision model screens for thirst-trap/bait imagery before the tweet reveals (see [Image bait check](#image-bait-check)). For signal tweets worth replying to, rai generates reply suggestions you **copy-paste manually** — zero automation.
+**On X:** stage 1 classifies every tweet as **signal** (worth reading) or **noise** (skip). Noise disappears immediately. Signal appears immediately, then an asynchronous memory pass compares it with up to five locally stored tweets and quietly collapses strong-known repeats or value-free funnels. New information, meaningful updates, critical content, weakly known matches, and low-confidence verdicts always stay visible. Every contextual collapse has a one-click reveal.
 
-**On YouTube:** classifies every video by its **title + channel** as `music`, `motivational`, or `other`, and **blurs everything that isn't music or motivational**. For when you open YouTube to listen to music but keep getting pulled into videos. Music/motivational thumbnails get the same vision-model bait check as X before they reveal. Hit "👁 Show" on any blurred card to reveal it.
+On your own X status pages, the **reply guard** blurs high-confidence hostile, bot, or spam replies while leaving criticism and disagreement visible. The optional vision check can screen photos for thirst-trap/bait imagery, but it remains off by default while a labeled image eval set is built.
+
+**On YouTube:** classifies every video by its **title + channel** as `music`, `motivational`, or `other`, and **blurs everything that isn't music or motivational**. For when you open YouTube to listen to music but keep getting pulled into videos. The optional vision check can also screen thumbnails. Hit "👁 Show" on any blurred card to reveal it.
 
 ## How it works
 
 ```
 Tweet appears → Reply? (posts-only mode) → HIDE
                      ↓ not a reply
-              Has tech/AI keywords? → pass to AI (safelist)
-                     ↓ no
-              Obvious spam/bait? → HIDE (regex, instant)
-              Entertainment/video? → HIDE (prefilter)
+              Tech/AI safelist + deterministic noise prefilter
                      ↓ passes
-              Already classified? → apply cached result
-                     ↓ cache miss
-              Ollama AI (up to 5 concurrent) → signal or noise
+              Exact-result cache → otherwise stage-1 classifier
                      ↓
-              Noise (score 0-2/4) → HIDE
-              Signal (score 3-4/4), no photo → SHOW
-              Signal (score 3-4/4), has photo → blur, image bait check
-                     ↓
-              Bait image  → HIDE ("AI: bait image")
-              Clean image → SHOW
+              Noise → REMOVE
+              Signal → SHOW immediately
+                          ↓ asynchronous, local-only
+                   Embed current tweet
+                          ↓
+                Retrieve top 5 local memories
+                          ↓
+             Focused novelty / importance checks
+                          ↓
+                 Strict six-field verdict
+                          ↓
+                Deterministic action policy
+                   ↙                   ↘
+                SHOW          reversible COLLAPSE
 ```
 
-**4-dimension scoring** (each 0 or 1):
-- **Novelty** — New info or recycled take?
+When the optional image-bait check is enabled, a photo or thumbnail must also pass the local vision gate before it reveals. The image gate is disabled by default.
+
+**Stage-1 scoring** (each dimension is 0 or 1):
+- **Novelty** — New information or a recycled take?
 - **Specificity** — Concrete details or vague claims?
 - **Density** — High insight-to-word ratio?
 - **Authenticity** — Genuine sharing or engagement farming?
+
+## Memory-aware X filtering
+
+Stage 2 answers a different question from stage 1: not merely "is this good?", but "is this still worth your attention given what you have already seen?"
+
+- **Reveal first** — Stage-1-kept tweets render before memory work begins. The slower contextual pass never blocks the feed.
+- **Bounded local retrieval** — `all-minilm:latest` embeds the current tweet and retrieves at most five similar records from the separate local `xrai_knowledge` IndexedDB database. The full history is never put into a runtime prompt.
+- **Evidence-based familiarity** — A prior tweet is `strong` knowledge only after at least 1,000ms of active dwell or an exact direct status-page open. Merely showing a tweet is weak evidence; hidden content does not become known.
+- **Model judges meaning, code decides action** — The production X model returns only `importance`, `novelty`, `funnelRisk`, `standaloneValue`, `confidence`, and `reason`. Deterministic policy code computes `knownState` and the final `show`/`collapse` action.
+- **Conservative collapse** — Critical content, new signals, meaningful updates, low-confidence verdicts, and matches supported only by weak/unknown exposure always show. Strong-known repeats and reinforcements, plus non-critical value-free funnels, may collapse.
+- **Recoverable and interruptible** — Every collapse has a one-click reveal. A late collapse is suppressed after 1,000ms of active dwell, and the **Collapse familiar posts** setting is a live rollback toggle.
+- **Fail-open** — Storage, embedding, retrieval, messaging, timeout, model, or parser failures leave the tweet visible.
+- **Local even in cloud mode** — Optional cloud mode can handle stage-1 text classification, but embeddings and all memory-aware classification still use local Ollama.
+
+The prompt suite was evaluated offline against 5,229 real X records and 102 disjoint chronological scenarios, judged with GPT-5.6 Luna at high reasoning. Luna is evaluation tooling only: it is never called by the extension at runtime. The production sequence gate passed with 100% critical-signal recall, 96.36% show retention, 82.22% strong-known collapse recall, and a 3.64% false-collapse rate.
+
+**Historical-memory note:** `benchmarks/seed-memory-x.js` currently verifies complete and idempotent import in an isolated IndexedDB. It does not backfill the installed Chrome profile's live `xrai_knowledge` database, so after reloading the extension, live semantic memory grows from newly processed tweets.
 
 ## YouTube: music-only mode
 
@@ -51,7 +75,7 @@ Video card appears (home / subscriptions / watch sidebar)
         ↓ not obvious
   Blur immediately → Ollama classifies title+channel
         ↓
-  music / motivational → image bait check (thumbnail)
+  music / motivational → SHOW, or image bait check when enabled
         ↓                        ↓
   other → stays BLURRED    bait → stays BLURRED ("AI: bait-thumbnail")
   ("👁 Show" to peek)       clean → SHOW (♪ music / 💪 motivation badge)
@@ -64,7 +88,7 @@ Video card appears (home / subscriptions / watch sidebar)
 
 ## Image bait check
 
-Photos on X and thumbnails on YouTube get one more gate before they reveal: a
+When enabled, photos on X and thumbnails on YouTube get one more gate before they reveal: a
 local vision model ([`qwen3-vl:30b`](https://ollama.com/library/qwen3-vl), a
 MoE model — ~19GB resident but faster once warm than the smaller dense
 variants) screens for thirst-trap/bait imagery — sexualized framing used to
@@ -78,9 +102,12 @@ videos still get through.
   nothing on the common path.
 - Blur-then-reveal on both platforms — a bait image never flashes on screen
   while the model is still thinking.
-- Toggle: **Image bait check** in the ⚙ settings popup (on by default).
+- Toggle: **Image bait check** in the ⚙ settings popup (off by default).
   Model + confidence threshold: `imageModel` / `imageConfidenceThreshold` in
   config (default `qwen3-vl:30b` @ 0.6).
+- Live telemetry through August 5, 2026 found 1,626 checks, zero bait verdicts,
+  p50 4.8s, and p95 16.0s. The gate now fails open after 8 seconds and remains
+  opt-in until labels support a real accuracy eval.
 - **Golden-set labeling** — every image the check runs on gets two small
   buttons (🔞 bait / ✅ safe) so real examples accumulate from ordinary
   scrolling. Labels write to the same durable event log as everything else
@@ -100,19 +127,15 @@ videos still get through.
 
 Download from [ollama.ai](https://ollama.ai). On Mac, it sits in the menubar and auto-starts on login.
 
-### 2. Pull a model
+### 2. Pull the models
 
 ```bash
-ollama pull phi4-mini    # recommended: 92% accuracy, 518ms, 2.5GB — best accuracy
-ollama pull gemma2:2b    # backup: 88% accuracy, 231ms, 1.6GB — fastest
+ollama pull dhiltgen/gemma4:e2b-mlx-bf16  # X stage 1 + memory-aware verdicts
+ollama pull all-minilm:latest              # X semantic-memory embeddings
+ollama pull gemma2:2b                      # YouTube title + channel classifier
 ```
 
-**Benchmarked models** (89 real tweets, Apple Silicon):
-
-| Model | Accuracy | Speed | Size |
-|-------|----------|-------|------|
-| `phi4-mini` | **92%** | 518ms | 2.5 GB |
-| `gemma2:2b` | 88% | **231ms** | 1.6 GB |
+Optional image-bait filtering additionally requires `ollama pull qwen3-vl:30b`. The extension settings expose the active models, but changing a production model should be followed by its corresponding regression eval.
 
 ### 3. Load the extension
 
@@ -125,71 +148,60 @@ ollama pull gemma2:2b    # backup: 88% accuracy, 231ms, 1.6GB — fastest
 
 ### 4. Start the data collector (optional)
 
-The extension logs every classification. To save this data to your local machine for improving filters:
+Every decision is already written to a durable, append-only IndexedDB log in the browser. The collector adds a best-effort local JSONL mirror for analysis:
 
 ```bash
-node scripts/collector.js              # saves to data/classifications.jsonl
-node scripts/collector.js --improve    # also auto-runs improve script every 200 entries
+node scripts/collector.js              # listens on localhost:11435
+node scripts/collector.js --improve    # also analyzes every 200 new X decisions
 ```
 
-The collector runs on `localhost:11435`. The extension auto-sends every 100 classifications. If the collector isn't running, no problem — the extension works fine without it.
+The current streams are `data/events-x.jsonl`, `data/events-youtube.jsonl`, and `data/model-io.jsonl`. Events flush in small batches and on tab close. If the collector is unavailable, filtering and the browser's durable log continue normally.
 
 ## Features
 
-- **Local-first** — All AI runs on your machine via Ollama. No cloud, no API keys
-- **Tech-focused** — Tuned for AI engineers and entrepreneurs. Tech/AI tweets safelisted
-- **Result cache** — Scroll back up? Cached result applied instantly, no re-classification
-- **Pre-filter** — 11 regex categories catch obvious noise instantly: NSFW, spam, engagement bait, clickbait, entertainment, crypto pumps, short-video/image, ultra-short text
-- **Concurrent classification** — Up to 5 Ollama calls in parallel, every tweet gets classified
-- **Reply generation** — Copy-paste only, never auto-posts
-- **Rate limited** — 20 model calls/min max, debounced DOM observer
-- **Self-improving** — Classification data collected automatically, feeds into improvement pipeline
+- **Local-first** — Ollama is the default; cloud text classification is optional and explicit
+- **Memory-aware X filter** — Top-five semantic retrieval collapses only deterministic, high-confidence cases after reveal
+- **Tech-focused stage 1** — Tuned for AI engineers and entrepreneurs, with tech/AI safelisting
+- **Result cache** — Revisiting a card applies its exact cached result without another classification
+- **High-precision prefilters** — Obvious X noise and obvious YouTube keeps resolve instantly
+- **Low-latency scheduling** — Stage-1 work takes priority over the asynchronous memory queue
+- **Reply guard** — Bad-faith, bot, and spam replies on your own X threads blur with one-click peek
+- **Recoverable filtering** — Contextual X collapses and YouTube blurs always have a reveal control
+- **Fail-open runtime** — Local service, storage, parser, and messaging failures preserve content
+- **Attention ledger** — Records actual X dwell and foreground YouTube watch time, not merely impressions
+- **Workflow-tip ledger** — Captures actionable practices from X for later review
+- **Interruption nudges** — Detects X↔YouTube hopping and configurable YouTube Shorts binges
+- **Offline regression system** — Golden sets, live audits, sequence evals, and latency gates protect recall
 
-## Data Collection & Self-Improving Filters
+## Local data and evaluation
 
-xrai automatically logs every classification decision (tweet text, media type, prediction, confidence, source).
+Classification decisions, memory verdicts, dwell/watch events, peeks, tips, hops, and Shorts activity are stored locally. Use **⬇ Export log** in the extension settings to download a platform's full durable log. The optional collector mirrors those events into `data/` for CLI analysis.
 
-### Automatic pipeline
+The event log records whether a decision came from a deterministic prefilter or a model. Prompt studies should filter to `source: "model"`; cache replays are not re-logged.
 
-```bash
-# 1. Start the collector (runs alongside the extension)
-node scripts/collector.js --improve
-
-# 2. Browse x.com normally
-#    Extension auto-sends data every 100 tweets
-
-# 3. At 200 new entries, collector auto-runs improve analysis
-#    Output: patterns in misclassifications + suggested regex/prompt fixes
-```
-
-### Manual pipeline
+### Running tests, benchmarks, and audits
 
 ```bash
-# Export from Chrome DevTools console on x.com:
-chrome.storage.local.get('xrai_classifications', r => copy(JSON.stringify(r.xrai_classifications)))
+# Fast test suite
+bun test
 
-# Save to file and analyze:
-node scripts/improve.js classifications.json
+# Canonical production-pipeline regression gates (requires Ollama)
+bun run eval:x
+bun run eval:youtube
 
-# Pipe to Claude for AI-generated improvements:
-node scripts/improve.js classifications.json | claude -p
+# Memory novelty and full chronological-sequence gates
+bun run eval:x:memory-novelty
+bun run audit:x:corpus -- report \
+  --out data/luna-audit-x-gpt-5.6-luna
+
+# Burst latency on recent live X traffic
+bun run bench:x:live -- --since 2026-07-23 --sample 24
+
+# Prepare a stratified offline audit of recent decisions
+bun run audit:x -- prepare --since 2026-07-23
 ```
 
-### Data format
-
-Classifications stored as JSONL in `data/classifications.jsonl`:
-
-```json
-{"text":"Just shipped a feature...","mediaType":"text","prediction":"signal","confidence":0.92,"source":"model","timestamp":1743282000}
-{"text":"this is so good 😂","mediaType":"video","prediction":"noise","confidence":0.80,"source":"prefilter:short-video-non-tech","timestamp":1743282001}
-```
-
-### Running benchmarks
-
-```bash
-# Test model accuracy on 45 labeled tweets
-node benchmarks/benchmark.js
-```
+Changing the production prompt, prefilter, model, or confidence threshold requires its canonical eval. Bless a new baseline only for an intentional, reviewed behavior change.
 
 ## X Terms of Service
 
@@ -197,44 +209,46 @@ xrai is designed to comply with X's ToS:
 
 - **No API access** — Only reads DOM elements already rendered in your browser
 - **No automation** — Never clicks buttons, submits forms, or triggers actions
-- **No scraping** — Processes only tweets visible in your current session
-- **Replies are copy-paste** — Generated text is copied to clipboard, you paste manually
-- **CSS-only hiding** — Same mechanism as ad blockers
+- **No scraping** — Processes only posts and video cards already rendered in your current session
+- **No posting** — Never generates or sends replies, likes, follows, or other site actions
+- **CSS-only filtering** — Hides, blurs, or collapses existing DOM cards, like an ad blocker
 
 ## Project structure
 
 ```
-xrai/                          # repo (named for history; extension is "rai")
+xrai/                               # repo name is historical; extension is "rai"
 ├── extension/
-│   ├── manifest.json          # Chrome MV3 — 2 content_script blocks (x.com, youtube.com)
-│   ├── content/
-│   │   ├── core/              # SHARED across both platforms
-│   │   │   ├── classifier.js  # Concurrent queue (max 5) + result cache
-│   │   │   ├── image-classifier.js  # Small queue (max 2) for the image bait check
-│   │   │   ├── hider.js       # Hide/blur/collapse + peek/wrong/label buttons
-│   │   │   ├── indicator.js   # Status pill + per-platform settings
-│   │   │   └── styles.css
-│   │   ├── x/                 # X-specific
-│   │   │   ├── detector.js    # Tweet detection (MutationObserver)
-│   │   │   ├── prefilter.js   # Regex noise filter + tech safelist
-│   │   │   ├── reply.js       # Reply generation (copy-paste only)
-│   │   │   └── main.js        # Pipeline: hide noise, keep signal
-│   │   └── youtube/           # YouTube-specific
-│   │       ├── detector.js    # Video-card detection (recycle-aware)
-│   │       ├── prefilter.js   # Regex KEEP for obvious music/motivational
-│   │       └── main.js        # Inverted pipeline: blur all, reveal music
+│   ├── manifest.json               # Chrome MV3; X + YouTube content scripts
+│   ├── background/
+│   │   └── worker.js               # Platform-routed Ollama/cloud proxy + prompt suite
 │   ├── lib/
-│   │   ├── memory.js          # Per-platform stats/log + IndexedDB (RaiMemory)
-│   │   └── config.js          # Per-platform preferences (RaiConfig)
-│   └── background/
-│       └── worker.js          # Service worker — platform-routed Ollama proxy
+│   │   ├── config.js               # Per-platform preferences and migrations
+│   │   ├── memory.js               # Durable event ledger, stats, and collector mirror
+│   │   ├── knowledge.js            # X semantic-memory IndexedDB + top-five retrieval
+│   │   └── hops.js                 # Pure X↔YouTube loop detection
+│   └── content/
+│       ├── core/                    # Shared classifier, hider, indicator, dwell, nudges
+│       ├── x/
+│       │   ├── detector.js         # Tweet detection and SPA rescans
+│       │   ├── prefilter.js        # High-precision noise filter + reply prefilter
+│       │   ├── replyroute.js       # Own-thread reply-guard routing and immunity
+│       │   ├── memorypass.js       # Async retrieval, fail-open policy, dwell suppression
+│       │   └── main.js             # Stage 1 reveal + asynchronous memory pass
+│       └── youtube/                 # Feed filter, Shorts tracker, and watch ledger
 ├── scripts/
-│   ├── collector.js           # Local data collector (port 11435)
-│   └── improve.js             # Meta-learning analysis (X)
-├── benchmarks/benchmark.js    # X model speed/accuracy tests
-├── data/                      # Local classification data (gitignored)
-├── SPEC.md                    # Architecture spec (X)
-└── CLAUDE.md                  # Dev instructions for AI assistants
+│   ├── collector.js                # Optional local event mirror (port 11435)
+│   ├── digest.js                   # Daily attention digest
+│   └── tips.js                     # Workflow-tip ledger CLI
+├── benchmarks/
+│   ├── eval-x.js                   # Canonical X stage-1 regression gate
+│   ├── eval-memory-novelty-x.js    # Memory policy/prompt regression gate
+│   ├── full-corpus-audit-x.js      # Provenance-bound Luna + sequence evaluation
+│   ├── seed-memory-x.js            # Isolated historical-import verification
+│   └── bench-memory-pass-x.js      # End-to-end contextual-pass latency replay
+├── tests/                           # Bun + happy-dom regression suite
+├── data/                            # Local logs and audit artifacts (gitignored)
+├── ISA.md                           # 52/52 verified memory-filter ideal state
+└── CLAUDE.md                        # Repository operating instructions
 ```
 
 ## License

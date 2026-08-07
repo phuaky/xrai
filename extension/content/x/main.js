@@ -6,6 +6,7 @@ var XraiMain = (function () {
   var config = null;
   var ollamaAvailable = false;
   var offHomeLogged = Object.create(null);
+  var memoryProcessed = Object.create(null);
 
   // === Live activity — feeds the pill/panel and marks the card being judged ===
   // pendingEls maps tweetId -> element for cards awaiting a verdict; the
@@ -44,16 +45,48 @@ var XraiMain = (function () {
     return path === '/' || path === '/home' || path.indexOf('/home/') === 0;
   }
 
+  function directOpenStatusId() {
+    var match = window.location.pathname.match(/^\/[^/]+\/status\/(\d+)(?:\/|$)/);
+    return match ? match[1] : null;
+  }
+
+  function maybeRecordDirectOpen(data, text) {
+    var statusId = directOpenStatusId();
+    if (!statusId || String(data.id) !== statusId || typeof RaiKnowledge === 'undefined') return;
+    try {
+      Promise.resolve(RaiKnowledge.recordDirectOpen({
+        tweetId: data.id,
+        text: text || data.text || '',
+        author: data.author,
+        url: window.location.pathname,
+        timestamp: Date.now()
+      })).catch(function () {});
+    } catch (e) { /* direct-open memory must not affect rendering */ }
+  }
+
   function start() {
     console.log('[xrai] Starting...');
 
     RaiMemory.init(PLATFORM).catch(function (e) {
       console.warn('[xrai] Memory init error:', e);
     });
+    if (typeof RaiKnowledge !== 'undefined') {
+      RaiKnowledge.init()
+        .then(function () { return RaiKnowledge.pruneRetention(); })
+        .then(function () {
+          var retry = function () { RaiKnowledge.retryPendingEmbeddings(10).catch(function () {}); };
+          if (typeof requestIdleCallback === 'function') requestIdleCallback(retry, { timeout: 60000 });
+          else setTimeout(retry, 60000);
+        })
+        .catch(function (e) { console.warn('[xrai] Knowledge init error:', e); });
+    }
     RaiMemory.startSession();
 
     RaiConfig.getConfig(PLATFORM).then(function (cfg) {
       config = cfg;
+      if (RaiConfig.onChanged) {
+        RaiConfig.onChanged(PLATFORM, function (next) { config = next; });
+      }
       RaiClassifier.configure({ maxModelCallsPerMinute: cfg.maxModelCallsPerMinute, platform: PLATFORM });
       RaiImageClassifier.configure({ platform: PLATFORM });
 
@@ -198,7 +231,9 @@ var XraiMain = (function () {
       model: result && result._model,
       raw: result && result._raw,    // raw model output (model path only)
       ms: result && result._ms,
-      text: (text || data.text || '').substring(0, 500),
+      // Keep the complete expanded tweet for future audits. Older records
+      // were capped at 500 characters and cannot be reconstructed locally.
+      text: text || data.text || '',
       mediaType: data.mediaType,
       author: data.author,
       tweetId: data.id,
@@ -206,6 +241,44 @@ var XraiMain = (function () {
     };
     RaiMemory.logEvent(record);      // durable IDB log (source of truth); stamps record.ts
     RaiMemory.mirrorEvent(record);   // best-effort live copy → collector → data/events-x.jsonl
+    // Claim history is derived asynchronously after the stage-1 decision is
+    // committed. Embedding/storage failures cannot delay or alter that verdict.
+    if (typeof RaiKnowledge !== 'undefined' && record.text) {
+      try { Promise.resolve(RaiKnowledge.recordFeedDecision(record)).catch(function () {}); }
+      catch (e) { /* stage 1 remains authoritative */ }
+    }
+  }
+
+  // Stage 2 starts only after stage 1 has committed and revealed a kept tweet.
+  // Nothing here is awaited by the feed pipeline; every failure leaves it shown.
+  function runMemoryPass(el, data, text, source) {
+    if (!config || config.memoryAware === false || memoryProcessed[data.id]) return;
+    if (typeof XraiMemoryPass === 'undefined' || typeof RaiHider.collapseMemory !== 'function') return;
+    memoryProcessed[data.id] = true;
+
+    Promise.resolve().then(function () {
+      return XraiMemoryPass.run({
+        id: data.id,
+        text: text,
+        author: data.author,
+        truncated: data.truncated === true,
+        threshold: config.memoryConfidenceThreshold,
+        model: config.model,
+        stage1Source: source,
+        collapse: function (label, verdict) {
+          if (!el.isConnected || String(data.id) !== String(el.getAttribute('data-xrai-memory-id'))) return false;
+          return RaiHider.collapseMemory(el, label, function () {
+            var record = {
+              platform: 'x', kind: 'memory-reveal', tweetId: data.id,
+              label: label, novelty: verdict.novelty, author: data.author,
+              url: location.pathname
+            };
+            RaiMemory.logEvent(record);
+            RaiMemory.mirrorEvent(record);
+          });
+        }
+      });
+    }).catch(function () { /* stage 1 remains authoritative */ });
   }
 
   // === Workflow-tip capture — the tips-ledger intake ===
@@ -249,7 +322,7 @@ var XraiMain = (function () {
     RaiHider.addImageLabelButtons(el, function (label) {
       RaiMemory.logEvent({
         platform: 'x', kind: 'image-label', label: label,
-        imageUrl: data.imageUrl, text: (text || '').substring(0, 300),
+        imageUrl: data.imageUrl, text: text || '',
         author: data.author, tweetId: data.id
       });
       console.log('[xrai] LABEL  | @' + (data.author || '?') + ' | id:' + data.id + ' | labeled: ' + label);
@@ -280,6 +353,8 @@ var XraiMain = (function () {
         RaiMemory.markSeen(RaiMemory.computeFingerprint(data.text, data.mediaType), 'signal');
         RaiIndicator.incrementKept();
         maybeCaptureTip(data, enrichedText, 'feed');
+        el.setAttribute('data-xrai-memory-id', String(data.id));
+        runMemoryPass(el, data, enrichedText, source);
       }
       attachNewTabHandler(el, data);
       attachGoldenSetButtons(el, data, enrichedText);
@@ -341,7 +416,7 @@ var XraiMain = (function () {
       model: result && result._model,
       raw: result && result._raw,
       ms: result && result._ms,
-      text: (text || '').substring(0, 500),
+      text: text || '',
       author: data.author,
       tweetId: data.id,
       url: location.pathname
@@ -459,6 +534,9 @@ var XraiMain = (function () {
     // Own status page: reply guard — blur bad-faith replies, keep everything
     // else (including criticism) visible. All other off-home routes skip.
     if (!isHomeFeed()) {
+      // Only the tweet whose ID appears in the current status-page URL is a
+      // direct open. Historical off-home dwell remains a weaker route proxy.
+      maybeRecordDirectOpen(data, enrichedText);
       var guardPage = (config && config.replyGuard !== false && typeof XraiReplyRoute !== 'undefined')
         ? XraiReplyRoute.guardPage(window.location.pathname, config.ownHandle)
         : null;
@@ -596,6 +674,21 @@ var XraiMain = (function () {
       }
       el.textContent = JSON.stringify(events);
       window.dispatchEvent(new CustomEvent('xrai-export-response'));
+    });
+  });
+
+  window.addEventListener('xrai-memory-export-request', function () {
+    if (typeof RaiKnowledge === 'undefined' || !RaiKnowledge.exportData) return;
+    RaiKnowledge.exportData().then(function (data) {
+      var el = document.getElementById('xrai-memory-export-data');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'xrai-memory-export-data';
+        el.style.display = 'none';
+        document.body.appendChild(el);
+      }
+      el.textContent = JSON.stringify(data);
+      window.dispatchEvent(new CustomEvent('xrai-memory-export-response'));
     });
   });
 

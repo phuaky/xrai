@@ -393,22 +393,19 @@
           <div class="who">@arvidkahl <span>· 2h</span></div>
           <p>When someone signs up to your SaaS, grab their email domain, get a summary from Firecrawl, have an LLM generate the best starting configuration…</p>
           <span class="ctag ctag-keep">✓ AI: specific tool and tactic</span>
-          <span class="xbtn">✗</span>
         </div>
         <div class="card blurred">
           <div class="who">@viralclips <span>· 3h</span></div>
           <p>You won't believe what happened next 🤯 wait for the end</p>
           <span class="ctag ctag-hide">prefilter: clickbait-phrase</span>
           <span class="peek">👁 SHOW</span>
-          <span class="xbtn">✗</span>
         </div>
         <div class="card">
           <div class="who">@levelsio <span>· 5h</span></div>
           <p>I mass launched 70+ startups since 2013. Here's my stack: a $5/month VPS, PHP, jQuery, SQLite. No frameworks. No team. $2.7M ARR.</p>
           <span class="ctag ctag-keep">✓ AI: concrete numbers, real stack</span>
-          <span class="xbtn">✗</span>
         </div>
-        <div class="feed-caption">The <b>✗</b> on every card tells the filter it was wrong — and it learns from that.</div>
+        <div class="feed-caption">Every decision is logged locally so fresh traffic can be audited against the filter.</div>
       </div>
     </div>
   </div>
@@ -429,7 +426,7 @@
     <div class="cell">
       <div class="cell-head"><span class="n">02 LOCAL MODEL</span><span class="arr">→</span></div>
       <h4>A 4B model scores the rest</h4>
-      <p>Novelty, specificity, density, authenticity — scored by Gemma running locally (~780ms median). Concrete numbers and real experience read as signal; vague hype reads as noise.</p>
+      <p>Novelty, specificity, density, authenticity — scored by Gemma running locally. Concrete numbers and real experience read as signal; vague hype reads as noise.</p>
     </div>
     <div class="cell">
       <div class="cell-head"><span class="n">03 THRESHOLD</span><span class="arr">→</span></div>
@@ -437,9 +434,9 @@
       <p>Only confident noise calls get blurred. Everything is reversible — peek under any blur with one click, and tune the confidence threshold to taste.</p>
     </div>
     <div class="cell">
-      <div class="cell-head"><span class="n">04 CORRECTION</span><span class="arr">→</span></div>
-      <h4>Wrong calls become test cases</h4>
-      <p>One tap on ✗ fixes a bad decision and records the mistake. Real corrections graduate into the eval set that gates every future version.</p>
+      <div class="cell-head"><span class="n">04 AUDIT</span><span class="arr">→</span></div>
+      <h4>Fresh traffic becomes test data</h4>
+      <p>Recent decisions are sampled, re-judged, and queued for human review. Confirmed mistakes graduate into the eval set that gates future versions.</p>
     </div>
   </div>
 </section>
@@ -452,17 +449,17 @@
 
     <div class="stats">
       <div class="stat">
-        <div class="num">90.9%</div>
+        <div class="num">100%</div>
         <div class="lbl">Critical-signal recall</div>
         <div class="sub">Job leads, paid pilots, key releases — the tier that must not slip.</div>
       </div>
       <div class="stat">
-        <div class="num">80.1%</div>
+        <div class="num">85.1%</div>
         <div class="lbl">Signal recall</div>
         <div class="sub">The metric you could never feel by scrolling.</div>
       </div>
       <div class="stat">
-        <div class="num">60.8%</div>
+        <div class="num">67.3%</div>
         <div class="lbl">Noise caught</div>
         <div class="sub">Now measured against tempting noise, the stuff built to look like signal.</div>
       </div>
@@ -470,7 +467,7 @@
 
     <div class="callout">
       <span class="k">Why measure at all?</span>
-      A feed filter has two failure modes with very different visibility. Noise that leaks through is annoying — but you <i>see</i> it, so you fix it. Signal that gets hidden is <b>invisible</b> — you never know what you lost, so every hand-tuned "improvement" quietly drifts toward over-hiding. The eval suite guards the side no human can feel, and the ✗ button turns your real corrections into test cases.
+      A feed filter has two failure modes with very different visibility. Noise that leaks through is annoying — but you <i>see</i> it, so you fix it. Signal that gets hidden is <b>invisible</b> — you never know what you lost, so every hand-tuned "improvement" quietly drifts toward over-hiding. The eval suite guards the side no human can feel, and fresh-traffic audits keep the test set honest.
     </div>
   </div>
 </section>
@@ -573,7 +570,7 @@ bash scripts/setup.sh
         <span class="n">03</span>
         <div>
           <h4>Open x.com</h4>
-          <p>The rai pill appears bottom-right with live shown/hidden counts. 👁 peeks under any blur, ✗ corrects mistakes, ⚙ tunes everything.</p>
+          <p>The rai pill appears bottom-right with live shown/hidden counts. 👁 peeks under any blur, while ⚙ tunes filtering and local-model settings.</p>
         </div>
       </div>
     </div>
@@ -607,7 +604,7 @@ bash scripts/setup.sh
       </details>
       <details>
         <summary><span class="qn">04</span><span class="q">What if it hides something important?</span><span class="toggle"></span></summary>
-        <div class="a">Every hidden post is one click from visible — blur, not delete. And the failure you can't see is exactly what the eval suite guards: 100% recall on critical signal, gated on every release, with your ✗ corrections feeding the test set.</div>
+        <div class="a">The failure you can't see is exactly what the eval suite guards: 100% recall on critical signal, gated on every release, with recent real traffic feeding a separate audit queue.</div>
       </details>
     </div>
   </div>

@@ -32,7 +32,7 @@ open YouTube to listen to music and don't want to get pulled into a rabbit hole.
 - 100% on-device — the AI model runs on your machine via Ollama, nothing is sent
   anywhere
 - No account, no login, no tracking
-- One-tap correction button trains the filter from your actual mistakes
+- Durable local decision logs support fresh-traffic audits and regression tests
 - Full data export any time
 
 **Cloud mode (optional, free while in beta)**
@@ -63,10 +63,10 @@ https://snratio.xyz/privacy.html
 2. YouTube home grid — blurred-except-music/motivational
 3. Settings panel — Local/Cloud mode toggle, model picker, threshold slider
 4. Status pill expanded — shown/hidden counts, connection status
-5. Correction flow — the ✗ "you got this wrong" button on a card
+5. Settings and local export — tune thresholds and export the durable decision log
 
 ## Permissions justification (for review)
-- `storage`, `unlimitedStorage`: local classification cache + correction history
+- `storage`, `unlimitedStorage`: local classification cache + durable decision history
 - Host permissions (x.com, twitter.com, youtube.com, i.ytimg.com, pbs.twimg.com):
   read already-rendered DOM content to classify it — no API calls
 - `localhost:11434`/`11435`: local Ollama model + optional local data collector

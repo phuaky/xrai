@@ -349,6 +349,9 @@ var RaiIndicator = (function () {
         '<option value="posts-only">Posts only</option>' +
         '<option value="all">All</option>' +
         '</select></label>' +
+        '<div class="xrai-settings-sub">Memory-aware signal</div>' +
+        '<label>Collapse familiar posts<input type="checkbox" id="xrai-s-memory-aware"></label>' +
+        '<label>Memory confidence<input type="range" id="xrai-s-memory-threshold" min="0.5" max="0.95" step="0.05"><span id="xrai-s-memory-threshold-val"></span></label>' +
         '<div class="xrai-settings-sub">Reply guard (your posts)</div>' +
         '<label>Blur bad-faith replies<input type="checkbox" id="xrai-s-replyguard"></label>' +
         '<label>Your handle<input type="text" id="xrai-s-ownhandle" placeholder="yourhandle"></label>';
@@ -363,6 +366,10 @@ var RaiIndicator = (function () {
 
     var aggressivenessLabel = _platform === 'youtube' ? 'Strictness' : 'Aggressiveness';
     var cloudMode = cfg.mode === 'cloud';
+    var memoryActions = _platform === 'x'
+      ? ' · <span class="xrai-p-link" id="xrai-s-export-memory">export memory</span>' +
+        ' · <span class="xrai-p-link" id="xrai-s-seed-memory">seed history</span>'
+      : '';
 
     popup.innerHTML =
       '<div class="xrai-p-head"><span class="xrai-p-name"></span><span class="xrai-p-savenote" id="xrai-s-saved">saved</span></div>' +
@@ -387,7 +394,8 @@ var RaiIndicator = (function () {
       '<option value="blur">Blur</option>' +
       '</select></label>' +
       '<div class="xrai-p-foot">' +
-      '<span><span class="xrai-p-link" id="xrai-s-export">export log</span> · <span class="xrai-p-link xrai-p-danger" id="xrai-s-clear">clear memory</span></span>' +
+      '<span><span class="xrai-p-link" id="xrai-s-export">export log</span>' + memoryActions +
+      ' · <span class="xrai-p-link xrai-p-danger" id="xrai-s-clear">clear memory</span></span>' +
       '<span class="xrai-p-link" id="xrai-s-back">back</span></div>';
 
     popup.querySelector('.xrai-p-name').textContent = L.name + ' settings';
@@ -406,6 +414,10 @@ var RaiIndicator = (function () {
     popup.querySelector('#xrai-s-hide').value = cfg.hideMethod || 'remove';
     if (_platform === 'x') {
       popup.querySelector('#xrai-s-filter').value = cfg.contentFilter || 'posts-only';
+      popup.querySelector('#xrai-s-memory-aware').checked = cfg.memoryAware !== false;
+      var memorySlider = popup.querySelector('#xrai-s-memory-threshold');
+      memorySlider.value = cfg.memoryConfidenceThreshold || 0.75;
+      popup.querySelector('#xrai-s-memory-threshold-val').textContent = String(cfg.memoryConfidenceThreshold || 0.75);
       popup.querySelector('#xrai-s-replyguard').checked = cfg.replyGuard !== false;
       popup.querySelector('#xrai-s-ownhandle').value = cfg.ownHandle || '';
     } else if (_platform === 'youtube') {
@@ -482,6 +494,17 @@ var RaiIndicator = (function () {
     if (_platform === 'x') {
       popup.querySelector('#xrai-s-filter').addEventListener('change', function (e) {
         save({ contentFilter: e.target.value });
+      });
+      popup.querySelector('#xrai-s-memory-aware').addEventListener('change', function (e) {
+        save({ memoryAware: e.target.checked });
+      });
+      var memorySlider = popup.querySelector('#xrai-s-memory-threshold');
+      var memorySliderVal = popup.querySelector('#xrai-s-memory-threshold-val');
+      memorySlider.addEventListener('input', function () {
+        memorySliderVal.textContent = memorySlider.value;
+      });
+      memorySlider.addEventListener('change', function () {
+        save({ memoryConfidenceThreshold: parseFloat(memorySlider.value) });
       });
       popup.querySelector('#xrai-s-replyguard').addEventListener('change', function (e) {
         save({ replyGuard: e.target.checked });
@@ -575,6 +598,45 @@ var RaiIndicator = (function () {
         }, 1500);
       });
     });
+
+    if (_platform === 'x') {
+      popup.querySelector('#xrai-s-export-memory').addEventListener('click', function () {
+        var btn = popup.querySelector('#xrai-s-export-memory');
+        if (typeof RaiKnowledge === 'undefined' || !RaiKnowledge.exportData) {
+          btn.textContent = 'memory unavailable';
+          return;
+        }
+        btn.textContent = 'exporting…';
+        RaiKnowledge.exportData().then(function (data) {
+          var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = 'xrai-memory-' + new Date().toISOString().slice(0, 10) + '.json';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+          btn.textContent = 'exported ' + data.claims.length + ' claims';
+        }).catch(function () { btn.textContent = 'export failed'; });
+      });
+
+      popup.querySelector('#xrai-s-seed-memory').addEventListener('click', function () {
+        var btn = popup.querySelector('#xrai-s-seed-memory');
+        if (typeof RaiKnowledge === 'undefined' || !RaiKnowledge.importSeed) {
+          btn.textContent = 'memory unavailable';
+          return;
+        }
+        btn.textContent = 'seeding…';
+        RaiMemory.getEvents().then(function (events) {
+          return RaiKnowledge.importSeed(events || []);
+        }).then(function (result) {
+          btn.textContent = result.pending
+            ? result.embedded + ' ready · ' + result.pending + ' retry'
+            : result.embedded + ' claims ready';
+        }).catch(function () { btn.textContent = 'seed failed'; });
+      });
+    }
 
     popup.querySelector('#xrai-s-export').addEventListener('click', function () {
       var btn = popup.querySelector('#xrai-s-export');

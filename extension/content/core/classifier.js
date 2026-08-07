@@ -2,10 +2,12 @@
 var RaiClassifier = (function () {
   'use strict';
 
-  // 3 in flight — matched to OLLAMA_NUM_PARALLEL=4 (com.ollama.env plist);
-  // one slot is left free so the image bait-check and the other platform's
-  // classifier never queue behind a full feed burst.
-  var MAX_CONCURRENT = 3;
+  // The local model is throughput-serial in practice. On fresh live tweets,
+  // 1/2/3 in flight delivered 1.15/1.22/1.23 tweets per second, while p50
+  // latency grew from 880ms to 1660ms to 2431ms. Keep one request in flight
+  // so the first visible card resolves quickly instead of sitting behind a
+  // model-internal queue.
+  var MAX_CONCURRENT = 1;
   var MAX_CALLS_PER_MINUTE = 100;
   var _platform = 'x';
 

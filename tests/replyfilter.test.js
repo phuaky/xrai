@@ -173,6 +173,6 @@ describe('reply-guard drift pins', () => {
   });
 
   it('Anti (ISC-33): the feed prompt is untouched by this feature', () => {
-    expect(sha(worker.X_CLASSIFY_SYSTEM)).toBe('c8b70eecf243a9a8');
+    expect(sha(worker.X_CLASSIFY_SYSTEM)).toBe('7fed6a900f019b71');
   });
 });

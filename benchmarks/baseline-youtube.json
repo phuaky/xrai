@@ -1,5 +1,5 @@
 {
-  "date": "2026-07-09T03:23:49.832Z",
+  "date": "2026-08-05T08:01:36.773Z",
   "model": "gemma2:2b",
   "threshold": 0.6,
   "keepMotivational": true,
@@ -19,8 +19,8 @@
   ],
   "prefilterFalseKeepIds": [],
   "latency": {
-    "p50": 258,
-    "p95": 266
+    "p50": 259,
+    "p95": 275
   },
   "decisions": {
     "yt-001": "kept",

@@ -19,6 +19,7 @@ ORIGIN_HEADER="Origin: chrome-extension://rai-setup-check"
 X_MODEL_APPLE="dhiltgen/gemma4:e2b-mlx-bf16"   # extension default (Apple Silicon, MLX)
 X_MODEL_FALLBACK="gemma2:2b"                    # small, runs anywhere
 YT_MODEL="gemma2:2b"
+MEMORY_MODEL="all-minilm:latest"
 PLIST="$HOME/Library/LaunchAgents/com.ollama.env.plist"
 
 BOLD=$(tput bold 2>/dev/null || true); RESET=$(tput sgr0 2>/dev/null || true)
@@ -154,7 +155,7 @@ else
   warn "After install: on x.com click the ⚙ on the rai pill and select $X_MODEL as the model."
 fi
 
-for m in "$X_MODEL" "$YT_MODEL"; do
+for m in "$X_MODEL" "$YT_MODEL" "$MEMORY_MODEL"; do
   if have_model "$m"; then
     ok "$m already downloaded"
   else

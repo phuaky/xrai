@@ -68,6 +68,19 @@ describe('prefilter vs golden set', () => {
       expect(r?.reason).toBe(reason);
     }
   });
+
+  it('passes recent live signal false-hides to the model', () => {
+    const recentSignal = [
+      "building is 10x easier now. figuring out what's worth building isn't.",
+      'Why is the search and discoverability of people that I already follow so hard on Twitter.',
+      'Hotels made for people who care about sleep, fitness and workout. All beds use sleep mattresses, AC goes cold, air purifiers are everywhere, and the restaurant serves longevity food. The gym has proper weights and ergs, there are daily classes, and there is a quiet laptop-friendly working space for people building companies.',
+      'NVIDIA is making a substantial investment in SSI that will let us 10x our compute in the next 12 months.',
+      'Software is becoming malleable. This allows us to move 10x faster than before.',
+    ];
+    for (const text of recentSignal) {
+      expect(prefilter.prefilter({ text, hasMedia: false })).toBe(null);
+    }
+  });
 });
 
 // ─── Parser: must fail OPEN (shown), never fail closed ─────────────────────
@@ -112,12 +125,14 @@ describe('decide()', () => {
 // `--bless` a new baseline and update the pin.
 describe('drift pins', () => {
   it('X classify prompt is pinned', () => {
-    expect(sha(worker.X_CLASSIFY_SYSTEM)).toBe('c8b70eecf243a9a8');
+    expect(sha(worker.X_CLASSIFY_SYSTEM)).toBe('7fed6a900f019b71');
   });
 
   it('X config defaults are pinned', () => {
     expect(defaults.x.confidenceThreshold).toBe(0.7);
     expect(defaults.x.model).toBe('dhiltgen/gemma4:e2b-mlx-bf16');
     expect(defaults.x.contentFilter).toBe('posts-only');
+    expect(defaults.x.imageBaitEnabled).toBe(false);
+    expect(defaults.youtube.imageBaitEnabled).toBe(false);
   });
 });

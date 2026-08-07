@@ -2,9 +2,9 @@
 var RaiImageClassifier = (function () {
   'use strict';
 
-  // Image calls are slow (1-3s+) and the vision model is RAM-heavy when
-  // warm — keep concurrency low so a fast scroll doesn't pile up requests.
-  var MAX_CONCURRENT = 2;
+  // Vision calls are RAM-heavy and Ollama serializes them on the target
+  // machine. One in flight avoids multiplying per-card wait time.
+  var MAX_CONCURRENT = 1;
   var _platform = 'x';
 
   var resultCache = {};    // id -> { baity, confidence, reason, source }

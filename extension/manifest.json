@@ -23,6 +23,7 @@
       "matches": ["https://x.com/*", "https://twitter.com/*"],
       "js": [
         "lib/memory.js",
+        "lib/knowledge.js",
         "lib/config.js",
         "content/core/classifier.js",
         "content/core/image-classifier.js",
@@ -34,6 +35,7 @@
         "content/x/replyroute.js",
         "content/x/tips.js",
         "content/x/detector.js",
+        "content/x/memorypass.js",
         "content/x/main.js"
       ],
       "css": ["content/core/styles.css"],

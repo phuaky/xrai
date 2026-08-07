@@ -15,9 +15,11 @@ const STATS = {
 function makeIndicator(opts = {}) {
   const saved = [];
   let cleared = false;
+  let seeded = null;
   const config = Object.assign({
     mode: 'local', model: 'test-model', confidenceThreshold: 0.7,
     contentFilter: 'posts-only', imageBaitEnabled: true, hopNudge: true,
+    memoryAware: true, memoryConfidenceThreshold: 0.75,
     hideMethod: 'remove', cloudApiKey: ''
   }, opts.config);
 
@@ -34,16 +36,23 @@ function makeIndicator(opts = {}) {
     onStatsChanged: () => {},
     getDailyTime: () => Promise.resolve(3780), // 63 min -> "1h 3m"
     clearAll: () => { cleared = true; return Promise.resolve(); },
-    getEvents: () => Promise.resolve([])
+    getEvents: () => Promise.resolve(opts.events || [])
+  };
+  const RaiKnowledge = {
+    exportData: () => Promise.resolve({ claims: opts.claims || [] }),
+    importSeed: (events) => {
+      seeded = events;
+      return Promise.resolve({ embedded: events.length, pending: 0 });
+    }
   };
   const chrome = { runtime: {} }; // no .id -> listModels/balance paths skipped
 
   const RaiIndicator = new Function(
-    'chrome', 'RaiConfig', 'RaiMemory',
+    'chrome', 'RaiConfig', 'RaiMemory', 'RaiKnowledge',
     src + '\nreturn RaiIndicator;'
-  )(chrome, RaiConfig, RaiMemory);
+  )(chrome, RaiConfig, RaiMemory, RaiKnowledge);
 
-  return { RaiIndicator, saved, isCleared: () => cleared };
+  return { RaiIndicator, saved, isCleared: () => cleared, seeded: () => seeded };
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
@@ -158,6 +167,16 @@ describe('panel — settings view', () => {
     bait.dispatchEvent(new Event('change'));
     await tick();
     expect(ctx.saved).toContainEqual({ imageBaitEnabled: false });
+
+    const memoryAware = panel.querySelector('#xrai-s-memory-aware');
+    memoryAware.checked = false;
+    memoryAware.dispatchEvent(new Event('change'));
+    const memoryThreshold = panel.querySelector('#xrai-s-memory-threshold');
+    memoryThreshold.value = '0.85';
+    memoryThreshold.dispatchEvent(new Event('change'));
+    await tick();
+    expect(ctx.saved).toContainEqual({ memoryAware: false });
+    expect(ctx.saved).toContainEqual({ memoryConfidenceThreshold: 0.85 });
   });
 
   it('clear memory requires a second confirming click', async () => {
@@ -172,6 +191,19 @@ describe('panel — settings view', () => {
     clear.click();
     await tick();
     expect(ctx.isCleared()).toBe(true);
+  });
+
+  it('seeds X claim history from the durable local event log without Luna', async () => {
+    const events = [{ platform: 'x', tweetId: 't1', text: 'claim', decision: 'shown' }];
+    const ctx = await initHealthy({ events });
+    const panel = await openSettings(ctx);
+    const seed = panel.querySelector('#xrai-s-seed-memory');
+    expect(seed).not.toBe(null);
+    seed.click();
+    await tick();
+    await tick();
+    expect(ctx.seeded()).toEqual(events);
+    expect(seed.textContent).toBe('1 claims ready');
   });
 
   it('back returns to the today view (and does not close the panel)', async () => {
