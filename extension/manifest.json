@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "rai — local AI feed filter",
-  "version": "2.0.0",
-  "description": "Local AI feed filter. On X: signal stays, noise disappears. On YouTube: only music + motivational videos show, the rest blurs.",
+  "version": "2.1.0",
+  "description": "Local AI feed filter. On X: signal stays, noise disappears. On YouTube: worthwhile videos stay, distractions blur.",
   "permissions": ["storage", "unlimitedStorage"],
   "host_permissions": [
     "https://x.com/*",
@@ -52,6 +52,7 @@
         "content/core/indicator.js",
         "content/core/hopnudge.js",
         "content/youtube/prefilter.js",
+        "content/youtube/policy.js",
         "content/youtube/detector.js",
         "content/youtube/shorts.js",
         "content/youtube/watch.js",

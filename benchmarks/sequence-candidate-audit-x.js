@@ -23,7 +23,9 @@ const NOVELTIES = new Set([
 ]);
 const MANIFEST_FIELDS = [
   'schemaVersion', 'kind', 'corpusSha256', 'verdictsSha256', 'embeddingModel',
-  'embeddingInput', 'similarityThreshold', 'maxIdUses', 'excludedIds',
+  'embeddingInput', 'similarityThreshold', 'maxIdUses',
+  'exactClusterSupplementLimit', 'exactClusterSupplementCount',
+  'exactClusterMaxRows', 'semanticCandidateCount', 'excludedIds',
   'excludedIdSha256', 'seedCandidateCount', 'candidateCount',
   'candidatesSha256', 'batches',
 ];
@@ -167,6 +169,12 @@ function loadPrepared(auditDir) {
   if (!Object.prototype.hasOwnProperty.call(manifest, 'maxIdUses')) {
     manifest.maxIdUses = 0;
   }
+  if (!Object.prototype.hasOwnProperty.call(manifest, 'exactClusterSupplementLimit')) {
+    manifest.exactClusterSupplementLimit = 0;
+    manifest.exactClusterSupplementCount = 0;
+    manifest.exactClusterMaxRows = 12;
+    manifest.semanticCandidateCount = manifest.candidateCount - (manifest.seedCandidateCount || 0);
+  }
   if (!Object.prototype.hasOwnProperty.call(manifest, 'excludedIds')) {
     manifest.excludedIds = [];
     manifest.excludedIdSha256 = idChecksum([]);
@@ -178,6 +186,15 @@ function loadPrepared(auditDir) {
   if (!Array.isArray(manifest.batches)) throw new Error(`${manifestPath}: batches must be an array`);
   if (!Number.isInteger(manifest.candidateCount) || manifest.candidateCount < 100) {
     throw new Error(`${manifestPath}: invalid candidateCount`);
+  }
+  if (!Number.isInteger(manifest.exactClusterSupplementLimit) || manifest.exactClusterSupplementLimit < 0 ||
+      !Number.isInteger(manifest.exactClusterSupplementCount) || manifest.exactClusterSupplementCount < 0 ||
+      manifest.exactClusterSupplementCount > manifest.exactClusterSupplementLimit ||
+      !Number.isInteger(manifest.exactClusterMaxRows) || manifest.exactClusterMaxRows < 3 ||
+      !Number.isInteger(manifest.semanticCandidateCount) || manifest.semanticCandidateCount < 0 ||
+      manifest.seedCandidateCount + manifest.semanticCandidateCount + manifest.exactClusterSupplementCount !==
+        manifest.candidateCount) {
+    throw new Error(`${manifestPath}: invalid candidate source counts`);
   }
   if (!Number.isInteger(manifest.seedCandidateCount) || manifest.seedCandidateCount < 0 ||
       manifest.seedCandidateCount > manifest.candidateCount) {

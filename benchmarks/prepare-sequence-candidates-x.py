@@ -10,6 +10,7 @@ Luna must still approve every triple; vector similarity never becomes truth.
 
 import argparse
 import hashlib
+import itertools
 import json
 import os
 from pathlib import Path
@@ -126,6 +127,43 @@ def candidate_row(corpus_row, verdict):
     }
 
 
+def exact_cluster_key(verdict) -> str:
+    return " ".join(str(verdict.get("claimCluster") or "").casefold().split())
+
+
+def exact_cluster_options(
+    retained,
+    verdict_by_id,
+    similarities: np.ndarray,
+    seen_triples,
+    max_rows: int,
+):
+    groups = {}
+    for index, row in enumerate(retained):
+        key = exact_cluster_key(verdict_by_id[row["id"]])
+        if key:
+            groups.setdefault(key, []).append(index)
+
+    options = []
+    for key, indexes in groups.items():
+        if len(indexes) < 3 or len(indexes) > max_rows:
+            continue
+        for triple in itertools.combinations(indexes, 3):
+            row_ids = [retained[index]["id"] for index in triple]
+            triple_key = tuple(sorted(row_ids))
+            if triple_key in seen_triples:
+                continue
+            left, middle, right = triple
+            score = min(
+                float(similarities[left, middle]),
+                float(similarities[left, right]),
+                float(similarities[middle, right]),
+            )
+            options.append((key, score, triple))
+    options.sort(key=lambda option: (-option[1], option[0], option[2]))
+    return options
+
+
 def candidate_options(
     index: int,
     similarities: np.ndarray,
@@ -163,6 +201,8 @@ def main():
     parser.add_argument("--top-k", type=int, default=12)
     parser.add_argument("--alternatives", type=int, default=8)
     parser.add_argument("--max-id-uses", type=int, default=0)
+    parser.add_argument("--exact-cluster-supplement", type=int, default=0)
+    parser.add_argument("--exact-cluster-max-rows", type=int, default=12)
     parser.add_argument("--batch-size", type=int, default=20)
     parser.add_argument("--seed-candidates")
     parser.add_argument("--exclude-ids")
@@ -171,6 +211,10 @@ def main():
         raise ValueError("--alternatives must be positive")
     if args.max_id_uses < 0:
         raise ValueError("--max-id-uses must be non-negative")
+    if args.exact_cluster_supplement < 0:
+        raise ValueError("--exact-cluster-supplement must be non-negative")
+    if args.exact_cluster_max_rows < 3:
+        raise ValueError("--exact-cluster-max-rows must be at least 3")
 
     audit_dir = Path(args.audit_dir).resolve()
     corpus = read_jsonl(audit_dir / "corpus.jsonl")
@@ -273,7 +317,27 @@ def main():
         selected.append((score, indexes))
         if len(seed_candidates) + len(selected) >= args.target:
             break
-    total_candidates = len(seed_candidates) + len(selected)
+
+    exact_selected = []
+    if args.exact_cluster_supplement:
+        exact_options = exact_cluster_options(
+            retained,
+            verdict_by_id,
+            similarities,
+            seen_triples,
+            args.exact_cluster_max_rows,
+        )
+        for key, score, indexes in exact_options:
+            row_ids = [retained[index]["id"] for index in indexes]
+            triple_key = tuple(sorted(row_ids))
+            if triple_key in seen_triples:
+                continue
+            seen_triples.add(triple_key)
+            exact_selected.append((key, score, indexes))
+            if len(exact_selected) >= args.exact_cluster_supplement:
+                break
+
+    total_candidates = len(seed_candidates) + len(selected) + len(exact_selected)
     if total_candidates < 100:
         raise ValueError(
             f"only {total_candidates} candidate triples; lower --threshold"
@@ -286,6 +350,17 @@ def main():
 
     candidates = list(seed_candidates)
     for score, indexes in selected:
+        rows = []
+        for index in indexes:
+            corpus_row = retained[index]
+            verdict = verdict_by_id[corpus_row["id"]]
+            rows.append(candidate_row(corpus_row, verdict))
+        candidates.append({
+            "candidateId": f"candidate-{len(candidates):04d}",
+            "minSimilarity": round(score, 6),
+            "rows": rows,
+        })
+    for _, score, indexes in exact_selected:
         rows = []
         for index in indexes:
             corpus_row = retained[index]
@@ -342,6 +417,9 @@ def main():
         "embeddingInput": "luna-claim-topic-plus-tweet-text",
         "similarityThreshold": args.threshold,
         "maxIdUses": args.max_id_uses,
+        "exactClusterSupplementLimit": args.exact_cluster_supplement,
+        "exactClusterSupplementCount": len(exact_selected),
+        "exactClusterMaxRows": args.exact_cluster_max_rows,
         "excludedIds": sorted(excluded_ids),
         "excludedIdSha256": sha256(
             (("\n".join(sorted(excluded_ids)) + "\n").encode())
@@ -349,6 +427,7 @@ def main():
         ),
         "seedCandidateCount": len(seed_candidates),
         "candidateCount": len(candidates),
+        "semanticCandidateCount": len(selected),
         "candidatesSha256": sha256(all_bytes),
         "batches": manifest_batches,
     }
@@ -357,6 +436,8 @@ def main():
         "retainedRows": len(retained),
         "excludedRows": len(all_retained) - len(retained),
         "candidateCount": len(candidates),
+        "semanticCandidateCount": len(selected),
+        "exactClusterSupplementCount": len(exact_selected),
         "batches": len(manifest_batches),
         "minimumSimilarity": min(row["minSimilarity"] for row in candidates),
         "output": str(out),

@@ -1,4 +1,4 @@
-/* ytrai — YouTube Orchestrator (blur everything, reveal only music + motivational) */
+/* ytrai - YouTube Orchestrator (keep worthwhile videos, blur confident distraction) */
 var YtraiMain = (function () {
   'use strict';
 
@@ -93,7 +93,7 @@ var YtraiMain = (function () {
       // Hop nudge — X ↔ YouTube doom-loop detector (see core/hopnudge.js)
       if (typeof RaiHopNudge !== 'undefined') RaiHopNudge.init(PLATFORM, cfg);
 
-      console.log('[ytrai] Running. Keep music' + (cfg.keepMotivational ? ' + motivational' : '') + '. Hide: ' + cfg.hideMethod);
+      console.log('[ytrai] Running. Keep worthwhile content. Hide: ' + cfg.hideMethod);
     });
 
     var healthInterval = setInterval(function () {
@@ -144,7 +144,7 @@ var YtraiMain = (function () {
       return;
     }
 
-    // 2. Pre-filter — instant keep for obvious music / motivational.
+    // 2. Pre-filter — instant decisions for high-precision obvious cases.
     var pf = YtraiPrefilter.prefilter(data);
     if (pf) {
       var pfRes = { category: pf.category, confidence: pf.confidence, source: 'prefilter:' + pf.reason };
@@ -174,32 +174,22 @@ var YtraiMain = (function () {
   }
 
   function applyDecision(el, data, result, threshold, shouldLog) {
-    // Worker unreachable — fail open.
-    if (result.source === 'error') {
-      keepVideo(el, data, 'other', '');
-      if (shouldLog) logDecision(data, 'kept', result, 'other');
-      return;
-    }
-
-    var cat = result.category || 'other';
-    var isPrefilter = result.source && result.source.indexOf('prefilter') === 0;
-    var keep = false;
+    var verdict = YtraiPolicy.decide(result, {
+      threshold: threshold,
+      keepMotivational: !config || config.keepMotivational !== false
+    });
+    var cat = verdict.category;
     var label = '';
 
     if (cat === 'music') {
-      keep = true;
       label = '♪ music';
-    } else if (cat === 'motivational' && config && config.keepMotivational) {
-      keep = true;
-      label = '💪 motivation';
+    } else if (cat === 'motivational') {
+      label = 'motivation';
+    } else if (cat === 'useful') {
+      label = 'useful';
     }
 
-    // Strictness: a low-confidence model keep gets blurred anyway. Prefilter keeps bypass.
-    if (keep && !isPrefilter && result.confidence !== undefined && result.confidence < threshold) {
-      keep = false;
-    }
-
-    if (keep) {
+    if (verdict.decision === 'kept') {
       finalizeKeep(el, data, cat, label, result, shouldLog);
     } else {
       blurVideo(el, data, cat);
@@ -208,8 +198,8 @@ var YtraiMain = (function () {
   }
 
   // === Image bait gate — runs only on videos already headed for "keep" ===
-  // Everything blurred for being "other" category never reaches here, so
-  // this only spends the extra second-plus on candidates that would
+  // Everything blurred for being distraction never reaches here, so this
+  // only spends the extra time on candidates that would
   // otherwise reveal. Card is already blurred (default state), so there's
   // no flash risk either way — just a longer wait before reveal.
   function finalizeKeep(el, data, cat, label, result, shouldLog) {
@@ -221,7 +211,9 @@ var YtraiMain = (function () {
         keepVideo(el, data, cat, label);
         if (shouldLog) logDecision(data, 'kept', result, cat);
       }
-      attachGoldenSetButtons(el, data);
+      // Label controls belong to the opt-in image experiment. Keeping them
+      // hidden by default avoids adding controls to every useful video.
+      if (imageBaitOn) attachGoldenSetButtons(el, data);
     }
 
     var imageBaitOn = config && config.imageBaitEnabled !== false;
@@ -242,8 +234,7 @@ var YtraiMain = (function () {
   }
 
   // === Golden-set labeling — the image-bait ground-truth loop ===
-  // Only offered on music/motivational candidates (the only videos that ever
-  // reach finalizeKeep), so it never spams every card in the feed.
+  // Only offered while the experimental image gate is enabled.
   function attachGoldenSetButtons(el, data) {
     if (!data.thumbnailUrl) return;
     RaiHider.addImageLabelButtons(el, function (label) {
@@ -279,6 +270,7 @@ var YtraiMain = (function () {
       category: cat || result.category || 'other',
       confidence: result.confidence,
       source: result.source,                    // prefilter:<reason> | model | ollama-off | error
+      reason: result.reason,
       model: result._model,
       raw: result._raw,                         // raw model output (model path only)
       ms: result._ms,

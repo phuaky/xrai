@@ -37,6 +37,12 @@ function loadYoutubePrefilter() {
   return new Function(src + '\nreturn YtraiPrefilter;')();
 }
 
+// YtraiPolicy - conservative pure decision logic used by runtime and evals
+function loadYoutubePolicy() {
+  const src = loadSource('extension/content/youtube/policy.js');
+  return new Function(src + '\nreturn YtraiPolicy;')();
+}
+
 // RaiHops — pure IIFE, no browser deps (hop-detection logic)
 function loadHops() {
   const src = loadSource('extension/lib/hops.js');
@@ -63,26 +69,32 @@ function loadWorker() {
       'classifyX: classifyX, X_REPLY_SYSTEM: X_REPLY_SYSTEM, ' +
       'parseReplyClassification: parseReplyClassification, ' +
       'X_MEMORY_SYSTEM: X_MEMORY_SYSTEM, X_MEMORY_NOVELTY_SYSTEM: X_MEMORY_NOVELTY_SYSTEM, ' +
-      'X_MEMORY_HIGH_OVERLAP_SYSTEM: X_MEMORY_HIGH_OVERLAP_SYSTEM, ' +
+      'X_MEMORY_FAMILIAR_CONFIRM_SYSTEM: X_MEMORY_FAMILIAR_CONFIRM_SYSTEM, ' +
       'X_MEMORY_UPDATE_RECHECK_SYSTEM: X_MEMORY_UPDATE_RECHECK_SYSTEM, ' +
-      'X_MEMORY_UPDATE_CONFIRM_SYSTEM: X_MEMORY_UPDATE_CONFIRM_SYSTEM, ' +
-      'X_MEMORY_LAUNCH_REPEAT_SYSTEM: X_MEMORY_LAUNCH_REPEAT_SYSTEM, ' +
-      'X_MEMORY_COLLAPSE_GUARD_AI_SYSTEM: X_MEMORY_COLLAPSE_GUARD_AI_SYSTEM, ' +
-      'X_MEMORY_COLLAPSE_GUARD_NS_SYSTEM: X_MEMORY_COLLAPSE_GUARD_NS_SYSTEM, ' +
-      'X_MEMORY_COLLAPSE_GUARD_EVENT_SYSTEM: X_MEMORY_COLLAPSE_GUARD_EVENT_SYSTEM, ' +
-      'X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM: X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM, ' +
+      'X_MEMORY_COLLAPSE_GUARD_SYSTEM: X_MEMORY_COLLAPSE_GUARD_SYSTEM, ' +
       'X_MEMORY_IMPORTANCE_SYSTEM: X_MEMORY_IMPORTANCE_SYSTEM, ' +
       'parseMemoryNovelty: parseMemoryNovelty, parseMemoryImportance: parseMemoryImportance, ' +
+      'parseMemoryAssessment: parseMemoryAssessment, ' +
+      'parseMemoryValueAssessment: parseMemoryValueAssessment, ' +
       'parseMemoryClassification: parseMemoryClassification, ' +
       'buildMemoryUserMessage: buildMemoryUserMessage, ' +
       'buildMemoryImportanceUserMessage: buildMemoryImportanceUserMessage, ' +
       'buildMemoryNoveltyUserMessage: buildMemoryNoveltyUserMessage, ' +
+      'shouldRunMemoryUpdateRecheck: shouldRunMemoryUpdateRecheck, ' +
+      'shouldConfirmMemoryUpdate: shouldConfirmMemoryUpdate, ' +
+      'hasContainedMemoryText: hasContainedMemoryText, ' +
+      'hasUnseenQuantifiedCapability: hasUnseenQuantifiedCapability, ' +
+      'hasMultipleChangedActions: hasMultipleChangedActions, ' +
+      'criticalFamiliarSignalKind: criticalFamiliarSignalKind, ' +
+      'isDirectOpportunityInvitation: isDirectOpportunityInvitation, ' +
+      'isFamiliarQuestion: isFamiliarQuestion, ' +
       'classifyMemory: classifyMemory, scheduleMemoryClassification: scheduleMemoryClassification, ' +
-      'embedLocal: embedLocal, YT_CLASSIFY_SYSTEM: YT_CLASSIFY_SYSTEM, ' +
+      'embedLocal: embedLocal, EMBEDDING_KEEP_ALIVE: EMBEDDING_KEEP_ALIVE, ' +
+      'EMBEDDING_TIMEOUT_MS: EMBEDDING_TIMEOUT_MS, YT_CLASSIFY_SYSTEM: YT_CLASSIFY_SYSTEM, ' +
       'parseYoutubeClassification: parseYoutubeClassification, ' +
       'TEXT_KEEP_ALIVE: TEXT_KEEP_ALIVE, TEXT_NUM_CTX: TEXT_NUM_CTX, ' +
+      'MEMORY_SEED: MEMORY_SEED, ' +
       'MEMORY_MAX_CONTEXTS: MEMORY_MAX_CONTEXTS, ' +
-      'MEMORY_HIGH_SIMILARITY_THRESHOLD: MEMORY_HIGH_SIMILARITY_THRESHOLD, ' +
       'scheduleLocalText: scheduleLocalText, scheduleMemoryText: scheduleMemoryText };'
   )(chromeStub);
 }
@@ -182,28 +194,23 @@ function toYoutubeUserMessage(item) {
   return msg;
 }
 
-// Mirror of applyDecision() in extension/content/youtube/main.js. Note the same
-// asymmetry as X's decide(): a prefilter keep bypasses confidenceThreshold
-// entirely; only the model path respects it.
 function decideYoutube(prefilterResult, modelResult, keepMotivational, threshold) {
   const result = prefilterResult
     ? { category: prefilterResult.category, confidence: prefilterResult.confidence, source: 'prefilter:' + prefilterResult.reason }
     : { category: modelResult.category, confidence: modelResult.confidence, source: 'model' };
-  const isPrefilter = result.source.indexOf('prefilter') === 0;
-
-  let keep = false;
-  if (result.category === 'music') keep = true;
-  else if (result.category === 'motivational' && keepMotivational) keep = true;
-
-  if (keep && !isPrefilter && result.confidence !== undefined && result.confidence < threshold) {
-    keep = false;
-  }
-
-  return { decision: keep ? 'kept' : 'blurred', stage: isPrefilter ? 'prefilter' : 'model', category: result.category, confidence: result.confidence };
+  if (modelResult._error) result._error = true;
+  const verdict = loadYoutubePolicy().decide(result, { keepMotivational, threshold });
+  return {
+    decision: verdict.decision,
+    stage: result.source.indexOf('prefilter') === 0 ? 'prefilter' : 'model',
+    category: verdict.category,
+    confidence: verdict.confidence,
+    cause: verdict.cause,
+  };
 }
 
 function isKeepTier(tier) {
-  return tier === 'music' || tier === 'motivational';
+  return tier === 'music' || tier === 'motivational' || tier === 'useful';
 }
 
 function sha(text) {
@@ -213,6 +220,7 @@ function sha(text) {
 module.exports = {
   loadPrefilter,
   loadYoutubePrefilter,
+  loadYoutubePolicy,
   loadHops,
   loadMemoryPass,
   loadTips,

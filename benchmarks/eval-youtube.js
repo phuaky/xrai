@@ -1,11 +1,10 @@
 // rai YouTube eval — full-pipeline regression harness (prefilter + model + threshold).
 //
-// What "better" means here, in priority order — the mirror image of X's asymmetry:
-//   1. Keep recall (guarded metric). A music/motivational video wrongly blurred is
-//      INVISIBLE in daily use — you never know you missed a good song. This eval
-//      exists to guard the side no one can feel.
-//   2. False-keep rate (felt metric). An "other" video wrongly revealed is annoying
-//      but visible — you'll notice a distracting video slipped through.
+// What "better" means here, in priority order:
+//   1. Keep recall (guarded metric). A music/motivational/useful video wrongly
+//      blurred is INVISIBLE in daily use. This is the costly failure.
+//   2. False-keep rate (felt metric). A distracting video wrongly revealed is
+//      visible and recoverable.
 //   Weighted cost = 2*keepLost + 1*falseKeep.
 //
 // Runs the REAL pipeline: production prefilter, system prompt, parser, input
@@ -47,8 +46,9 @@ async function classify(model, item, worker) {
       think: false,
       keep_alive: worker.TEXT_KEEP_ALIVE,
       options: {
-        temperature: 0.1,
-        num_predict: 40,
+        temperature: 0,
+        seed: 42,
+        num_predict: 60,
         num_ctx: worker.TEXT_NUM_CTX,
       },
     }),
@@ -78,6 +78,7 @@ async function main() {
   const keepMotivational = defaults.keepMotivational !== false;
   const promptSha = L.sha(worker.YT_CLASSIFY_SYSTEM);
   const prefilterSha = L.sha(fs.readFileSync(path.join(__dirname, '../extension/content/youtube/prefilter.js'), 'utf8'));
+  const policySha = L.sha(fs.readFileSync(path.join(__dirname, '../extension/content/youtube/policy.js'), 'utf8'));
 
   // Ollama up?
   try {
@@ -93,7 +94,7 @@ async function main() {
   }
 
   const items = limit ? golden.items.slice(0, limit) : golden.items;
-  console.log(`eval-youtube: ${items.length} items | model=${model} | threshold=${threshold} | keepMotivational=${keepMotivational} | prompt=${promptSha} | prefilter=${prefilterSha}\n`);
+  console.log(`eval-youtube: ${items.length} items | model=${model} | threshold=${threshold} | keepMotivational=${keepMotivational} | prompt=${promptSha} | prefilter=${prefilterSha} | policy=${policySha}\n`);
 
   // Warm up
   await classify(model, items[0], worker);
@@ -120,6 +121,9 @@ async function main() {
       stage: d.stage,
       category: d.category,
       confidence: d.confidence,
+      cause: d.cause,
+      reason: modelResult && modelResult.reason,
+      raw: raw.slice(0, 500),
       correct,
       title: item.title.slice(0, 80),
     });
@@ -135,12 +139,15 @@ async function main() {
   const keepLost = keepItems.filter((r) => r.decision === 'blurred');
   const otherItems = results.filter((r) => !L.isKeepTier(r.tier));
   const falseKeeps = otherItems.filter((r) => r.decision === 'kept');
-  const temptingFalseKeeps = by('tempting-other').filter((r) => r.decision === 'kept');
   const prefilterFalseKeeps = falseKeeps.filter((r) => r.stage === 'prefilter');
 
   const keepRecall = 1 - keepLost.length / keepItems.length;
   const falseKeepRate = falseKeeps.length / otherItems.length;
   const weightedCost = 2 * keepLost.length + 1 * falseKeeps.length;
+  const recallFor = (tier) => {
+    const rows = by(tier);
+    return rows.length ? rows.filter((r) => r.decision === 'kept').length / rows.length : 1;
+  };
 
   times.sort((a, b) => a - b);
   const p50 = times[Math.floor(times.length / 2)] || 0;
@@ -153,10 +160,17 @@ async function main() {
     keepMotivational,
     promptSha,
     prefilterSha,
+    policySha,
     goldenVersion: golden.version,
     items: items.length,
     keepRecall,
     falseKeepRate,
+    tierRecall: {
+      music: recallFor('music'),
+      motivational: recallFor('motivational'),
+      useful: recallFor('useful'),
+      distractionCatch: otherItems.length ? 1 - falseKeepRate : 1,
+    },
     weightedCost,
     keepLostIds: keepLost.map((r) => r.id),
     falseKeepIds: falseKeeps.map((r) => r.id),
@@ -167,7 +181,8 @@ async function main() {
 
   console.log('\n══════════════════ SUMMARY ══════════════════');
   console.log(`  Keep recall (guarded) : ${pct(keepRecall)}  (${keepLost.length}/${keepItems.length} blurred — you can't feel these)`);
-  console.log(`  False-keep rate (felt): ${pct(falseKeepRate)}  (${falseKeeps.length}/${otherItems.length} leaked, ${temptingFalseKeeps.length} tempting)`);
+  console.log(`  False-keep rate (felt): ${pct(falseKeepRate)}  (${falseKeeps.length}/${otherItems.length} distractions leaked)`);
+  console.log(`  Tier recall             : music ${pct(summary.tierRecall.music)} | motivation ${pct(summary.tierRecall.motivational)} | useful ${pct(summary.tierRecall.useful)} | distraction catch ${pct(summary.tierRecall.distractionCatch)}`);
   console.log(`  Weighted cost          : ${weightedCost}  (2×keepLost + 1×falseKeep)`);
   console.log(`  Prefilter false-keeps  : ${prefilterFalseKeeps.length}  (deterministic, threshold-bypassing, silent)`);
   console.log(`  Model latency          : p50 ${p50}ms | p95 ${p95}ms`);
@@ -202,6 +217,8 @@ async function main() {
     failures.push(`prompt changed since baseline (${base.promptSha} → ${promptSha}) — intentional? re-bless after reviewing metrics`);
   if (base.prefilterSha !== prefilterSha)
     failures.push(`prefilter changed since baseline (${base.prefilterSha} → ${prefilterSha}) — intentional? re-bless after reviewing metrics`);
+  if (base.policySha !== policySha)
+    failures.push(`policy changed since baseline (${base.policySha || 'missing'} → ${policySha}) — intentional? re-bless after reviewing metrics`);
   if (base.model !== model) failures.push(`model changed since baseline (${base.model} → ${model})`);
 
   const newKeepLosses = summary.keepLostIds.filter((id) => !base.keepLostIds.includes(id));

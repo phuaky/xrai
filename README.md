@@ -3,7 +3,7 @@
 Filter your feeds with local AI. One Chrome extension, two platforms:
 
 - **X / Twitter** — noise disappears, signal stays.
-- **YouTube** — everything blurs except **music** and **motivational** videos.
+- **YouTube** — worthwhile videos stay visible; confident distractions blur.
 
 **Local-first by default.** Ollama handles inference on your machine with no account required. Optional cloud mode routes text classification through `api.snratio.xyz` only when explicitly enabled; X semantic memory, embeddings, and contextual filtering remain local.
 
@@ -13,7 +13,7 @@ Filter your feeds with local AI. One Chrome extension, two platforms:
 
 On your own X status pages, the **reply guard** blurs high-confidence hostile, bot, or spam replies while leaving criticism and disagreement visible. The optional vision check can screen photos for thirst-trap/bait imagery, but it remains off by default while a labeled image eval set is built.
 
-**On YouTube:** classifies every video by its **title + channel** as `music`, `motivational`, or `other`, and **blurs everything that isn't music or motivational**. For when you open YouTube to listen to music but keep getting pulled into videos. The optional vision check can also screen thumbnails. Hit "👁 Show" on any blurred card to reveal it.
+**On YouTube:** classifies every recommendation by its **title + channel** as `music`, `motivational`, `useful`, or `distraction`. Music, motivation, and substantive videos stay visible. Only explicit prefilter matches or high-confidence distractions blur; uncertainty and runtime failures stay visible. Hit "👁 Show" on any blurred card to reveal it.
 
 ## How it works
 
@@ -61,43 +61,47 @@ Stage 2 answers a different question from stage 1: not merely "is this good?", b
 - **Fail-open** — Storage, embedding, retrieval, messaging, timeout, model, or parser failures leave the tweet visible.
 - **Local even in cloud mode** — Optional cloud mode can handle stage-1 text classification, but embeddings and all memory-aware classification still use local Ollama.
 
-The prompt suite was evaluated offline against 5,229 real X records and 102 disjoint chronological scenarios, judged with GPT-5.6 Luna at high reasoning. Luna is evaluation tooling only: it is never called by the extension at runtime. The production sequence gate passed with 100% critical-signal recall, 96.36% show retention, 82.22% strong-known collapse recall, and a 3.64% false-collapse rate.
+The prompt suite was evaluated offline against 8,922 real X records and 101 disjoint chronological scenarios (303 tweets, including 44 post-freeze scenarios), judged with GPT-5.6 Luna at high reasoning. Luna is evaluation tooling only: it is never called by the extension at runtime. The refreshed production sequence gate passed with 100% critical-signal recall, 97.42% show retention, 83.33% strong-known collapse recall, a 2.58% false-collapse rate, and 100% value-free-funnel collapse. Contextual classification measured p50 1.46s and p95 2.46s after reveal.
 
-**Historical-memory note:** `benchmarks/seed-memory-x.js` currently verifies complete and idempotent import in an isolated IndexedDB. It does not backfill the installed Chrome profile's live `xrai_knowledge` database, so after reloading the extension, live semantic memory grows from newly processed tweets.
+**Historical-memory note:** after reloading the extension, use **Settings → seed history** once to backfill the installed Chrome profile's `xrai_knowledge` database from its durable local event ledger. The action reports progress, retries claims whose embeddings previously failed, and is safe to run again without creating duplicates. `benchmarks/seed-memory-x.js` independently verifies the same import contract in an isolated IndexedDB.
 
-## YouTube: music-only mode
+## YouTube: worthwhile mode
 
 ```
 Video card appears (home / subscriptions / watch sidebar)
         ↓
-  Obvious music? ("Official Video", "feat.", "- Topic", VEVO, lofi…) → SHOW (instant, regex)
-  Obvious motivational? ("motivation", "discipline", Goggins…)       → SHOW (instant, regex)
-        ↓ not obvious
-  Blur immediately → Ollama classifies title+channel
+  High-precision prefilter
+        ├─ obvious music / motivation / useful format or interest → SHOW instantly
+        └─ explicit low-context distraction                        → BLUR instantly
+        ↓ ambiguous
+  Blur while the shared local model classifies title + channel
         ↓
-  music / motivational → SHOW, or image bait check when enabled
-        ↓                        ↓
-  other → stays BLURRED    bait → stays BLURRED ("AI: bait-thumbnail")
-  ("👁 Show" to peek)       clean → SHOW (♪ music / 💪 motivation badge)
+  music / motivational / useful → SHOW
+  confident distraction         → stays BLURRED ("👁 Show" to peek)
+  low confidence / error        → SHOW (fail open)
 ```
 
 - **Scoped** to the home feed, subscriptions, and the watch-page "up next" sidebar — the surfaces that distract you. The video you're actually watching, search results, and channel pages are left alone.
-- **Default model** `gemma2:2b` (fast — titles are short and the regex prefilter handles obvious music, so the model only sees ambiguous cases).
-- **Keep motivational** is a toggle in settings (on by default). Turn it off for music only.
+- **Default model** `dhiltgen/gemma4:e2b-mlx-bf16`, shared with X so switching platforms does not unload and reload separate text models. High-precision prefilters keep obvious decisions off the model queue.
+- **Personalized useful topics** currently reflect the observed watch history: AI/software/startups, coffee, endurance sports, combat sports, Singapore/Malaysia/Chinese culture, travel, and food.
+- **Keep motivational** is a toggle in settings (on by default). Turning it off leaves music and useful videos unaffected.
 - **Fail-open** — if Ollama is down, nothing is blurred (YouTube stays usable).
+
+The balanced policy is regression-tested on 120 music, motivation, useful, and distraction recommendations drawn from the existing set and recent local history. The production run kept 100% of the worthwhile cases and caught 87.5% of labeled distractions, with warm model latency of p50 472ms and p95 531ms. The conservative misses remain visible instead of risking a useful false block.
 
 ## Image bait check
 
-When enabled, photos on X and thumbnails on YouTube get one more gate before they reveal: a
+The experimental image path can give photos on X and thumbnails on YouTube one more gate before they reveal: a
 local vision model ([`qwen3-vl:30b`](https://ollama.com/library/qwen3-vl), a
 MoE model — ~19GB resident but faster once warm than the smaller dense
 variants) screens for thirst-trap/bait imagery — sexualized framing used to
 bait clicks, unrelated to the actual content. Fully clothed fitness/workout
 content is explicitly **not** treated as bait, so legitimate motivational
-videos still get through.
+videos should still get through. This path is disabled by default and is not
+currently trusted for filtering.
 
 - Only runs on candidates that would otherwise be revealed (signal tweets
-  with a photo; music/motivational-classified thumbnails) — text-only
+  with a photo; otherwise-kept YouTube thumbnails) — text-only
   content and anything already hidden skips this entirely, so it costs
   nothing on the common path.
 - Blur-then-reveal on both platforms — a bait image never flashes on screen
@@ -105,16 +109,18 @@ videos still get through.
 - Toggle: **Image bait check** in the ⚙ settings popup (off by default).
   Model + confidence threshold: `imageModel` / `imageConfidenceThreshold` in
   config (default `qwen3-vl:30b` @ 0.6).
-- Live telemetry through August 5, 2026 found 1,626 checks, zero bait verdicts,
-  p50 4.8s, and p95 16.0s. The gate now fails open after 8 seconds and remains
-  opt-in until labels support a real accuracy eval.
+- Historical telemetry through August 5, 2026 contains 1,630 X image attempts,
+  but every stored model response body is empty, so all 1,630 failed open as
+  safe. Latency was p50 4.85s and p95 16.67s, with extreme stalls. The gate now
+  fails open after 8 seconds and remains disabled by default until its runtime
+  output is repaired and labels support a real accuracy eval.
 - **Golden-set labeling** — every image the check runs on gets two small
   buttons (🔞 bait / ✅ safe) so real examples accumulate from ordinary
   scrolling. Labels write to the same durable event log as everything else
   (`kind: "image-label"`) — export via ⬇ Export log in settings. This is
   what eventually grounds a proper accuracy eval for the image model, the
-  same way `benchmarks/golden-x.json` grounds the text classifier today (no
-  such golden set exists yet for images).
+  same way `benchmarks/golden-x.json` grounds the text classifier today. No
+  image labels or image golden set exist yet.
 - Requires pulling the model once: `ollama pull qwen3-vl:30b`.
 
 ## Setup
@@ -130,9 +136,8 @@ Download from [ollama.ai](https://ollama.ai). On Mac, it sits in the menubar and
 ### 2. Pull the models
 
 ```bash
-ollama pull dhiltgen/gemma4:e2b-mlx-bf16  # X stage 1 + memory-aware verdicts
+ollama pull dhiltgen/gemma4:e2b-mlx-bf16  # X + YouTube text classification
 ollama pull all-minilm:latest              # X semantic-memory embeddings
-ollama pull gemma2:2b                      # YouTube title + channel classifier
 ```
 
 Optional image-bait filtering additionally requires `ollama pull qwen3-vl:30b`. The extension settings expose the active models, but changing a production model should be followed by its corresponding regression eval.
@@ -163,7 +168,7 @@ The current streams are `data/events-x.jsonl`, `data/events-youtube.jsonl`, and 
 - **Memory-aware X filter** — Top-five semantic retrieval collapses only deterministic, high-confidence cases after reveal
 - **Tech-focused stage 1** — Tuned for AI engineers and entrepreneurs, with tech/AI safelisting
 - **Result cache** — Revisiting a card applies its exact cached result without another classification
-- **High-precision prefilters** — Obvious X noise and obvious YouTube keeps resolve instantly
+- **High-precision prefilters** — Obvious X noise and obvious YouTube keeps/distractions resolve instantly
 - **Low-latency scheduling** — Stage-1 work takes priority over the asynchronous memory queue
 - **Reply guard** — Bad-faith, bot, and spam replies on your own X threads blur with one-click peek
 - **Recoverable filtering** — Contextual X collapses and YouTube blurs always have a reveal control

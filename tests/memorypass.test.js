@@ -125,6 +125,8 @@ describe('XraiMemoryPass orchestration', () => {
       actionCause: 'repeat',
       model: 'prod',
       failure: null,
+      failureStage: null,
+      failureDetail: null,
     });
     expect(events[0].retrievedTweetIds).toHaveLength(5);
     expect(Number.isFinite(events[0].totalMs)).toBe(true);
@@ -136,16 +138,26 @@ describe('XraiMemoryPass orchestration', () => {
     });
     const result = await pass.run({ id: 'current', text: 'Current claim' });
 
-    expect(result).toMatchObject({ action: 'show', failure: 'retrieval-failed' });
+    expect(result).toMatchObject({
+      action: 'show', failure: 'retrieval-failed', failureStage: 'retrieval', failureDetail: 'embed down',
+    });
     expect(messages).toHaveLength(0);
-    expect(events[0]).toMatchObject({ finalAction: 'show', failure: 'retrieval-failed' });
+    expect(events[0]).toMatchObject({
+      finalAction: 'show', failure: 'retrieval-failed', failureStage: 'retrieval', failureDetail: 'embed down',
+    });
   });
 
   it('fails open on invalid model output', async () => {
     const { pass, events } = loadPass({ contexts: strong, response: { novelty: 'repeat' } });
     const result = await pass.run({ id: 'current', text: 'Current claim' });
-    expect(result).toMatchObject({ action: 'show', failure: 'invalid-model-output' });
-    expect(events[0].finalAction).toBe('show');
+    expect(result).toMatchObject({
+      action: 'show', failure: 'invalid-model-output', failureStage: 'classification',
+      failureDetail: 'Memory model output failed strict validation',
+    });
+    expect(events[0]).toMatchObject({
+      finalAction: 'show', failureStage: 'classification',
+      failureDetail: 'Memory model output failed strict validation',
+    });
   });
 
   it('suppresses a late collapse after one second of active dwell', async () => {

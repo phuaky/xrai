@@ -4,11 +4,11 @@ slug: 20260805-090926_memory-aware-signal-filtering
 project: rai
 effort: deep
 effort_source: explicit
-phase: complete
-progress: 52/52
+phase: execute
+progress: 59/60
 mode: interactive
 started: 2026-08-05T09:09:26Z
-updated: 2026-08-05T20:50:45Z
+updated: 2026-08-20T02:19:27Z
 ---
 
 ## Problem
@@ -128,6 +128,17 @@ Numeric thresholds in ISC-8, 10, 16, 17, 18, 35, 37, 40–43, and 52 are provisi
 
 - [x] ISC-52: Before ContextualDecisionPolicy work begins, a prompt-only spike over at least 40 labeled cases shows the production local model separating `repeat` from `meaningful-update` with at least 75% agreement against Luna or hand labels, given at most five retrieved contexts; a failing spike blocks the build until a Decision names the model or architecture change.
 
+### Production Recovery And Refresh
+
+- [x] ISC-53: With `all-minilm:latest` explicitly unloaded, the real worker embedding adapter returns a valid 384-dimensional vector before its configured cold-start deadline instead of failing over or timing out.
+- [x] ISC-54: After the embedding model is warm, 100 consecutive real adapter calls succeed with p95 latency at or below 150ms without changing the stage-1 text queue.
+- [x] ISC-55: Every failed memory decision records both a bounded failure stage and the underlying failure detail; a generic `retrieval-failed` value alone is rejected by the event-log contract.
+- [ ] ISC-56: The installed-profile seed action imports every non-empty durable X feed-decision record, retries pending embeddings, reports ready/pending/failed counts, and an immediate second run inserts zero duplicates.
+- [x] ISC-57: A production-path replay over at least 100 current kept tweets records at least 99% successful retrievals, zero pre-reveal memory operations, and at least one non-empty retrieved context after the first stored claim.
+- [x] ISC-58: The incremental Luna input contains exactly one row for every retained current-corpus tweet that is new or whose canonical input bytes changed from the frozen August 5 corpus; only byte-identical rows may reuse a frozen verdict.
+- [x] ISC-59: GPT-5.6 Luna/high emits one strict-schema verdict for every incremental input ID, with zero unknown, duplicate, missing, or invalid verdicts and an exact source checksum preserved through the run.
+- [x] ISC-60: A combined chronological sequence eval containing post-freeze traffic preserves 100% critical recall, at least 85% new/update retention, at least 80% familiar-collapse recall, at most 5% false collapse, and at least 85% value-free-funnel collapse.
+
 ### Evaluation And Rollout
 
 - [x] ISC-38: The sequence-aware golden set contains at least 100 scenarios with at least three chronologically ordered tweets per scenario, mined from Luna's `claimCluster` labels.
@@ -168,6 +179,13 @@ Numeric thresholds in ISC-8, 10, 16, 17, 18, 35, 37, 40–43, and 52 are provisi
 | ISC-36 | stage-1-purity | Replay p50 vs baseline + path spy | within 10% of 854ms; 0 memory ops on path | `bun run bench:x:memory` + worker spy |
 | ISC-37 | async-latency | Post-reveal memory verdict timing | p50 <=1,500ms; p95 <=3,000ms | `bun run bench:x:memory` |
 | ISC-52 | feasibility | Repeat vs meaningful-update spike | >=75% agreement on >=40 cases | spike script + labeled slice |
+| ISC-53 | cold-start integration | Unload embedding model, invoke real worker adapter, validate vector | 384 dimensions before configured deadline | Ollama + worker integration probe |
+| ISC-54 | warm embedding performance | Invoke real adapter 100 times after warm-up | 100% success; p95 <=150ms | local benchmark |
+| ISC-55 | observability | Force retrieval-stage failures and validate emitted event fields | stage + bounded root detail on 100% of failures | memory-pass unit/integration test |
+| ISC-56 | profile seed | Import durable browser events twice and retry pending embeddings | all non-empty decisions ready or explicitly failed; second run inserts 0 | browser integration + export probe |
+| ISC-57 | current replay | Run the actual stage-1 then asynchronous memory path over current kept tweets | >=100; retrieval success >=99%; pre-reveal ops 0; non-empty context observed | `bun run bench:x:memory-live` |
+| ISC-58–59 | incremental audit | Diff current canonical IDs from frozen corpus, run Luna, validate exact schema/provenance | exact ID sets; 0 invalid; unchanged source SHA | incremental audit runner |
+| ISC-60 | refreshed sequence quality | Mine and predict combined chronological scenarios containing post-freeze traffic | all five stated quality gates | sequence audit + production predictor |
 | ISC-38 | eval-coverage | Ordered scenario count and length | >=100; >=3 items each | eval manifest validator |
 | ISC-39–43 | sequence-quality | Critical, novelty, repeat, and funnel metrics | stated ISC thresholds | `bun run audit:x:corpus -- mine-sequences --predictions <validated.jsonl>` |
 | ISC-44 | regression | Existing canonical X metrics | no metric below baseline | `bun run eval:x` |
@@ -232,6 +250,18 @@ Numeric thresholds in ISC-8, 10, 16, 17, 18, 35, 37, 40–43, and 52 are provisi
   satisfies: [ISC-36, ISC-37, ISC-45, ISC-47, ISC-48]
   depends_on: [LocalSemanticIndex, ContextualDecisionPolicy]
   parallelizable: true
+
+- name: OperationalRecovery
+  description: Repair real-browser embedding cold starts, make failures diagnosable, backfill the installed profile, and gate rollout on a current production-path canary.
+  satisfies: [ISC-53, ISC-54, ISC-55, ISC-56, ISC-57]
+  depends_on: [ExposureAwareMemory, LocalSemanticIndex, PerformanceAndObservability]
+  parallelizable: false
+
+- name: IncrementalLunaRefresh
+  description: Judge only retained IDs added after the frozen August 5 corpus, preserve exact provenance, and rerun combined chronological quality gates with post-freeze traffic.
+  satisfies: [ISC-58, ISC-59, ISC-60]
+  depends_on: [OperationalRecovery, FullCorpusLunaAudit, SequenceEvalHarness]
+  parallelizable: false
 ```
 
 ## Decisions
@@ -260,11 +290,19 @@ Numeric thresholds in ISC-8, 10, 16, 17, 18, 35, 37, 40–43, and 52 are provisi
 - 2026-08-05 20:50 UTC: The final sequence denominator for familiar-collapse recall includes only normal-importance, collapse-eligible `reinforcement|repeat` steps with strong-known prior exposure. Critical familiar steps are excluded because deterministic policy forbids their collapse; including them would score the policy against an impossible action.
 - 2026-08-05 20:50 UTC: The production local model is stochastic at temperature 0.1. ISC-44 is bound to source identity plus the canonical regression gate: the current model, threshold, stage-1 prompt SHA, and prefilter SHA exactly match the passing 294-item artifact (`100% / 85.1% / 68.0% / cost 91`), while fresh reruns may flip a few threshold-adjacent items and still pass the designed 3-point/5-point regression guard. No stage-1 prompt, prefilter, model, or threshold was changed by this feature.
 - 2026-08-05 20:50 UTC: The tuned runtime prompts and the Luna sequence set are a regression system over observed traffic, not an unseen-distribution generalization claim. Future live judge audits should continue graduating novel misses into the golden sets without weakening critical, update, or low-confidence fail-open rules.
+- 2026-08-19 22:35 UTC: refined: Reopened the completed ISA after post-launch telemetry showed 672/672 live memory attempts failing at retrieval while stage 1 continued fail-open. Added ISC-53–60 so completion now requires a real cold-start probe, warm reliability, actionable failure records, installed-profile backfill, a 100-item current replay, an exact incremental GPT-5.6 Luna audit, and refreshed sequence gates.
+- 2026-08-19 22:48 UTC: refined: ISC-58 rejudges both entirely new IDs and prior IDs whose canonical corpus row changed. Frozen Luna verdicts are reusable only when the full canonical input row is byte-identical; this preserves newly captured long text and changed exposure evidence instead of treating tweet ID alone as immutable provenance.
+- 2026-08-19 23:14 UTC: The incremental GPT-5.6 Luna/high runner rejected temporary outputs for batches 0021 and 0035 because each contained an unknown tweet ID. Neither output was promoted; a resumable second pass skipped 36 validated batches and regenerated only those two, after which all 38 batches passed. The combined current corpus reuses 5,208 prior verdicts only for byte-identical inputs and overlays 3,714 new judgments.
+- 2026-08-20 02:19 UTC: The refreshed 101-scenario production replay passed all five ISC-60 gates over 303 chronological items, including 44 post-freeze scenarios. A deterministic familiar-collapse safety lane preserves explicit timed releases, security findings, personnel changes, company actions, completed shipments, multi-point factual updates, and direct opportunities; exact duplicates still collapse. The production stage-1 prompt, prefilter, model, and threshold remain unchanged.
 
 ## Changelog
 
 - **Conjectured:** the live decision policy depends on the full-corpus Luna audit completing (seed draft: `ContextualDecisionPolicy depends_on FullCorpusLunaAudit`). **Refuted by:** 2026-08-05 author review — runtime memory records need only tweet text, a locally computed embedding, and ledger exposure state, all already on disk; none of Luna's labels are load-bearing at runtime. **Learned:** Luna's labels are an eval asset; memory is a local asset — coupling them made ChatGPT a blocking dependency for a local-first feature. **Criterion now:** ISC-49/50 (local seed, no Luna output), FullCorpusLunaAudit is eval-only, ContextualDecisionPolicy depends on the feasibility spike instead.
 - **Conjectured:** value-free funnels should resolve to `action: hide` (seed draft ISC-30). **Refuted by:** 2026-08-05 author decision for an async memory verdict — the funnel verdict now lands after the tweet is already visible, and removing content mid-read is hostile and unrecoverable. **Learned:** any post-reveal demotion must be collapse-with-reveal; hide/remove is only acceptable when the verdict precedes first paint. **Criterion now:** ISC-30 resolves funnels to a labeled collapse, never removal; the Constraints section carries the general rule.
+- 2026-08-19 | conjectured: passing unit tests, isolated seed tests, and a 24-tweet benchmark were sufficient evidence that semantic retrieval would operate in the installed browser.
+  refuted by: the append-only event ledger through 2026-08-20 contains 672 memory decisions, all with `failure: retrieval-failed`, while a real unloaded `all-minilm:latest` request took 7.08 seconds of which 7.06 seconds was model load against a 5-second worker timeout.
+  learned: local-model cold admission is a separate production state from warm benchmark performance, and fail-open correctness can conceal total feature non-operation unless success-rate telemetry is itself a rollout gate.
+  criterion now: ISC-53–57 require cold and warm adapter probes, specific failure evidence, installed-profile backfill, and a current 100-item production-path replay before memory-aware filtering is considered operational.
 
 ## Verification
 
@@ -559,3 +597,11 @@ Numeric thresholds in ISC-8, 10, 16, 17, 18, 35, 37, 40–43, and 52 are provisi
   Ran 204 tests across 23 files.
   ```
   `for f in extension/lib/*.js extension/content/core/*.js extension/content/x/*.js extension/content/youtube/*.js extension/background/*.js scripts/*.js benchmarks/*.js; do node -c "$f" || exit 1; done && python3 -m py_compile benchmarks/*.py && git diff --check` returned exit code `0` with no output. Focused worker coverage separately returned `16 pass, 0 fail, 106 expect() calls`, including retry behavior, stage-1 interleaving, conditional update confirmation, all collapse-guard routes, strict final-label contracts, empty final context, and the 4,096-token final context window.
+- ISC-53: cold-start integration — `bun run bench:x:embedding` after `ollama stop all-minilm:latest` returned `dimensions: 384`, `cold.success: true`, `cold.elapsedMs: 653`, `configuredTimeoutMs: 15000`, and `cold.beforeDeadline: true`.
+- ISC-54: warm embedding performance — the same real-adapter probe returned `runs: 100`, `successes: 100`, `p50Ms: 18.4`, `p95Ms: 19.7`, `maxMs: 24`, `gateMs: 150`, and `gate.pass: true`.
+- ISC-55: failure observability — `bun test tests/knowledge.test.js tests/memorypass.test.js tests/worker.test.js` returned `48 pass`, `0 fail`, and `207 expect() calls`; the retrieval-failure probe emitted `failure: retrieval-failed`, `failureStage: retrieval`, and `failureDetail: embed down`, while the transport-failure probe confirmed that a timeout does not trigger a second legacy cold-load request.
+- ISC-57: current production-path replay — `bun run bench:x:memory-live` over the post-freeze event mirror returned `stage1Kept: 100`, `preRevealMemoryOps: 0`, `retrievalAttempts: 100`, `retrievalSuccesses: 100`, `retrievalSuccessRate: 1`, `nonEmptyRetrievals: 99`, `validMemoryVerdicts: 100`, and `gate.pass: true`; measured latency was stage-1 p50 `949.1ms` and asynchronous memory p50 `1948.4ms`.
+- ISC-58: incremental corpus provenance — `bun run audit:x:increment prepare` froze `18,671` physical source rows into `8,922` current retained IDs and produced an exact `3,714`-row Luna input: `3,693` new IDs, `21` byte-changed prior IDs, and `5,208` byte-identical reusable IDs. `full-corpus-audit-x.js validate --allow-incomplete` independently returned `corpusCount: 3714`, `pendingBatches: 38`, and corpus SHA `03ecd16d7d0875db56ba61867e4bc0eb3a0ffbd01d7f503f03ca7ef2c65a9ccb`.
+- ISC-59: incremental GPT-5.6 Luna/high audit — the resumable runner finished `verdictCount: 3714` and `validatedBatches: 38`; `audit:x:increment validate` returned `complete: true`, `pendingBatches: 0`, frozen full-source SHA `d54207b5846a497d83cdb16d948473fc5dbf5d36d094384caf29a34f63700d82`, and incremental-source SHA `e2246a7fa8b6a7d79af6b388fbf244c90e5e65b3d3c1aeb18f84ddcd82a6a810`. The report records `143` low-confidence review rows, `105` unjudgeable empty-text rows, and verdict SHA `e2ec6e7dc53a9e4a87a4a7b6a7441592505f3fa3075c6b5489b1f069257f20e6`; the exact merge produced `8,922/8,922` combined verdicts.
+- ISC-60: refreshed production sequence gate — `bun run audit:x:sequence-predict ...` completed `303/303` predictions with zero failures at p50 `1455.6ms` and p95 `2459.3ms`; `bun run eval:x:sequence-current -- --out=data/luna-audit-x-current-2026-08-20` returned `gate.pass: true`, critical recall `171/171` (`100%`), new/update retention `227/233` (`97.42%`), strong-known collapse `25/30` (`83.33%`), false collapse `6/233` (`2.58%`), and value-free-funnel collapse `3/3` (`100%`). Corpus SHA is `675646a42ca6dd0b27dc412a58e14e44b21b0cb718101023cf6a99e17a8f8fb0`, scenario SHA is `d19bf18bf3ed4136700d6931a2f77ff0e168b8722f982a3e13338a87a45d58ee`, and prediction SHA is `286e496735939d6a318aa5b0b5735138a0f9b49b4cfa30c62a55e24fa42e44ac`.
+- Final refreshed regression verification (2026-08-20): `bun test` returned `219 pass`, `0 fail`, and `697 expect() calls`; `bun run eval:x` passed at `100%` critical recall, `85.1%` signal recall, `67.3%` noise catch, weighted cost `92`, p50 `933ms`, and p95 `1023ms`; `bun run eval:x:memory-novelty` passed at `96%` policy agreement, `23/25` repeat collapse, `0/25` update false collapse, p50 `1492.3ms`, and p95 `1647.8ms`; `bun run eval:youtube` passed at `100%` keep recall and `13.3%` false keeps; and `bun run bench:x:embedding` passed with `100/100` warm calls, p50 `15.2ms`, and p95 `18.1ms`.

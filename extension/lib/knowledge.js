@@ -636,10 +636,13 @@ var RaiKnowledge = (function () {
     });
   }
 
-  function importSeed(events) {
+  function importSeed(events, options) {
+    options = options || {};
+    var onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
     var prepared = prepareSeedRecords(events);
     var result = {
       prepared: prepared.length,
+      processed: 0,
       inserted: 0,
       updated: 0,
       skipped: 0,
@@ -656,6 +659,11 @@ var RaiKnowledge = (function () {
           else if (outcome.record) {
             result.pending++;
             if (outcome.record.embeddingError) result.failed++;
+          }
+          result.processed++;
+          if (onProgress && (result.processed === result.prepared || result.processed % 25 === 0)) {
+            try { onProgress(Object.assign({}, result)); }
+            catch (e) { /* progress reporting cannot interrupt a seed */ }
           }
         });
       });

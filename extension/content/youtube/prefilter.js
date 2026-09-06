@@ -1,4 +1,4 @@
-/* ytrai — Pre-filter (regex-based instant KEEP for obvious music / motivational) */
+/* ytrai - high-precision instant decisions before local-model classification */
 var YtraiPrefilter = (function () {
   'use strict';
 
@@ -26,6 +26,16 @@ var YtraiPrefilter = (function () {
   // Speaking") — the AI correctly sorts these as OTHER, the prefilter can't.
   var MOTIVATION_SIGNAL = /\b(study\s+motivation|gym\s+motivation|workout\s+motivation|self[\s-]?discipline|david\s+goggins|jocko\s+willink|les\s+brown|eric\s+thomas|jim\s+rohn)\b/i;
 
+  // Formats that reliably promise a complete, deliberate piece rather than a
+  // contextless clip. These are keeps because false blocking is the costly side.
+  var USEFUL_FORMAT = /(^how\s+to\b|\b(explained|understanding|field\s+guide|postmortem|case\s+study|deep\s+dive|documentary|full\s+(match|journey|interview)|learn(?:ing)?\b|tutorial|review|study\s+with\s+me|pomodoro)\b)/i;
+  var USEFUL_INTEREST = /\b(ai\s+agents?|artificial\s+intelligence|chatgpt|claude|deepseek|postgres|github|robotics?|startups?|espresso|coffee|barista|grinders?|whoop|running|marathon|ultramarathon|cycling|singapore|malaysia)\b/i;
+  var USEFUL_CHANNEL = /\bfight\s+films\b/i;
+
+  // Only patterns whose low-context intent is explicit enough to bypass the
+  // model. Broad words such as "vlog", "sports", or "interview" stay model-owned.
+  var DISTRACTION_SIGNAL = /^(no\s+way\b|this\s+was\s+a\s+bad\s+idea|i\s+couldn['’]t\s+say\s+no|i\s+promised\s+i['’]d\s+find\s+it|i\s+was\s+worried\s+for)|\b(reacting\s+to|try\s+not\s+to\s+laugh|official\s+trailer|gameplay|unboxing\s+every|morning\s+routine|fails?\s+compilation|subscribe\s+for\s+more|loses\s+it|\bdrama\b|no\s+playback|cocomelon|nursery\s+rhymes?)\b/i;
+
   function prefilter(data) {
     var title = (data.title || '').trim();
     var channel = (data.channel || '').trim();
@@ -39,6 +49,12 @@ var YtraiPrefilter = (function () {
     }
     if (MOTIVATION_SIGNAL.test(hay)) {
       return { category: 'motivational', confidence: 0.85, reason: 'motivational' };
+    }
+    if (DISTRACTION_SIGNAL.test(hay)) {
+      return { category: 'distraction', confidence: 0.95, reason: 'clear-distraction' };
+    }
+    if (USEFUL_FORMAT.test(hay) || USEFUL_INTEREST.test(hay) || USEFUL_CHANNEL.test(channel)) {
+      return { category: 'useful', confidence: 0.9, reason: 'useful-format-or-interest' };
     }
     return null; // not obviously keepable — let the AI decide
   }

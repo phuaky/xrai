@@ -64,11 +64,26 @@ var YtraiDetector = (function () {
 
   function extractChannel(el) {
     var cn = el.querySelector('ytd-channel-name, #channel-name, .ytd-channel-name');
-    if (!cn) return '';
-    // Drill into the actual name node; take the first line so trailing badge /
-    // metadata text can't break the end-anchored "- Topic" prefilter match.
-    var nameNode = cn.querySelector('#text, a, yt-formatted-string') || cn;
-    return (nameNode.textContent || '').split('\n')[0].replace(/\s+/g, ' ').trim();
+    if (cn) {
+      // Drill into the actual name node; take the first line so trailing badge /
+      // metadata text can't break the end-anchored "- Topic" prefilter match.
+      var nameNode = cn.querySelector('#text, a, yt-formatted-string') || cn;
+      var legacyName = (nameNode.textContent || '').split('\n')[0].replace(/\s+/g, ' ').trim();
+      if (legacyName) return legacyName;
+    }
+
+    // YouTube's 2026 lockup cards replaced ytd-channel-name with a metadata
+    // view model. Its first metadata text node is the byline; later nodes are
+    // view count and age. Keep this scoped so labels added by rai are ignored.
+    var modern = el.querySelector('yt-content-metadata-view-model');
+    if (!modern) return '';
+    var rows = modern.querySelectorAll('.ytContentMetadataViewModelMetadataText');
+    for (var i = 0; i < rows.length; i++) {
+      var value = (rows[i].textContent || '').replace(/\s+/g, ' ').trim();
+      if (!value || value === '\u2022' || /^\d[\d.,]*[KMB]?\s+views?$/i.test(value) || /\sago$/i.test(value)) continue;
+      return value;
+    }
+    return '';
   }
 
   function scan() {

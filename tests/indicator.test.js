@@ -40,9 +40,14 @@ function makeIndicator(opts = {}) {
   };
   const RaiKnowledge = {
     exportData: () => Promise.resolve({ claims: opts.claims || [] }),
-    importSeed: (events) => {
+    importSeed: (events, options) => {
       seeded = events;
-      return Promise.resolve({ embedded: events.length, pending: 0 });
+      if (options && options.onProgress) {
+        options.onProgress({ processed: events.length, prepared: events.length });
+      }
+      return Promise.resolve({
+        embedded: events.length, pending: 0, failed: 0, inserted: events.length,
+      });
     }
   };
   const chrome = { runtime: {} }; // no .id -> listModels/balance paths skipped
@@ -203,7 +208,7 @@ describe('panel — settings view', () => {
     await tick();
     await tick();
     expect(ctx.seeded()).toEqual(events);
-    expect(seed.textContent).toBe('1 claims ready');
+    expect(seed.textContent).toBe('1 ready · 0 pending · 0 failed · 1 new');
   });
 
   it('back returns to the today view (and does not close the panel)', async () => {

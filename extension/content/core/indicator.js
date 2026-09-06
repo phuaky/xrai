@@ -623,18 +623,29 @@ var RaiIndicator = (function () {
 
       popup.querySelector('#xrai-s-seed-memory').addEventListener('click', function () {
         var btn = popup.querySelector('#xrai-s-seed-memory');
+        if (btn.getAttribute('data-xrai-busy') === 'true') return;
         if (typeof RaiKnowledge === 'undefined' || !RaiKnowledge.importSeed) {
           btn.textContent = 'memory unavailable';
           return;
         }
+        btn.setAttribute('data-xrai-busy', 'true');
         btn.textContent = 'seeding…';
         RaiMemory.getEvents().then(function (events) {
-          return RaiKnowledge.importSeed(events || []);
+          return RaiKnowledge.importSeed(events || [], {
+            onProgress: function (progress) {
+              if (popup && btn.isConnected) {
+                btn.textContent = progress.processed + '/' + progress.prepared + ' claims';
+              }
+            }
+          });
         }).then(function (result) {
-          btn.textContent = result.pending
-            ? result.embedded + ' ready · ' + result.pending + ' retry'
-            : result.embedded + ' claims ready';
-        }).catch(function () { btn.textContent = 'seed failed'; });
+          btn.removeAttribute('data-xrai-busy');
+          btn.textContent = result.embedded + ' ready · ' + result.pending + ' pending · ' +
+            result.failed + ' failed · ' + result.inserted + ' new';
+        }).catch(function () {
+          btn.removeAttribute('data-xrai-busy');
+          btn.textContent = 'seed failed';
+        });
       });
     }
 

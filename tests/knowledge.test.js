@@ -331,6 +331,25 @@ describe('local seed import', () => {
     expect((await RaiKnowledge.get('shown')).embedding).toEqual([1, 0]);
     expect((await RaiKnowledge.get('hidden')).embedding).toBeUndefined();
   });
+
+  it('reports progress and repairs pending embeddings without duplicating claims', async () => {
+    let available = false;
+    const progress = [];
+    const { RaiKnowledge } = loadKnowledge({
+      embed: async () => {
+        if (!available) throw new Error('cold model unavailable');
+        return [1, 0];
+      },
+    });
+    const first = await RaiKnowledge.importSeed(events, { onProgress: (value) => progress.push(value) });
+    expect(first).toMatchObject({ prepared: 2, processed: 2, inserted: 2, pending: 2, failed: 2 });
+    expect(progress.at(-1)).toMatchObject({ processed: 2, prepared: 2 });
+
+    available = true;
+    const second = await RaiKnowledge.importSeed(events);
+    expect(second).toMatchObject({ inserted: 0, updated: 0, skipped: 2, embedded: 2, pending: 0, failed: 0 });
+    expect(await RaiKnowledge.count()).toBe(2);
+  });
 });
 
 describe('runtime integration', () => {
@@ -405,7 +424,8 @@ describe('Ollama embedding adapter', () => {
   function loadWorker(chrome) {
     return new Function(
       'chrome',
-      workerSrc + '\nreturn { embedLocal: embedLocal, DEFAULT_EMBEDDING_MODEL: DEFAULT_EMBEDDING_MODEL };'
+      workerSrc + '\nreturn { embedLocal: embedLocal, DEFAULT_EMBEDDING_MODEL: DEFAULT_EMBEDDING_MODEL, ' +
+        'EMBEDDING_KEEP_ALIVE: EMBEDDING_KEEP_ALIVE, EMBEDDING_TIMEOUT_MS: EMBEDDING_TIMEOUT_MS };'
     )(chrome || { runtime: { onMessage: { addListener() {} } }, storage: { local: { get() {}, set() {} } } });
   }
 
@@ -424,9 +444,31 @@ describe('Ollama embedding adapter', () => {
         'http://localhost:11434/api/embed',
         'http://localhost:11434/api/embeddings',
       ]);
-      expect(calls[0].body).toMatchObject({ model: 'all-minilm:latest', input: 'claim text' });
-      expect(calls[1].body).toMatchObject({ model: 'all-minilm:latest', prompt: 'claim text' });
+      expect(calls[0].body).toMatchObject({
+        model: 'all-minilm:latest', input: 'claim text', keep_alive: worker.EMBEDDING_KEEP_ALIVE,
+      });
+      expect(calls[1].body).toMatchObject({
+        model: 'all-minilm:latest', prompt: 'claim text', keep_alive: worker.EMBEDDING_KEEP_ALIVE,
+      });
+      expect(worker.EMBEDDING_TIMEOUT_MS).toBeGreaterThan(7_000);
       expect(result.embedding).toEqual([3, 4]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('does not retry the legacy endpoint after a timeout or transport failure', async () => {
+    const originalFetch = globalThis.fetch;
+    const urls = [];
+    globalThis.fetch = async (url) => {
+      urls.push(String(url));
+      throw new Error('cold embedding timed out');
+    };
+    try {
+      const worker = loadWorker();
+      await expect(worker.embedLocal('claim text', worker.DEFAULT_EMBEDDING_MODEL, 'http://localhost:11434'))
+        .rejects.toThrow('cold embedding timed out');
+      expect(urls).toEqual(['http://localhost:11434/api/embed']);
     } finally {
       globalThis.fetch = originalFetch;
     }

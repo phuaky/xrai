@@ -4,8 +4,8 @@ import { join } from 'path';
 
 const source = readFileSync(join(import.meta.dir, '../extension/lib/config.js'), 'utf8');
 
-function loadConfig() {
-  return new Function(source + '\nreturn RaiConfig;')();
+function loadConfig(chrome) {
+  return new Function('chrome', source + '\nreturn RaiConfig;')(chrome);
 }
 
 describe('memory-aware configuration', () => {
@@ -17,7 +17,48 @@ describe('memory-aware configuration', () => {
       imageBaitEnabled: false,
     });
     expect(config.DEFAULTS.youtube.memoryAware).toBeUndefined();
-    expect(config.DEFAULTS.youtube.imageBaitEnabled).toBe(false);
+    expect(config.DEFAULTS.youtube).toMatchObject({
+      configVersion: 2,
+      model: 'dhiltgen/gemma4:e2b-mlx-bf16',
+      imageBaitEnabled: false,
+    });
+  });
+
+  it('migrates the former YouTube default model but preserves custom choices', async () => {
+    function storageWith(stored) {
+      const writes = [];
+      return {
+        writes,
+        chrome: {
+          storage: {
+            local: {
+              get(_key, callback) { callback({ ytrai_config: { ...stored } }); },
+              set(value, callback) { writes.push(value); if (callback) callback(); },
+            },
+          },
+        },
+      };
+    }
+
+    const formerDefault = storageWith({
+      configVersion: 1,
+      model: 'gemma2:2b',
+      imageBaitEnabled: true,
+    });
+    const migrated = await loadConfig(formerDefault.chrome).getConfig('youtube');
+    expect(migrated).toMatchObject({
+      configVersion: 2,
+      model: 'dhiltgen/gemma4:e2b-mlx-bf16',
+      imageBaitEnabled: false,
+    });
+    expect(formerDefault.writes.at(-1).ytrai_config).toMatchObject({
+      configVersion: 2,
+      model: 'dhiltgen/gemma4:e2b-mlx-bf16',
+    });
+
+    const custom = storageWith({ configVersion: 1, model: 'custom-youtube-model' });
+    expect(await loadConfig(custom.chrome).getConfig('youtube'))
+      .toMatchObject({ configVersion: 2, model: 'custom-youtube-model' });
   });
 
   it('notifies the live X pipeline when the rollback toggle changes', async () => {

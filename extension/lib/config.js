@@ -25,9 +25,9 @@ var RaiConfig = (function () {
       batchFlushDelay: 2000,
       // Image bait check — gates image-bearing signal tweets behind a vision
       // model before reveal (blur first, same as YouTube). See CLAUDE.md.
-      // Paused by default after 1,626 live checks produced zero bait verdicts
-      // at p50 4.8s / p95 16.0s. It remains available as an opt-in control
-      // while labeled image data accumulates.
+      // Paused by default after 1,630 live attempts all returned empty model
+      // content at p50 4.85s / p95 16.67s. It remains available only as an
+      // experimental opt-in while the runtime path and labeled eval are repaired.
       imageBaitEnabled: false,
       imageModel: 'qwen3-vl:30b',
       imageConfidenceThreshold: 0.6,
@@ -53,17 +53,17 @@ var RaiConfig = (function () {
       cloudApiKey: ''
     },
     youtube: {
-      configVersion: 1,
-      model: 'gemma2:2b',
+      configVersion: 2,
+      model: 'dhiltgen/gemma4:e2b-mlx-bf16',
       ollamaUrl: 'http://localhost:11434',
       confidenceThreshold: 0.6,
-      keepMotivational: true,        // also keep motivational videos, not just music
-      hideMethod: 'blur',            // blur everything that isn't kept
+      keepMotivational: true,
+      hideMethod: 'blur',            // only confident distraction is blurred
       memoryRetentionDays: 30,
       maxModelCallsPerMinute: 120,
-      // Image bait check — gates music/motivational thumbnails behind a
-      // vision model before reveal, to catch bait thumbnails on titles that
-      // would otherwise pass the text classifier.
+      // Image bait check — gates otherwise-kept thumbnails behind a vision
+      // model before reveal, to catch bait thumbnails on titles that would
+      // otherwise pass the text classifier.
       imageBaitEnabled: false,
       imageModel: 'qwen3-vl:30b',
       imageConfidenceThreshold: 0.6,
@@ -135,6 +135,13 @@ var RaiConfig = (function () {
           if (platform === 'x' && !stored.configVersion && stored.hideMethod === 'blur') {
             stored.hideMethod = 'remove';
             stored.configVersion = 2;
+          }
+          // Aug 2026: YouTube's balanced useful/distraction policy needs the
+          // stronger shared text model. Migrate only the former default; an
+          // explicitly chosen custom model remains untouched.
+          if (platform === 'youtube' && (stored.configVersion || 0) < 2 &&
+              (!stored.model || stored.model === 'gemma2:2b')) {
+            stored.model = defaultsFor(platform).model;
           }
           // Aug 2026: pause the unevaluated 30B vision gate after live
           // telemetry showed multi-second waits and no positive catches.

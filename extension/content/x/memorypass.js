@@ -102,6 +102,14 @@ var XraiMemoryPass = (function () {
     });
   }
 
+  function failureInfo(stage, code, detail) {
+    return {
+      stage: String(stage || 'unknown').substring(0, 40),
+      code: String(code || 'memory-failed').substring(0, 80),
+      detail: String(detail || code || 'memory failure').replace(/\s+/g, ' ').trim().substring(0, 300)
+    };
+  }
+
   function logOutcome(input, contexts, verdict, policy, timing, failure) {
     if (typeof RaiMemory === 'undefined' || !RaiMemory.logEvent) return;
     var record = {
@@ -123,7 +131,9 @@ var XraiMemoryPass = (function () {
       retrievalMs: timing.retrievalMs,
       classificationMs: timing.classificationMs,
       totalMs: timing.totalMs,
-      failure: failure || null,
+      failure: failure ? failure.code : null,
+      failureStage: failure ? failure.stage : null,
+      failureDetail: failure ? failure.detail : null,
       source: input.stage1Source,
       model: input.runtimeModel || input.model
     };
@@ -146,23 +156,34 @@ var XraiMemoryPass = (function () {
       cause: 'failure'
     };
     logOutcome(input, contexts || [], null, policy, timing, failure);
-    return { action: 'show', verdict: null, contexts: contexts || [], timing: timing, failure: failure };
+    return {
+      action: 'show',
+      verdict: null,
+      contexts: contexts || [],
+      timing: timing,
+      failure: failure.code,
+      failureStage: failure.stage,
+      failureDetail: failure.detail
+    };
   }
 
   function run(input) {
     var startedAt = Date.now();
     var retrievalStartedAt = Date.now();
     if (!input || !input.id || !String(input.text || '').trim()) {
-      return Promise.resolve(failOpen(input || {}, [], startedAt, 0, 'missing-input'));
+      return Promise.resolve(failOpen(input || {}, [], startedAt, 0,
+        failureInfo('input', 'missing-input', 'Tweet ID or text is missing')));
     }
     if (typeof RaiKnowledge === 'undefined' || !RaiKnowledge.searchWithStatus) {
-      return Promise.resolve(failOpen(input, [], startedAt, 0, 'knowledge-unavailable'));
+      return Promise.resolve(failOpen(input, [], startedAt, 0,
+        failureInfo('retrieval', 'knowledge-unavailable', 'RaiKnowledge.searchWithStatus is unavailable')));
     }
 
     return RaiKnowledge.searchWithStatus(input.text, MAX_CONTEXTS).then(function (retrieval) {
       var retrievalMs = Date.now() - retrievalStartedAt;
       if (!retrieval || !retrieval.ok) {
-        return failOpen(input, [], startedAt, retrievalMs, 'retrieval-failed');
+        return failOpen(input, [], startedAt, retrievalMs,
+          failureInfo('retrieval', 'retrieval-failed', retrieval && retrieval.error));
       }
       var contexts = (retrieval.records || []).filter(function (context) {
         return String(context.tweetId) !== String(input.id);
@@ -185,7 +206,10 @@ var XraiMemoryPass = (function () {
       })).then(function (response) {
         var classificationMs = Date.now() - classificationStartedAt;
         var verdict = validateVerdict(response);
-        if (!verdict) return failOpen(input, contexts, startedAt, retrievalMs, 'invalid-model-output');
+        if (!verdict) {
+          return failOpen(input, contexts, startedAt, retrievalMs,
+            failureInfo('classification', 'invalid-model-output', 'Memory model output failed strict validation'));
+        }
         input.runtimeModel = response._model || input.model;
         var policy = decide(verdict, contexts, input.threshold);
         var activeDwellMs = 0;
@@ -225,11 +249,11 @@ var XraiMemoryPass = (function () {
         };
       }).catch(function (error) {
         return failOpen(input, contexts, startedAt, retrievalMs,
-          String((error && error.message) || error || 'model-failed'));
+          failureInfo('classification', 'model-failed', (error && error.message) || error));
       });
     }).catch(function (error) {
       return failOpen(input, [], startedAt, Date.now() - retrievalStartedAt,
-        String((error && error.message) || error || 'retrieval-failed'));
+        failureInfo('retrieval', 'retrieval-failed', (error && error.message) || error));
     });
   }
 

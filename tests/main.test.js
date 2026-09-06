@@ -1,117 +1,80 @@
-import { describe, it, expect, beforeEach, mock } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { bootXMain } from './helpers/x-main.js';
 
-describe('attachNewTabHandler', () => {
-  // We test the new-tab handler logic directly by simulating what main.js does
-  let openedUrls;
+describe('production tweet click handling', () => {
+  let ctx;
   let originalOpen;
 
   beforeEach(() => {
-    openedUrls = [];
+    document.body.innerHTML = '';
+    window.happyDOM.setURL('https://x.com/search');
     originalOpen = window.open;
-    window.open = mock((url, target) => {
-      openedUrls.push({ url, target });
-    });
+    window.open = mock(() => null);
+    ctx = bootXMain({ memoryAware: false });
   });
 
-  function createTweetElement(author, tweetId, opts = {}) {
-    const article = document.createElement('article');
-
-    const textDiv = document.createElement('div');
-    textDiv.setAttribute('data-testid', 'tweetText');
-    textDiv.textContent = 'Some tweet text here';
-    article.appendChild(textDiv);
-
-    if (opts.blurred) {
-      article.setAttribute('data-xrai-hidden', 'blur');
-    }
-    if (opts.revealed) {
-      article.setAttribute('data-xrai-revealed', '1');
-    }
-
-    return { article, textDiv };
-  }
-
-  // Replicate the attachNewTabHandler logic from main.js
-  function attachNewTabHandler(el, data) {
-    if (!data.author || !data.id) return;
-    var tweetText = el.querySelector('[data-testid="tweetText"]');
-    if (!tweetText || tweetText._xraiNewTab) return;
-    tweetText._xraiNewTab = true;
-    tweetText.addEventListener('click', function (e) {
-      if (e.target.closest('[data-testid="like"], [data-testid="retweet"], [data-testid="reply"], [data-testid="Tweet-User-Avatar"], [role="group"], video, [data-testid="videoPlayer"], [data-testid="tweetPhoto"]')) return;
-      if (el.getAttribute('data-xrai-hidden') === 'blur' && !el.hasAttribute('data-xrai-revealed')) return;
-      e.preventDefault();
-      e.stopPropagation();
-      window.open('https://x.com/' + data.author + '/status/' + data.id, '_blank');
-    });
-  }
-
-  it('opens tweet permalink in new tab on text click', () => {
-    const { article, textDiv } = createTweetElement('swyx', '123456');
-    attachNewTabHandler(article, { author: 'swyx', id: '123456' });
-    textDiv.click();
-
-    expect(openedUrls.length).toBe(1);
-    expect(openedUrls[0].url).toBe('https://x.com/swyx/status/123456');
-    expect(openedUrls[0].target).toBe('_blank');
+  afterEach(() => {
+    window.open = originalOpen;
+    document.body.innerHTML = '';
   });
 
-  it('does not open for tweets with no author', () => {
-    const { article, textDiv } = createTweetElement(null, '123');
-    attachNewTabHandler(article, { author: null, id: '123' });
-    textDiv.click();
-
-    expect(openedUrls.length).toBe(0);
+  it('opens the tweet permalink in a new tab', () => {
+    const article = ctx.emit({ author: 'swyx', id: '123' });
+    article.querySelector('[data-testid="tweetText"]').click();
+    expect(window.open).toHaveBeenCalledTimes(1);
+    expect(window.open).toHaveBeenCalledWith('https://x.com/swyx/status/123', '_blank');
   });
 
-  it('does not open for tweets with no id', () => {
-    const { article, textDiv } = createTweetElement('swyx', null);
-    attachNewTabHandler(article, { author: 'swyx', id: null });
-    textDiv.click();
-
-    expect(openedUrls.length).toBe(0);
+  it.each([{ author: null }, { id: null }])('ignores incomplete tweet data: %j', (data) => {
+    ctx.emit(data).querySelector('[data-testid="tweetText"]').click();
+    expect(window.open).not.toHaveBeenCalled();
   });
 
-  it('does not open for blurred (unrevealed) tweets', () => {
-    const { article, textDiv } = createTweetElement('swyx', '123', { blurred: true });
-    attachNewTabHandler(article, { author: 'swyx', id: '123' });
-    textDiv.click();
-
-    expect(openedUrls.length).toBe(0);
+  it('waits until a blurred tweet is revealed', () => {
+    const article = ctx.emit();
+    article.setAttribute('data-xrai-hidden', 'blur');
+    const text = article.querySelector('[data-testid="tweetText"]');
+    text.click();
+    expect(window.open).not.toHaveBeenCalled();
+    article.setAttribute('data-xrai-revealed', '1');
+    text.click();
+    expect(window.open).toHaveBeenCalledTimes(1);
   });
 
-  it('opens for revealed (unblurred) noise tweets', () => {
-    const { article, textDiv } = createTweetElement('swyx', '123', { blurred: true, revealed: true });
-    attachNewTabHandler(article, { author: 'swyx', id: '123' });
-    textDiv.click();
-
-    expect(openedUrls.length).toBe(1);
-    expect(openedUrls[0].url).toBe('https://x.com/swyx/status/123');
+  it('waits until classification is no longer pending', () => {
+    const article = ctx.emit();
+    article.setAttribute('data-xrai-pending', '1');
+    const text = article.querySelector('[data-testid="tweetText"]');
+    text.click();
+    expect(window.open).not.toHaveBeenCalled();
+    article.removeAttribute('data-xrai-pending');
+    text.click();
+    expect(window.open).toHaveBeenCalledTimes(1);
   });
 
-  it('does not intercept clicks on like button', () => {
-    const { article, textDiv } = createTweetElement('swyx', '123');
-    attachNewTabHandler(article, { author: 'swyx', id: '123' });
-
-    // Simulate a like button inside tweet text (edge case)
-    const likeBtn = document.createElement('div');
-    likeBtn.setAttribute('data-testid', 'like');
-    textDiv.appendChild(likeBtn);
-
-    // Create a click event that originates from the like button
-    const event = new MouseEvent('click', { bubbles: true });
-    Object.defineProperty(event, 'target', { value: likeBtn });
-    textDiv.dispatchEvent(event);
-
-    expect(openedUrls.length).toBe(0);
+  it('does not reopen the current status page', () => {
+    window.happyDOM.setURL('https://x.com/maker/status/tweet-1');
+    ctx.emit().querySelector('[data-testid="tweetText"]').click();
+    expect(window.open).not.toHaveBeenCalled();
   });
 
-  it('does not attach handler twice', () => {
-    const { article, textDiv } = createTweetElement('swyx', '123');
-    attachNewTabHandler(article, { author: 'swyx', id: '123' });
-    attachNewTabHandler(article, { author: 'swyx', id: '123' });
-    textDiv.click();
+  it.each(['like', 'retweet', 'reply', 'Tweet-User-Avatar', 'videoPlayer', 'tweetPhoto'])(
+    'preserves clicks on %s controls', (testId) => {
+      const article = ctx.emit();
+      const control = document.createElement('div');
+      control.setAttribute('data-testid', testId);
+      article.querySelector('[data-testid="tweetText"]').appendChild(control);
+      const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+      control.dispatchEvent(click);
+      expect(window.open).not.toHaveBeenCalled();
+      expect(click.defaultPrevented).toBe(false);
+    },
+  );
 
-    expect(openedUrls.length).toBe(1);
+  it('does not attach a second listener when a tweet is emitted again', () => {
+    const article = ctx.emit();
+    ctx.emit({}, article);
+    article.querySelector('[data-testid="tweetText"]').click();
+    expect(window.open).toHaveBeenCalledTimes(1);
   });
 });

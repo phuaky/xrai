@@ -3,7 +3,7 @@ import { setTimeout as delay } from 'timers/promises';
 import { loadWorker } from '../benchmarks/load-extension.js';
 
 describe('local text scheduling', () => {
-  it('serializes work and unloads the prior rai model on platform switches', async () => {
+  it('serializes shared production-model work without platform-switch churn', async () => {
     const worker = loadWorker();
     const originalFetch = globalThis.fetch;
     const calls = [];
@@ -13,7 +13,7 @@ describe('local text scheduling', () => {
     globalThis.fetch = async (url, options = {}) => {
       if (String(url).endsWith('/api/ps')) {
         return {
-          json: async () => ({ models: [{ name: 'gemma2:2b' }] }),
+          json: async () => ({ models: [{ name: 'dhiltgen/gemma4:e2b-mlx-bf16' }] }),
         };
       }
       const body = JSON.parse(options.body || '{}');
@@ -33,7 +33,7 @@ describe('local text scheduling', () => {
 
     try {
       const xModel = 'dhiltgen/gemma4:e2b-mlx-bf16';
-      const ytModel = 'gemma2:2b';
+      const ytModel = xModel;
       const results = await Promise.all([
         worker.scheduleLocalText(xModel, 'http://ollama.test', task('x-1')),
         worker.scheduleLocalText(xModel, 'http://ollama.test', task('x-2')),
@@ -43,7 +43,7 @@ describe('local text scheduling', () => {
       expect(results).toEqual(['x-1', 'x-2', 'yt-1']);
       expect(maxActive).toBe(1);
       expect(calls.filter((call) => call.body?.keep_alive === 0).map((call) => call.body.model))
-        .toEqual([ytModel, xModel]);
+        .toEqual([]);
       expect(calls.filter((call) => call.task).map((call) => `${call.task}:${call.phase}`))
         .toEqual([
           'x-1:start',
@@ -53,6 +53,32 @@ describe('local text scheduling', () => {
           'yt-1:start',
           'yt-1:end',
         ]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('still unloads the prior model for an explicit custom-model switch', async () => {
+    const worker = loadWorker();
+    const originalFetch = globalThis.fetch;
+    const calls = [];
+    const productionModel = 'dhiltgen/gemma4:e2b-mlx-bf16';
+    const customModel = 'gemma2:2b';
+
+    globalThis.fetch = async (url, options = {}) => {
+      if (String(url).endsWith('/api/ps')) {
+        return { json: async () => ({ models: [{ name: productionModel }] }) };
+      }
+      const body = JSON.parse(options.body || '{}');
+      calls.push(body);
+      return { json: async () => ({}) };
+    };
+
+    try {
+      await worker.scheduleLocalText(productionModel, 'http://ollama.test', async () => 'production');
+      await worker.scheduleLocalText(customModel, 'http://ollama.test', async () => 'custom');
+      expect(calls.filter((body) => body.keep_alive === 0).map((body) => body.model))
+        .toEqual([productionModel]);
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -106,7 +132,7 @@ describe('local text scheduling', () => {
       const request = JSON.parse(options.body);
       const system = request.messages[0].content;
       if (system === worker.X_MEMORY_IMPORTANCE_SYSTEM ||
-          system === worker.X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM) {
+          system === worker.X_MEMORY_COLLAPSE_GUARD_SYSTEM) {
         order.push(system === worker.X_MEMORY_IMPORTANCE_SYSTEM ? 'importance' : 'guard');
         return {
           ok: true,
@@ -145,8 +171,8 @@ describe('local text scheduling', () => {
 
     try {
       const memory = worker.scheduleMemoryClassification(
-        { id: 'now', text: 'current' },
-        [{ tweetId: 'before', text: 'context', similarity: 0.7 }],
+        { id: 'now', text: 'A much broader factual report. '.repeat(12) },
+        [{ tweetId: 'before', text: 'One event fragment', similarity: 0.7 }],
         'dhiltgen/gemma4:e2b-mlx-bf16',
         'http://ollama.test',
       );
@@ -193,38 +219,146 @@ describe('memory classification contract', () => {
     expect(worker.parseMemoryClassification('Result:\n' + JSON.stringify(valid))).toBeNull();
     expect(worker.parseMemoryNovelty('{"prediction":"repeat"}')).toEqual({ prediction: 'repeat' });
     expect(worker.parseMemoryNovelty('{"prediction":"meaningful-update","action":"show"}')).toBeNull();
-    expect(worker.parseMemoryNovelty('{"prediction":"reinforcement"}')).toBeNull();
+    expect(worker.parseMemoryNovelty('{"prediction":"reinforcement"}')).toEqual({
+      prediction: 'reinforcement',
+    });
+    expect(worker.parseMemoryNovelty('meaningful-update\nSupporting explanation')).toEqual({
+      prediction: 'meaningful-update',
+    });
+    expect(worker.parseMemoryNovelty('meaningful-update because facts changed')).toBeNull();
     expect(worker.parseMemoryImportance('{"importance":"critical"}')).toEqual({ importance: 'critical' });
+    expect(worker.parseMemoryImportance('normal\nSupporting explanation')).toEqual({ importance: 'normal' });
+    expect(worker.parseMemoryImportance('normal confidence')).toBeNull();
     expect(worker.parseMemoryImportance('{"importance":"low"}')).toBeNull();
     expect(worker.parseMemoryImportance('{"importance":"normal","action":"show"}')).toBeNull();
+    const assessment = {
+      importance: 'normal', funnelRisk: false, standaloneValue: true,
+      confidence: 0.9, reason: 'Useful facts are present',
+    };
+    expect(worker.parseMemoryAssessment(JSON.stringify(assessment))).toEqual(assessment);
+    expect(worker.parseMemoryAssessment(JSON.stringify({ ...assessment, novelty: 'repeat' }))).toBeNull();
+    const value = {
+      funnelRisk: false, standaloneValue: true,
+      confidence: 0.9, reason: 'Useful facts are present',
+    };
+    expect(worker.parseMemoryValueAssessment(JSON.stringify(value))).toEqual(value);
+    expect(worker.parseMemoryValueAssessment(JSON.stringify({ ...value, importance: 'normal' }))).toBeNull();
   });
 
   it('pins the final model contract and keeps Luna out of runtime', () => {
     const worker = loadWorker();
     const prompts = [
       worker.X_MEMORY_NOVELTY_SYSTEM,
+      worker.X_MEMORY_FAMILIAR_CONFIRM_SYSTEM,
       worker.X_MEMORY_UPDATE_RECHECK_SYSTEM,
-      worker.X_MEMORY_UPDATE_CONFIRM_SYSTEM,
-      worker.X_MEMORY_HIGH_OVERLAP_SYSTEM,
-      worker.X_MEMORY_LAUNCH_REPEAT_SYSTEM,
-      worker.X_MEMORY_COLLAPSE_GUARD_AI_SYSTEM,
-      worker.X_MEMORY_COLLAPSE_GUARD_NS_SYSTEM,
-      worker.X_MEMORY_COLLAPSE_GUARD_EVENT_SYSTEM,
-      worker.X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM,
+      worker.X_MEMORY_COLLAPSE_GUARD_SYSTEM,
       worker.X_MEMORY_IMPORTANCE_SYSTEM,
       worker.X_MEMORY_SYSTEM,
     ];
 
-    expect(worker.X_MEMORY_SYSTEM).toContain('Return exactly these six keys and no others');
-    expect(worker.X_MEMORY_SYSTEM).toContain('novelty is one string, never separate boolean keys');
-    expect(worker.X_MEMORY_SYSTEM).toContain('knownState, or action');
-    expect(worker.X_MEMORY_SYSTEM).toContain('FOCUSED NOVELTY REQUIRED');
-    expect(worker.X_MEMORY_SYSTEM).toContain('FOCUSED IMPORTANCE');
-    expect(worker.X_MEMORY_COLLAPSE_GUARD_AI_SYSTEM).not.toContain('IMMEDIATE CRITICAL');
-    expect(worker.X_MEMORY_COLLAPSE_GUARD_NS_SYSTEM).not.toContain('IMMEDIATE NORMAL');
+    expect(worker.X_MEMORY_SYSTEM).toContain('Return exactly these four keys and no others');
+    expect(worker.X_MEMORY_SYSTEM).toContain('Never add importance, novelty, knownState, or action');
+    expect(worker.X_MEMORY_COLLAPSE_GUARD_SYSTEM).toContain('final safety check');
     for (const prompt of prompts) {
       expect(prompt).not.toMatch(/\bLuna\b/i);
       expect(prompt).not.toContain('claimCluster');
+    }
+  });
+
+  it('recognizes concrete critical updates without treating clarification lists as alerts', () => {
+    const worker = loadWorker();
+    const cases = [
+      ['Another UPDATE: 1) the witness stepped forward 2) records were released', 'enumerated-update'],
+      ['CLAUDE OPUS 5 DROPS TODAY at half the prior price.', 'release-timing'],
+      ['A quantum signature system was weakened enough to recover its secret key.', 'security-finding'],
+      ['Anthropic will develop custom AI chips for Claude.', 'company-action'],
+      ['Google DeepMind CEO steps down to become chair.', 'personnel-change'],
+      ['The team worked around the clock and made it happen in time. Enjoy Fable.', 'completed-release'],
+    ];
+    for (const [text, expected] of cases) {
+      expect(worker.criticalFamiliarSignalKind({ text })).toBe(expected);
+    }
+    expect(worker.criticalFamiliarSignalKind({
+      text: ('A few questions about the project. Would appreciate clarification: ' +
+        '1) Is it local? 2) Who pays? 3) What license applies? ').repeat(3),
+    })).toBeNull();
+    expect(worker.isDirectOpportunityInvitation({
+      text: 'The program is back, who’s down to go to Kazakhstan?',
+    })).toBe(true);
+  });
+
+  it('shows a critical-shaped familiar item before the model can flatten its importance', async () => {
+    const worker = loadWorker();
+    const originalFetch = globalThis.fetch;
+    const systems = [];
+    globalThis.fetch = async (url, options = {}) => {
+      if (!String(url).endsWith('/api/chat')) return { ok: true, json: async () => ({}) };
+      const request = JSON.parse(options.body);
+      const system = request.messages[0].content;
+      systems.push(system);
+      const content = system === worker.X_MEMORY_SYSTEM
+        ? JSON.stringify({
+          funnelRisk: false, standaloneValue: true,
+          confidence: 0.9, reason: 'Concrete update safety lane',
+        })
+        : JSON.stringify({ prediction: 'repeat' });
+      return { ok: true, json: async () => ({ message: { content } }) };
+    };
+
+    try {
+      const result = await worker.classifyMemory(
+        {
+          id: 'now',
+          text: 'Another UPDATE: 1) the witness stepped forward 2) records were released. Thoughts?',
+        },
+        [{
+          tweetId: 'before', text: 'The earlier allegation.', similarity: 0.7,
+          knownState: 'strong',
+        }],
+        'model',
+        'http://ollama.test',
+      );
+      expect(result.importance).toBe('critical');
+      expect(result.novelty).toBe('repeat');
+      expect(result._importanceChecks).toEqual([
+        { kind: 'critical-safety', importance: 'critical', lane: 'enumerated-update' },
+      ]);
+      expect(systems).toEqual([worker.X_MEMORY_SYSTEM]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('still collapses an exact duplicate with a critical-looking headline', async () => {
+    const worker = loadWorker();
+    const originalFetch = globalThis.fetch;
+    const text = 'JUST IN: Anthropic will develop custom AI chips for Claude.';
+    globalThis.fetch = async (url, options = {}) => {
+      if (!String(url).endsWith('/api/chat')) return { ok: true, json: async () => ({}) };
+      return {
+        ok: true,
+        json: async () => ({
+          message: { content: JSON.stringify({
+            funnelRisk: false, standaloneValue: true,
+            confidence: 0.9, reason: 'Exact duplicate',
+          }) },
+        }),
+      };
+    };
+
+    try {
+      const result = await worker.classifyMemory(
+        { id: 'now', text },
+        [{ tweetId: 'before', text, similarity: 1, knownState: 'strong' }],
+        'model',
+        'http://ollama.test',
+      );
+      expect(result.importance).toBe('normal');
+      expect(result._importanceChecks).toEqual([
+        { kind: 'exact-containment', importance: 'normal' },
+      ]);
+    } finally {
+      globalThis.fetch = originalFetch;
     }
   });
 
@@ -253,9 +387,9 @@ describe('memory classification contract', () => {
 
     try {
       await worker.classifyMemory({ id: 'now', text: 'current' }, [], 'model', 'http://ollama.test');
-      expect(request.format).toBeUndefined();
-      expect(request.options).toMatchObject({ temperature: 0.1, num_predict: 100, num_ctx: 4096 });
-      expect(request.options.seed).toBeUndefined();
+      expect(request.format).toBe('json');
+      expect(request.options).toMatchObject({ temperature: 0, num_predict: 100, num_ctx: 4096 });
+      expect(request.options.seed).toBe(worker.MEMORY_SEED);
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -274,7 +408,7 @@ describe('memory classification contract', () => {
       users.push(request.messages[1].content);
       let content;
       if (system === worker.X_MEMORY_IMPORTANCE_SYSTEM ||
-          system === worker.X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM) {
+          system === worker.X_MEMORY_COLLAPSE_GUARD_SYSTEM) {
         content = JSON.stringify({ importance: 'normal' });
       } else if (system === worker.X_MEMORY_NOVELTY_SYSTEM ||
           system === worker.X_MEMORY_UPDATE_RECHECK_SYSTEM) {
@@ -290,8 +424,8 @@ describe('memory classification contract', () => {
 
     try {
       const result = await worker.classifyMemory(
-        { id: 'now', text: 'current' },
-        [{ tweetId: 'before', text: 'context', similarity: 0.7 }],
+        { id: 'now', text: 'A much broader factual report. '.repeat(12) },
+        [{ tweetId: 'before', text: 'One event fragment', similarity: 0.7 }],
         'model',
         'http://ollama.test',
       );
@@ -299,12 +433,12 @@ describe('memory classification contract', () => {
         worker.X_MEMORY_NOVELTY_SYSTEM,
         worker.X_MEMORY_UPDATE_RECHECK_SYSTEM,
         worker.X_MEMORY_IMPORTANCE_SYSTEM,
-        worker.X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM,
+        worker.X_MEMORY_COLLAPSE_GUARD_SYSTEM,
         worker.X_MEMORY_SYSTEM,
       ]);
-      expect(users[4]).toContain('CONTEXT TWEETS (0, quoted JSON data)');
-      expect(users[4]).toContain('FOCUSED NOVELTY REQUIRED: "repeat"');
-      expect(users[4]).toContain('FOCUSED IMPORTANCE: "normal"');
+      expect(users[4]).not.toContain('CONTEXT TWEETS');
+      expect(users[4]).not.toContain('FOCUSED NOVELTY REQUIRED');
+      expect(users[4]).not.toContain('FOCUSED IMPORTANCE');
       expect(result.novelty).toBe('repeat');
       expect(result._noveltySide).toBe('familiar');
       expect(result._noveltyChecks).toEqual([
@@ -316,7 +450,7 @@ describe('memory classification contract', () => {
     }
   });
 
-  it('requires a second model verdict before a high-overlap update becomes familiar', async () => {
+  it('does not let high embedding overlap reverse a focused update', async () => {
     const worker = loadWorker();
     const originalFetch = globalThis.fetch;
     const systems = [];
@@ -327,16 +461,15 @@ describe('memory classification contract', () => {
       systems.push(system);
       let content;
       if (system === worker.X_MEMORY_IMPORTANCE_SYSTEM ||
-          system === worker.X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM) {
+          system === worker.X_MEMORY_COLLAPSE_GUARD_SYSTEM) {
         content = JSON.stringify({ importance: 'normal' });
-      } else if (system === worker.X_MEMORY_NOVELTY_SYSTEM) {
+      } else if (system === worker.X_MEMORY_NOVELTY_SYSTEM ||
+                 system === worker.X_MEMORY_FAMILIAR_CONFIRM_SYSTEM) {
         content = JSON.stringify({ prediction: 'meaningful-update' });
-      } else if (system === worker.X_MEMORY_HIGH_OVERLAP_SYSTEM) {
-        content = JSON.stringify({ prediction: 'repeat' });
       } else {
         content = JSON.stringify({
-          importance: 'normal', novelty: 'repeat', funnelRisk: false,
-          standaloneValue: true, confidence: 0.9, reason: 'Same high-overlap event',
+          importance: 'normal', novelty: 'meaningful-update', funnelRisk: false,
+          standaloneValue: true, confidence: 0.9, reason: 'Concrete update preserved',
         });
       }
       return { ok: true, json: async () => ({ message: { content } }) };
@@ -351,28 +484,27 @@ describe('memory classification contract', () => {
       );
       expect(systems).toEqual([
         worker.X_MEMORY_NOVELTY_SYSTEM,
-        worker.X_MEMORY_HIGH_OVERLAP_SYSTEM,
+        worker.X_MEMORY_FAMILIAR_CONFIRM_SYSTEM,
         worker.X_MEMORY_IMPORTANCE_SYSTEM,
-        worker.X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM,
         worker.X_MEMORY_SYSTEM,
       ]);
       expect(result._noveltyChecks).toEqual([
         { kind: 'focused', prediction: 'meaningful-update' },
-        { kind: 'high-overlap', prediction: 'repeat' },
+        { kind: 'familiar-confirm', prediction: 'meaningful-update' },
       ]);
-      expect(result.novelty).toBe('repeat');
+      expect(result.novelty).toBe('meaningful-update');
     } finally {
       globalThis.fetch = originalFetch;
     }
   });
 
-  it('confirms promoted updates only when retrieved exposure is strong', async () => {
+  it('preserves a rechecked update regardless of retrieved exposure strength', async () => {
     const worker = loadWorker();
     const originalFetch = globalThis.fetch;
 
     async function classify(knownState) {
       const systems = [];
-      const requiredNovelty = knownState === 'strong' ? 'repeat' : 'meaningful-update';
+      const requiredNovelty = 'meaningful-update';
       globalThis.fetch = async (url, options = {}) => {
         if (!String(url).endsWith('/api/chat')) return { ok: true, json: async () => ({}) };
         const request = JSON.parse(options.body);
@@ -380,14 +512,12 @@ describe('memory classification contract', () => {
         systems.push(system);
         let content;
         if (system === worker.X_MEMORY_IMPORTANCE_SYSTEM ||
-            system === worker.X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM) {
+            system === worker.X_MEMORY_COLLAPSE_GUARD_SYSTEM) {
           content = '{"importance":"normal"}';
         } else if (system === worker.X_MEMORY_NOVELTY_SYSTEM) {
           content = '{"prediction":"repeat"}';
         } else if (system === worker.X_MEMORY_UPDATE_RECHECK_SYSTEM) {
           content = '{"prediction":"meaningful-update"}';
-        } else if (system === worker.X_MEMORY_UPDATE_CONFIRM_SYSTEM) {
-          content = '{"prediction":"repeat"}';
         } else {
           content = JSON.stringify({
             importance: 'normal', novelty: requiredNovelty, funnelRisk: false,
@@ -398,8 +528,8 @@ describe('memory classification contract', () => {
       };
 
       const result = await worker.classifyMemory(
-        { id: 'now', text: 'A familiar claim with one more framing sentence' },
-        [{ tweetId: 'before', text: 'The established claim', similarity: 0.7, knownState }],
+        { id: 'now', text: 'A broader factual report with participants and mechanics. '.repeat(8) },
+        [{ tweetId: 'before', text: 'One event fragment', similarity: 0.7, knownState }],
         'model',
         'http://ollama.test',
       );
@@ -411,25 +541,23 @@ describe('memory classification contract', () => {
       expect(strongResult.systems).toEqual([
         worker.X_MEMORY_NOVELTY_SYSTEM,
         worker.X_MEMORY_UPDATE_RECHECK_SYSTEM,
-        worker.X_MEMORY_UPDATE_CONFIRM_SYSTEM,
         worker.X_MEMORY_IMPORTANCE_SYSTEM,
-        worker.X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM,
         worker.X_MEMORY_SYSTEM,
       ]);
       expect(strongResult.result._noveltyChecks).toEqual([
         { kind: 'focused', prediction: 'repeat' },
         { kind: 'update-recheck', prediction: 'meaningful-update' },
-        { kind: 'update-confirm', prediction: 'repeat' },
       ]);
+      expect(strongResult.result.novelty).toBe('meaningful-update');
       expect(strongResult.result._importanceChecks).toEqual([
-        { kind: 'focused', importance: 'normal' },
-        { kind: 'collapse-guard', importance: 'normal', lane: 'x-memory-collapse-guard' },
+        { kind: 'focused-new-information', importance: 'normal' },
       ]);
 
       const weakResult = await classify('weak');
       expect(weakResult.systems).toEqual([
         worker.X_MEMORY_NOVELTY_SYSTEM,
         worker.X_MEMORY_UPDATE_RECHECK_SYSTEM,
+        worker.X_MEMORY_IMPORTANCE_SYSTEM,
         worker.X_MEMORY_SYSTEM,
       ]);
       expect(weakResult.result.novelty).toBe('meaningful-update');
@@ -438,14 +566,106 @@ describe('memory classification contract', () => {
         { kind: 'update-recheck', prediction: 'meaningful-update' },
       ]);
       expect(weakResult.result._importanceChecks).toEqual([
-        { kind: 'final', importance: 'normal' },
+        { kind: 'focused-new-information', importance: 'normal' },
       ]);
     } finally {
       globalThis.fetch = originalFetch;
     }
   });
 
-  it('runs the literal Falcon repeat check before collapsing a strong-known launch caption', async () => {
+  it('keeps independent support on the familiar reinforcement side', async () => {
+    const worker = loadWorker();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url, options = {}) => {
+      if (!String(url).endsWith('/api/chat')) return { ok: true, json: async () => ({}) };
+      const system = JSON.parse(options.body).messages[0].content;
+      let content;
+      if (system === worker.X_MEMORY_NOVELTY_SYSTEM) {
+        content = '{"prediction":"reinforcement"}';
+      } else if (system === worker.X_MEMORY_UPDATE_RECHECK_SYSTEM) {
+        content = '{"prediction":"repeat"}';
+      } else if (system === worker.X_MEMORY_IMPORTANCE_SYSTEM ||
+                 system === worker.X_MEMORY_COLLAPSE_GUARD_SYSTEM) {
+        content = '{"importance":"normal"}';
+      } else {
+        content = JSON.stringify({
+          importance: 'normal', novelty: 'reinforcement', funnelRisk: false,
+          standaloneValue: true, confidence: 0.9, reason: 'Supports known conclusion',
+        });
+      }
+      return { ok: true, json: async () => ({ message: { content } }) };
+    };
+
+    try {
+      const result = await worker.classifyMemory(
+        { id: 'now', text: 'Another independent example supports the known claim. '.repeat(3) },
+        [{
+          tweetId: 'before',
+          text: 'The established claim and its factual basis remain unchanged. '.repeat(3),
+          knownState: 'strong',
+          similarity: 0.7,
+        }],
+        'model',
+        'http://ollama.test',
+      );
+      expect(result.novelty).toBe('reinforcement');
+      expect(result._noveltySide).toBe('familiar');
+      expect(result._noveltyChecks).toEqual([
+        { kind: 'focused', prediction: 'reinforcement' },
+      ]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('rechecks a materially broader report even when the first pass calls it reinforcement', async () => {
+    const worker = loadWorker();
+    const originalFetch = globalThis.fetch;
+    const systems = [];
+    globalThis.fetch = async (url, options = {}) => {
+      if (!String(url).endsWith('/api/chat')) return { ok: true, json: async () => ({}) };
+      const system = JSON.parse(options.body).messages[0].content;
+      systems.push(system);
+      let content;
+      if (system === worker.X_MEMORY_NOVELTY_SYSTEM) {
+        content = '{"prediction":"reinforcement"}';
+      } else if (system === worker.X_MEMORY_UPDATE_RECHECK_SYSTEM) {
+        content = '{"prediction":"meaningful-update"}';
+      } else if (system === worker.X_MEMORY_IMPORTANCE_SYSTEM) {
+        content = '{"importance":"normal"}';
+      } else {
+        content = JSON.stringify({
+          importance: 'normal', novelty: 'meaningful-update', funnelRisk: false,
+          standaloneValue: true, confidence: 0.9, reason: 'Broader report adds mechanics',
+        });
+      }
+      return { ok: true, json: async () => ({ message: { content } }) };
+    };
+
+    try {
+      const result = await worker.classifyMemory(
+        { id: 'now', text: 'A broader report with participants and mechanics. '.repeat(8) },
+        [{ tweetId: 'before', text: 'One event fragment', similarity: 0.7 }],
+        'model',
+        'http://ollama.test',
+      );
+      expect(systems).toEqual([
+        worker.X_MEMORY_NOVELTY_SYSTEM,
+        worker.X_MEMORY_UPDATE_RECHECK_SYSTEM,
+        worker.X_MEMORY_IMPORTANCE_SYSTEM,
+        worker.X_MEMORY_SYSTEM,
+      ]);
+      expect(result.novelty).toBe('meaningful-update');
+      expect(result._noveltyChecks).toEqual([
+        { kind: 'focused', prediction: 'reinforcement' },
+        { kind: 'update-recheck', prediction: 'meaningful-update' },
+      ]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('does not let a topic-specific launch check reverse a rechecked update', async () => {
     const worker = loadWorker();
     const originalFetch = globalThis.fetch;
     const systems = [];
@@ -456,19 +676,16 @@ describe('memory classification contract', () => {
       systems.push(system);
       let content;
       if (system === worker.X_MEMORY_IMPORTANCE_SYSTEM ||
-          system === worker.X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM) {
+          system === worker.X_MEMORY_COLLAPSE_GUARD_SYSTEM) {
         content = '{"importance":"normal"}';
       } else if (system === worker.X_MEMORY_NOVELTY_SYSTEM) {
         content = '{"prediction":"repeat"}';
-      } else if (system === worker.X_MEMORY_UPDATE_RECHECK_SYSTEM ||
-                 system === worker.X_MEMORY_UPDATE_CONFIRM_SYSTEM) {
+      } else if (system === worker.X_MEMORY_UPDATE_RECHECK_SYSTEM) {
         content = '{"prediction":"meaningful-update"}';
-      } else if (system === worker.X_MEMORY_LAUNCH_REPEAT_SYSTEM) {
-        content = '{"prediction":"repeat"}';
       } else {
         content = JSON.stringify({
-          importance: 'normal', novelty: 'repeat', funnelRisk: false,
-          standaloneValue: true, confidence: 0.9, reason: 'Same Falcon 9 launch',
+          importance: 'normal', novelty: 'meaningful-update', funnelRisk: false,
+          standaloneValue: true, confidence: 0.9, reason: 'Launch update preserved',
         });
       }
       return { ok: true, json: async () => ({ message: { content } }) };
@@ -476,9 +693,9 @@ describe('memory classification contract', () => {
 
     try {
       const result = await worker.classifyMemory(
-        { id: 'now', text: 'Falcon 9 launches from pad. Watch live.' },
+        { id: 'now', text: 'Falcon 9 mission report with participants, hardware, mechanics, results, and purpose. '.repeat(6) },
         [{
-          tweetId: 'before', text: 'Falcon 9 mission to orbit is live', similarity: 0.8,
+          tweetId: 'before', text: 'Falcon 9 launches', similarity: 0.8,
           knownState: 'strong',
         }],
         'model',
@@ -487,31 +704,27 @@ describe('memory classification contract', () => {
       expect(systems).toEqual([
         worker.X_MEMORY_NOVELTY_SYSTEM,
         worker.X_MEMORY_UPDATE_RECHECK_SYSTEM,
-        worker.X_MEMORY_UPDATE_CONFIRM_SYSTEM,
-        worker.X_MEMORY_LAUNCH_REPEAT_SYSTEM,
         worker.X_MEMORY_IMPORTANCE_SYSTEM,
-        worker.X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM,
         worker.X_MEMORY_SYSTEM,
       ]);
-      expect(result.novelty).toBe('repeat');
-      expect(result._noveltyChecks.at(-1)).toEqual({ kind: 'launch-repeat', prediction: 'repeat' });
+      expect(result.novelty).toBe('meaningful-update');
+      expect(result._noveltyChecks.at(-1)).toEqual({
+        kind: 'update-recheck', prediction: 'meaningful-update',
+      });
     } finally {
       globalThis.fetch = originalFetch;
     }
   });
 
-  it('routes familiar collapse candidates through the matching critical guard', async () => {
+  it('routes every familiar collapse candidate through the general critical guard', async () => {
     const worker = loadWorker();
     const originalFetch = globalThis.fetch;
-    const cases = [
-      ['Claude model update', worker.X_MEMORY_COLLAPSE_GUARD_AI_SYSTEM, 'x-memory-collapse-guard-ai'],
-      ['Network School Malaysia update', worker.X_MEMORY_COLLAPSE_GUARD_NS_SYSTEM, 'x-memory-collapse-guard-ns'],
-      ['Airtable acquisition valuation', worker.X_MEMORY_COLLAPSE_GUARD_EVENT_SYSTEM, 'x-memory-collapse-guard-event'],
-      ['Ordinary familiar topic', worker.X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM, 'x-memory-collapse-guard'],
-    ];
+    const cases = ['Claude model update', 'Network School Malaysia update',
+      'Airtable acquisition valuation', 'Ordinary familiar topic'].map((text) =>
+      (text + ' with enough context to require a model-based critical safety decision. ').repeat(3));
 
     try {
-      for (const [text, expectedGuard, expectedLane] of cases) {
+      for (const text of cases) {
         const systems = [];
         globalThis.fetch = async (url, options = {}) => {
           if (!String(url).endsWith('/api/chat')) return { ok: true, json: async () => ({}) };
@@ -524,7 +737,7 @@ describe('memory classification contract', () => {
           } else if (system === worker.X_MEMORY_NOVELTY_SYSTEM ||
                      system === worker.X_MEMORY_UPDATE_RECHECK_SYSTEM) {
             content = '{"prediction":"repeat"}';
-          } else if (system === expectedGuard) {
+          } else if (system === worker.X_MEMORY_COLLAPSE_GUARD_SYSTEM) {
             content = '{"importance":"critical"}';
           } else {
             content = JSON.stringify({
@@ -541,12 +754,12 @@ describe('memory classification contract', () => {
           'model',
           'http://ollama.test',
         );
-        expect(systems).toContain(expectedGuard);
+        expect(systems).toContain(worker.X_MEMORY_COLLAPSE_GUARD_SYSTEM);
         expect(result.importance).toBe('critical');
         expect(result._importanceCheck).toBe('critical');
         expect(result._importanceChecks).toEqual([
           { kind: 'focused', importance: 'normal' },
-          { kind: 'collapse-guard', importance: 'critical', lane: expectedLane },
+          { kind: 'collapse-guard', importance: 'critical', lane: 'x-memory-collapse-guard' },
         ]);
       }
     } finally {
@@ -568,7 +781,7 @@ describe('memory classification contract', () => {
       } else if (system === worker.X_MEMORY_NOVELTY_SYSTEM ||
                  system === worker.X_MEMORY_UPDATE_RECHECK_SYSTEM) {
         content = '{"prediction":"repeat"}';
-      } else if (system === worker.X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM) {
+      } else if (system === worker.X_MEMORY_COLLAPSE_GUARD_SYSTEM) {
         guardCalls++;
         content = guardCalls === 1 ? '{"importance":"low"}' : '{"importance":"critical"}';
       } else {
@@ -582,7 +795,7 @@ describe('memory classification contract', () => {
 
     try {
       const result = await worker.classifyMemory(
-        { id: 'now', text: 'Ordinary familiar topic' },
+        { id: 'now', text: 'Ordinary familiar topic with enough detail for a model safety decision. '.repeat(3) },
         [{ tweetId: 'before', text: 'Known context', similarity: 0.7, knownState: 'strong' }],
         'model',
         'http://ollama.test',
@@ -603,7 +816,7 @@ describe('memory classification contract', () => {
       const system = request.messages[0].content;
       let content;
       if (system === worker.X_MEMORY_IMPORTANCE_SYSTEM ||
-          system === worker.X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM) {
+          system === worker.X_MEMORY_COLLAPSE_GUARD_SYSTEM) {
         content = '{"importance":"normal"}';
       } else if (system === worker.X_MEMORY_NOVELTY_SYSTEM ||
           system === worker.X_MEMORY_UPDATE_RECHECK_SYSTEM) {
@@ -678,7 +891,7 @@ describe('memory classification contract', () => {
         content = importanceCalls === 1
           ? '{"importance":"2"}'
           : '{"importance":"normal"}';
-      } else if (system === worker.X_MEMORY_COLLAPSE_GUARD_GENERAL_SYSTEM) {
+      } else if (system === worker.X_MEMORY_COLLAPSE_GUARD_SYSTEM) {
         content = '{"importance":"normal"}';
       } else if (system === worker.X_MEMORY_NOVELTY_SYSTEM ||
           system === worker.X_MEMORY_UPDATE_RECHECK_SYSTEM) {
@@ -713,7 +926,7 @@ describe('memory classification contract', () => {
     }
   });
 
-  it('bounds the current tweet and at most five context summaries', () => {
+  it('bounds the current assessment and at most five focused context summaries', () => {
     const worker = loadWorker();
     const contexts = Array.from({ length: 7 }, (_, index) => ({
       tweetId: 'ctx-' + index,
@@ -722,14 +935,11 @@ describe('memory classification contract', () => {
     }));
     const message = worker.buildMemoryUserMessage({ id: 'now', text: 'x'.repeat(7_000) }, contexts);
     const lines = message.split('\n');
-    const supplied = JSON.parse(lines[1]);
-    const current = JSON.parse(lines[3]);
+    const current = JSON.parse(lines[1]);
 
     expect(current.text).toHaveLength(6_000);
     expect(current.truncated).toBe(true);
-    expect(supplied).toHaveLength(worker.MEMORY_MAX_CONTEXTS);
-    expect(supplied.every((context) => context.text.length === 1_200 && context.truncated)).toBe(true);
-    expect(message).not.toContain('ctx-6');
+    expect(message).not.toContain('ctx-0');
 
     const focused = worker.buildMemoryNoveltyUserMessage(
       { id: 'now', text: 'x'.repeat(7_000) },
@@ -739,5 +949,25 @@ describe('memory classification contract', () => {
     expect(focused).not.toContain('ctx-5');
     expect(focused).not.toContain('ctx-6');
     expect(focused).not.toContain('x'.repeat(6_001));
+  });
+
+  it('reserves the broader-report safety recheck for materially fuller reports', () => {
+    const worker = loadWorker();
+    expect(worker.shouldRunMemoryUpdateRecheck(
+      { text: 'A broader report with concrete details. '.repeat(10) },
+      [{ text: 'One event fragment' }],
+    )).toBe(true);
+    expect(worker.shouldRunMemoryUpdateRecheck(
+      { text: 'A short restatement' },
+      [{ text: 'A detailed known report with the same event and its consequences' }],
+    )).toBe(false);
+    expect(worker.shouldRunMemoryUpdateRecheck(
+      { text: 'We are investigating the incident and sharing preliminary findings.' },
+      [{ text: 'An observer says the incident happened.' }],
+    )).toBe(true);
+    expect(worker.shouldRunMemoryUpdateRecheck(
+      { text: 'Code Arena now measures fullstack capabilities.' },
+      [{ text: 'Code Arena ranked the prior model on frontend tasks.' }],
+    )).toBe(true);
   });
 });
