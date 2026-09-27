@@ -39,7 +39,7 @@ Create `~/Library/LaunchAgents/com.ollama.env.plist`:
   <array>
     <string>/bin/sh</string>
     <string>-c</string>
-    <string>launchctl setenv OLLAMA_ORIGINS "chrome-extension://*"; launchctl setenv OLLAMA_HOST "127.0.0.1:11434"; sleep 2; open -a Ollama</string>
+    <string>launchctl setenv OLLAMA_ORIGINS "chrome-extension://*"; launchctl setenv OLLAMA_HOST "127.0.0.1:11434"; launchctl setenv OLLAMA_MAX_LOADED_MODELS "2"; sleep 2; OLLAMA_MAX_LOADED_MODELS=2 open -a Ollama --env OLLAMA_MAX_LOADED_MODELS=2</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
@@ -79,3 +79,51 @@ launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.ollama.env.plist
 rm ~/Library/LaunchAgents/com.ollama.env.plist
 ```
 Then re-enable Ollama as a Login Item if desired.
+
+
+## Ollama responds, but classification times out
+
+rai uses a text model and an embedding model. With
+`OLLAMA_MAX_LOADED_MODELS=1`, embedding requests can unload the text model.
+The 30-minute keep-alive does not prevent this eviction.
+
+Set the limit to two. On macOS:
+
+```bash
+launchctl setenv OLLAMA_MAX_LOADED_MODELS 2
+```
+
+Quit Ollama from its menu-bar menu, then relaunch it with an explicit override.
+This also handles terminals that inherited the old value:
+
+```bash
+OLLAMA_MAX_LOADED_MODELS=2 open -a Ollama --env OLLAMA_MAX_LOADED_MODELS=2
+```
+
+For persistence, update `OLLAMA_MAX_LOADED_MODELS` to `2` in your existing
+`~/Library/LaunchAgents/com.ollama.env.plist`. If it has no model-limit setting,
+add it before the launch command using the template above. Reload the agent
+when convenient, after quitting Ollama:
+
+```bash
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.ollama.env.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ollama.env.plist
+```
+
+On other systems, set `OLLAMA_MAX_LOADED_MODELS=2` in the service environment
+that starts Ollama, then restart that service.
+
+Verify the running server, not just the shell setting. After rai has made both
+text and embedding requests, `ollama ps` should list both models. The latest
+`server config` entry in `~/.ollama/logs/server.log` should show
+`OLLAMA_MAX_LOADED_MODELS:2`.
+
+On September 27, 2026, a 64 GB Mac with Ollama 0.34.4 passed alternating text,
+embedding, and text probes in 0.472s, 0.264s, and 0.040s. Both
+`dhiltgen/gemma4:e2b-mlx-bf16` and `all-minilm:latest` stayed loaded after the
+embedding request and final text request. Before the restart, a direct text
+probe timed out after 30 seconds. The restart and limit change were applied
+together; this check does not isolate their individual effects.
+
+The limit is global. It permits any two models, not only rai's pair. Two large
+models can use substantially more memory than a classifier plus embeddings.

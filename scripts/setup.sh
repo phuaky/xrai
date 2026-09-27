@@ -43,6 +43,17 @@ origin_status() { # HTTP code Ollama gives a chrome-extension origin
 echo "${BOLD}rai setup — local AI feed filter for X + YouTube${RESET}"
 echo "Everything runs on this machine. No data ever leaves it."
 
+# Text classification and embeddings must coexist. Export also overrides a
+# stale value inherited by this terminal when it starts the desktop app.
+export OLLAMA_MAX_LOADED_MODELS=2
+if [ "$(uname -s)" = "Darwin" ]; then
+  launchctl setenv OLLAMA_MAX_LOADED_MODELS 2 || { fail "Could not set Ollama model limit"; exit 1; }
+fi
+if server_up; then
+  warn "An existing Ollama server needs a restart to apply the two-model limit."
+fi
+warn "Existing startup configurations: set OLLAMA_MAX_LOADED_MODELS=2 there too (docs/TROUBLESHOOTING.md)."
+
 # ── 1. Ollama installed ─────────────────────────────────────────────
 step "1/5 Ollama installed"
 if command -v ollama >/dev/null 2>&1 || [ -d "/Applications/Ollama.app" ]; then
@@ -65,7 +76,7 @@ if server_up; then
 else
   warn "Server not responding — trying to start it"
   if [ -d "/Applications/Ollama.app" ]; then
-    open -a Ollama
+    open -a Ollama --env OLLAMA_MAX_LOADED_MODELS=2
   elif command -v ollama >/dev/null 2>&1; then
     nohup ollama serve >/tmp/ollama-serve.log 2>&1 &
   fi
@@ -90,7 +101,7 @@ else
     if [ -d "/Applications/Ollama.app" ]; then
       osascript -e 'quit app "Ollama"' >/dev/null 2>&1
       sleep 2
-      open -a Ollama
+      open -a Ollama --env OLLAMA_MAX_LOADED_MODELS=2
       for _ in $(seq 1 15); do server_up && break; sleep 2; done
     else
       warn "You run 'ollama serve' yourself — restart it with the env var:"
@@ -115,7 +126,7 @@ else
   <array>
     <string>/bin/sh</string>
     <string>-c</string>
-    <string>launchctl setenv OLLAMA_ORIGINS "chrome-extension://*"; launchctl setenv OLLAMA_HOST "127.0.0.1:11434"; sleep 2; open -a Ollama</string>
+    <string>launchctl setenv OLLAMA_ORIGINS "chrome-extension://*"; launchctl setenv OLLAMA_HOST "127.0.0.1:11434"; launchctl setenv OLLAMA_MAX_LOADED_MODELS "2"; sleep 2; OLLAMA_MAX_LOADED_MODELS=2 open -a Ollama --env OLLAMA_MAX_LOADED_MODELS=2</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
