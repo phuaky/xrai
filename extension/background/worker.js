@@ -47,6 +47,9 @@ var IMAGE_NUM_CTX = 4096;
 // uses the same num_ctx so the runner never reloads on a param change.
 var TEXT_KEEP_ALIVE = '30m';
 var TEXT_NUM_CTX = 8192;
+// Health checks also warm the text model. The observed 16–19s cold loads
+// exceed the old 15s probe deadline even when Ollama is healthy.
+var HEALTH_POST_TIMEOUT_MS = 30000;
 
 // Serialize local text work across tabs and platforms. Stage-1 feed/reply work
 // has priority over the post-reveal memory lane, which waits through a short
@@ -262,7 +265,7 @@ function checkHealth(ollamaUrl, model, apiKey) {
       return fetch(ollamaUrl + '/api/chat', {
         method: 'POST',
         headers: authHeaders(apiKey),
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(HEALTH_POST_TIMEOUT_MS),
         body: JSON.stringify({
           model: model,
           messages: [{ role: 'user', content: 'ping' }],

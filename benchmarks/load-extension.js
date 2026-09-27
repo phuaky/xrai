@@ -66,7 +66,7 @@ function loadWorker() {
     'chrome',
     src +
       '\nreturn { X_CLASSIFY_SYSTEM: X_CLASSIFY_SYSTEM, parseXClassification: parseXClassification, ' +
-      'classifyX: classifyX, X_REPLY_SYSTEM: X_REPLY_SYSTEM, ' +
+      'classifyX: classifyX, checkHealth: checkHealth, X_REPLY_SYSTEM: X_REPLY_SYSTEM, ' +
       'parseReplyClassification: parseReplyClassification, ' +
       'X_MEMORY_SYSTEM: X_MEMORY_SYSTEM, X_MEMORY_NOVELTY_SYSTEM: X_MEMORY_NOVELTY_SYSTEM, ' +
       'X_MEMORY_FAMILIAR_CONFIRM_SYSTEM: X_MEMORY_FAMILIAR_CONFIRM_SYSTEM, ' +

@@ -112,6 +112,8 @@ var XraiMain = (function () {
         if (response && response.available && response.classify) {
           console.log('[xrai] Ollama connected. Models:', (response.models || []).join(', '));
           RaiIndicator.update(null, { connected: true, classify: true });
+          // Cards discovered while the model warmed up were shown fail-open.
+          XraiDetector.rescan();
         } else if (response && response.available) {
           var detail = response.postStatus ? 'HTTP ' + response.postStatus : response.postError || 'unknown';
           console.warn('[xrai] Ollama running but classify POST failed (' + detail + '). Pre-filter only.');
@@ -169,6 +171,7 @@ var XraiMain = (function () {
               connected: response && response.available,
               classify: response && response.classify
             });
+            if (ollamaAvailable) XraiDetector.rescan();
           }
         });
       } catch (e) {
